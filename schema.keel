@@ -7,7 +7,8 @@ model Product {
         costPrice Decimal
         freightIn Decimal
         prices ProductPrice[]
-        normalSalesPrice ProductPrice? @unique
+        flatFees ProductFlatFee[]
+        percentageFees ProductPercentageFee[]
     }
 
     actions {
@@ -15,13 +16,8 @@ model Product {
         create createProduct() with (name, brand.id, sku, supplier.id, costPrice, freightIn)
         list listProducts(name?, sku?, supplier.id?, brand.id?)
         update updateProduct(id) with (name, brand.id, sku, supplier.id, costPrice, freightIn)
-        update setNormalSalesPrice(id) with (normalSalesPrice.id) {
-            @permission(expression: product.normalSalesPrice.product.id == product.id)
-        }
+        
         delete deleteProduct(id)
-        write calculateRetailPrice(id, grossProfit: Number) returns (CalculatorResponse) {
-            @permission(expression: ctx.isAuthenticated)
-        }
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
@@ -33,18 +29,35 @@ model ProductPrice {
         description Text
         product Product @relation(prices)
         totalCost Decimal
+        channelCost Decimal
         grossProfitMargin Number
         grossProfit Decimal
         retailPrice Decimal
+        isNormalSalesPrice Boolean
+        discountFromNormalSalesPrice Decimal @default(0.0)
+
     }
 
     actions {
         get getProductPrice(id)
-        create createProductPrice() with (channel.id, description, product.id, grossProfitMargin) {
+        create createProductPriceUsingGrossProfitMargin() with (channel.id, description, product.id, grossProfitMargin, isNormalSalesPrice) {
             @function
         }
-        list listProductPrices(product.id)
-        delete deleteProductPrice(id)
+        create createProductPriceUsingRetailPrice() with (channel.id, description, product.id, retailPrice, isNormalSalesPrice) {
+            @function
+        }
+        update updateProductPriceUsingGrossProfitMargin(id) with (grossProfitMargin, isNormalSalesPrice) {
+            @function
+        }
+        update updateProductPriceUsingRetailPrice(id) with (retailPrice, isNormalSalesPrice) {
+            @function
+        }
+        list listProductPrices(product.id) {
+            @orderBy(isNormalSalesPrice: desc)
+        }
+        delete deleteProductPrice(id) {
+            @function
+        }
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
@@ -54,6 +67,7 @@ model ProductPrice {
 model Channel {
     fields {
         name Text @unique
+        
     }
 
     actions {
@@ -64,6 +78,72 @@ model Channel {
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 
+}
+
+model ProductFlatFee {
+    fields {
+        product Product
+        fee ChannelFlatFee
+    }
+
+    actions {
+        create associateProductFlatFee() with ( product.id, fee.id)
+        list listChannelProductFlatFees(product.id?)
+    }
+
+    @unique([fee, product])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
+}
+
+model ProductPercentageFee {
+    fields {
+        product Product
+        fee ChannelPercentageFee
+    }
+
+    actions {
+        create associateProductPercentageFee() with (product.id, fee.id)
+        list listChannelProductFees(product.id)
+    }
+
+    @unique([fee, product])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
+}
+ 
+model ChannelFlatFee {
+    fields {
+        name Text
+        channel Channel
+        flatFee Decimal
+    }
+
+    actions {
+        get getChannelFlatFee(id)
+        create createChannelFlatFee() with (name, channel.id, flatFee)
+        update updateChannelFlatFee(id) with (name, flatFee)
+        list listChannelFlatFees(channel.id?)
+        delete deleteChannelFlatFee(id)
+    }
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
+}
+
+model ChannelPercentageFee {
+    fields {
+        name Text
+        channel Channel
+        percentageFee Decimal
+    }
+    actions {
+        get getChannelPercentageFee(id)
+        create createChannelPercentageFee() with (name, channel.id, percentageFee)
+        update updateChannelPercentageFee(id) with (name, percentageFee)
+        list listChannelPercentageFees(channel.id?)
+        delete deleteChannelPercentageFee(id)
+    }
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 message CalculatorResponse {
@@ -103,4 +183,10 @@ model Brand {
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 
+}
+
+model Seeder {
+    actions {
+        write seed(Any) returns (Any)
+    }
 }
