@@ -55,6 +55,9 @@ model Channel {
         list listChannels()
         get getChannel(id)
     }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
 }
 
 message CalculatorResponse {
