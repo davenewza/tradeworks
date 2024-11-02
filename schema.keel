@@ -67,7 +67,8 @@ model ProductPrice {
 model Channel {
     fields {
         name Text @unique
-        
+        flatFees ChannelFlatFee[]
+        percentageFees ChannelPercentageFee[]
     }
 
     actions {
