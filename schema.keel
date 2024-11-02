@@ -35,10 +35,12 @@ model ProductPrice {
     }
 
     actions {
+        get getProductPrice(id)
         create createProductPrice() with (channel.id, description, product.id, grossProfitMargin) {
             @function
         }
         list listProductPrices(product.id)
+        delete deleteProductPrice(id)
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
