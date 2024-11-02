@@ -11,13 +11,13 @@ export default CalculateRetailPrice(async (ctx, inputs) => {
         };
     }
 
-    const totalCost =    product.costPrice + product.freightIn;
+    const totalCost = product.costPrice + product.freightIn;
     const retailPrice = totalCost / 100 * inputs.grossProfit + totalCost;
 
     return {
         totalCost,
         grossProfitPercentage: inputs.grossProfit,
         grossProfit: retailPrice - totalCost,
-        retailPrice,
+        retailPrice: retailPrice / 100 * 15 + retailPrice,
     };
 });

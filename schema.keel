@@ -7,6 +7,7 @@ model Product {
         costPrice Decimal
         freightIn Decimal
         prices ProductPrice[]
+        normalSalesPrice ProductPrice? @unique
     }
 
     actions {
@@ -14,6 +15,9 @@ model Product {
         create createProduct() with (name, brand.id, sku, supplier.id, costPrice, freightIn)
         list listProducts(name?, sku?, supplier.id?, brand.id?)
         update updateProduct(id) with (name, brand.id, sku, supplier.id, costPrice, freightIn)
+        update setNormalSalesPrice(id) with (normalSalesPrice.id) {
+            @permission(expression: product.normalSalesPrice.product.id == product.id)
+        }
         delete deleteProduct(id)
         write calculateRetailPrice(id, grossProfit: Number) returns (CalculatorResponse) {
             @permission(expression: ctx.isAuthenticated)
@@ -27,7 +31,7 @@ model ProductPrice {
     fields {
         channel Channel
         description Text
-        product Product
+        product Product @relation(prices)
         totalCost Decimal
         grossProfitMargin Number
         grossProfit Decimal

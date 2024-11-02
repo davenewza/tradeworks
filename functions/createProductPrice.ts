@@ -4,8 +4,6 @@ import { CreateProductPrice, CreateProductPriceHooks, models } from '@teamkeel/s
 const hooks : CreateProductPriceHooks = {};
 
 export default CreateProductPrice({
-
-
     async beforeWrite(ctx, inputs, values) {
         const product = await models.product.findOne({ id: values.product.id });
         if (!product) {
@@ -16,6 +14,8 @@ export default CreateProductPrice({
         }
         const totalCost = product.costPrice + product.freightIn;
         const grossProfit = totalCost / 100 * values.grossProfitMargin;
+        const retailPriceExVat = totalCost + grossProfit;
+
         return {
             channelId: values.channel.id,
             description: values.description,
@@ -23,7 +23,7 @@ export default CreateProductPrice({
             grossProfitMargin: values.grossProfitMargin,
             totalCost: totalCost,
             grossProfit: grossProfit,
-            retailPrice: totalCost + grossProfit
+            retailPrice: retailPriceExVat / 100 * 15 + retailPriceExVat
         };
     },
 });
