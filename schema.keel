@@ -6,14 +6,14 @@ model Product {
         supplier Supplier
         costPrice Decimal
         freightIn Decimal
-        retailPrice Decimal
+        prices ProductPrice[]
     }
 
     actions {
         get getProduct(id)
-        create createProduct() with (name, brand.id, sku, supplier.id, costPrice, freightIn, retailPrice)
+        create createProduct() with (name, brand.id, sku, supplier.id, costPrice, freightIn)
         list listProducts(name?, sku?, supplier.id?, brand.id?)
-        update updateProduct(id) with (name, brand.id, sku, supplier.id, costPrice, freightIn, retailPrice)
+        update updateProduct(id) with (name, brand.id, sku, supplier.id, costPrice, freightIn)
         delete deleteProduct(id)
         write calculateRetailPrice(id, grossProfit: Number) returns (CalculatorResponse) {
             @permission(expression: ctx.isAuthenticated)
@@ -21,6 +21,40 @@ model Product {
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+}
+
+model ProductPrice {
+    fields {
+        channel Channel
+        description Text
+        product Product
+        totalCost Decimal
+        grossProfitMargin Number
+        grossProfit Decimal
+        retailPrice Decimal
+    }
+
+    actions {
+        create createProductPrice() with (channel.id, description, product.id, grossProfitMargin) {
+            @function
+        }
+        list listProductPrices(product.id)
+    }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
+}
+
+model Channel {
+    fields {
+        name Text @unique
+    }
+
+    actions {
+        create createChannel() with (name)
+        list listChannels()
+        get getChannel(id)
+    }
 }
 
 message CalculatorResponse {
