@@ -1,6 +1,12 @@
 import { models, ProductPrice } from "@teamkeel/sdk";
 
-export async function recalculateProductPrices({ productId }) {
+export async function recalculateProductPrices({
+  productId,
+  channelId = null,
+}: {
+  productId: string;
+  channelId?: string | null;
+}) {
   const product = await models.product.findOne({ id: productId });
   if (!product) {
     return {
@@ -21,12 +27,17 @@ export async function recalculateProductPrices({ productId }) {
   }
 
   for (const price of prices) {
+    if (channelId && price?.channelId != channelId) {
+      continue;
+    }
+
     let channelCost = 0;
     const fees = await models.productFee.findMany({
       where: { productId: product.id },
     });
     for (const f of fees) {
       const cf = await models.channelFee.findOne({ id: f.feeId });
+
       if (cf?.channelId == price.channelId) {
         if (cf.flatFee) {
           channelCost += cf.flatFee;

@@ -21,9 +21,22 @@ export default UpdateProductPrices(async (ctx, event) => {
           where: { feeId: event.target.data.id },
         });
         for (const pf of productFees) {
-          await recalculateProductPrices({ productId: pf.productId });
+          await recalculateProductPrices({
+            productId: pf.productId,
+            channelId: event.target.data.channelId,
+          });
         }
       }
+      break;
+    case "product_fee.created":
+      const channelFee = await models.channelFee.findOne({
+        id: event.target.data.feeId,
+      });
+      await recalculateProductPrices({
+        productId: event.target.data.productId,
+        channelId: channelFee?.channelId,
+      });
+
       break;
   }
 });

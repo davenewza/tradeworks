@@ -78,7 +78,6 @@ model Channel {
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-
 }
 
 model ProductFee {
@@ -93,6 +92,7 @@ model ProductFee {
     }
 
     @unique([fee, product])
+    @on([create], updateProductPrices)
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
  
