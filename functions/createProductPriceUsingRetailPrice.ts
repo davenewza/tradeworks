@@ -2,7 +2,7 @@ import {
   CreateProductPriceUsingRetailPrice,
   models,
   ProductPrice,
-  useDatabase
+  useDatabase,
 } from "@teamkeel/sdk";
 import { recalculateProductPrices } from "./internal/recalculateProductPrices";
 
@@ -17,36 +17,35 @@ export default CreateProductPriceUsingRetailPrice({
     }
 
     let channelCost = 0;
-    const flatFees = await models.productFlatFee.findMany({ where: {productId: product.id}  });
+    const flatFees = await models.productFee.findMany({
+      where: { productId: product.id },
+    });
     for (const f of flatFees) {
-        const cf = await models.channelFlatFee.findOne({ id: f.feeId  });
-        if (cf?.channelId == values.channel.id) {
-            channelCost += cf!.flatFee;
+      const cf = await models.channelFee.findOne({ id: f.feeId });
+      if (cf?.channelId == values.channel.id) {
+        if (cf.flatFee) {
+          channelCost += cf.flatFee;
         }
-    }
-
-    const percentageFees = await models.productPercentageFee.findMany({ where: {productId: product.id}  });
-    for (const f of percentageFees) {
-        const cf = await models.channelPercentageFee.findOne({ id: f.feeId  });
-        channelCost += Math.round(values.retailPrice / 100 * cf!.percentageFee);
+        if (cf.percFee) {
+          channelCost += Math.round((values.retailPrice / 100) * cf.percFee);
+        }
+      }
     }
 
     const retailPriceExVat = Math.round((values.retailPrice / 115) * 100);
 
-    console.log("product.costPrice is a ")
-    console.log(typeof product.costPrice);
-    console.log("product.freightIn is a ")
-
-    console.log(typeof product.freightIn);
-    console.log(product)
-
-
-    const p = await useDatabase().selectFrom("product").selectAll().where('id', '=', inputs.product.id).executeTakeFirst();
+    const p = await useDatabase()
+      .selectFrom("product")
+      .selectAll()
+      .where("id", "=", inputs.product.id)
+      .executeTakeFirst();
     console.log(p);
 
     const totalCost = product.costPrice + product.freightIn;
     const grossProfit = retailPriceExVat - (totalCost + channelCost);
-    const grossProfitMargin = Math.round((grossProfit / (totalCost + channelCost)) * 100);
+    const grossProfitMargin = Math.round(
+      (grossProfit / (totalCost + channelCost)) * 100
+    );
 
     if (values.isNormalSalesPrice) {
       const prices = await models.productPrice.findMany({

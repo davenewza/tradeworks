@@ -7,8 +7,7 @@ model Product {
         costPrice Decimal
         freightIn Decimal
         prices ProductPrice[]
-        flatFees ProductFlatFee[]
-        percentageFees ProductPercentageFee[]
+        fees ProductFee[]
     }
 
     actions {
@@ -19,6 +18,8 @@ model Product {
         
         delete deleteProduct(id)
     }
+
+    @on([update], updateProductPrices)
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
@@ -67,8 +68,7 @@ model ProductPrice {
 model Channel {
     fields {
         name Text @unique
-        flatFees ChannelFlatFee[]
-        percentageFees ChannelPercentageFee[]
+        fees ChannelFee[]
     }
 
     actions {
@@ -81,69 +81,38 @@ model Channel {
 
 }
 
-model ProductFlatFee {
+model ProductFee {
     fields {
         product Product
-        fee ChannelFlatFee
+        fee ChannelFee
     }
 
     actions {
-        create associateProductFlatFee() with ( product.id, fee.id)
-        list listChannelProductFlatFees(product.id?)
+        create associateProductFee() with ( product.id, fee.id)
+        list listChannelProductFees(product.id?)
     }
 
     @unique([fee, product])
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-
-}
-
-model ProductPercentageFee {
-    fields {
-        product Product
-        fee ChannelPercentageFee
-    }
-
-    actions {
-        create associateProductPercentageFee() with (product.id, fee.id)
-        list listChannelProductFees(product.id)
-    }
-
-    @unique([fee, product])
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-
 }
  
-model ChannelFlatFee {
+model ChannelFee {
     fields {
         name Text
         channel Channel
-        flatFee Decimal
+        flatFee Decimal?
+        percFee Decimal?
     }
 
     actions {
-        get getChannelFlatFee(id)
-        create createChannelFlatFee() with (name, channel.id, flatFee)
-        update updateChannelFlatFee(id) with (name, flatFee)
-        list listChannelFlatFees(channel.id?)
-        delete deleteChannelFlatFee(id)
+        get getChannelFee(id)
+        create createChannelFee() with (name, channel.id, flatFee?, percFee?)
+        update updateChannelFee(id) with (name, flatFee?, percFee?)
+        list listChannelFees(channel.id?)
+        delete deleteChannelFee(id)
     }
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 
-}
-
-model ChannelPercentageFee {
-    fields {
-        name Text
-        channel Channel
-        percentageFee Decimal
-    }
-    actions {
-        get getChannelPercentageFee(id)
-        create createChannelPercentageFee() with (name, channel.id, percentageFee)
-        update updateChannelPercentageFee(id) with (name, percentageFee)
-        list listChannelPercentageFees(channel.id?)
-        delete deleteChannelPercentageFee(id)
-    }
+    @on([update], updateProductPrices)
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 

@@ -1,7 +1,4 @@
-import {
-  UpdateProductPriceUsingRetailPrice,
-  models,
-} from "@teamkeel/sdk";
+import { UpdateProductPriceUsingRetailPrice, models } from "@teamkeel/sdk";
 import { recalculateProductPrices } from "./internal/recalculateProductPrices";
 
 export default UpdateProductPriceUsingRetailPrice({
