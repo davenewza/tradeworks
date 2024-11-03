@@ -27,10 +27,16 @@ export default CreateProductPriceUsingRetailPrice({
     const percentageFees = await models.productPercentageFee.findMany({ where: {productId: product.id}  });
     for (const f of percentageFees) {
         const cf = await models.channelPercentageFee.findOne({ id: f.feeId  });
-        channelCost += (values.retailPrice / 100 * cf!.percentageFee);
+        channelCost += Math.round(values.retailPrice / 100 * cf!.percentageFee);
     }
 
-    const retailPriceExVat = (values.retailPrice / 115) * 100;
+    const retailPriceExVat = Math.round((values.retailPrice / 115) * 100);
+
+    console.log("product.costPrice is a ")
+console.log(typeof product.costPrice);
+console.log("product.freightIn is a ")
+
+console.log(typeof product.freightIn);
     const totalCost = product.costPrice + product.freightIn;
     const grossProfit = retailPriceExVat - (totalCost + channelCost);
     const grossProfitMargin = Math.round((grossProfit / (totalCost + channelCost)) * 100);
