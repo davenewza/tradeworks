@@ -37,6 +37,7 @@ console.log(typeof product.costPrice);
 console.log("product.freightIn is a ")
 
 console.log(typeof product.freightIn);
+console.log(product)
     const totalCost = product.costPrice + product.freightIn;
     const grossProfit = retailPriceExVat - (totalCost + channelCost);
     const grossProfitMargin = Math.round((grossProfit / (totalCost + channelCost)) * 100);
