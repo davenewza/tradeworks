@@ -34,15 +34,15 @@ export default CreateProductPriceUsingRetailPrice({
     const retailPriceExVat = Math.round((values.retailPrice / 115) * 100);
 
     console.log("product.costPrice is a ")
-console.log(typeof product.costPrice);
-console.log("product.freightIn is a ")
+    console.log(typeof product.costPrice);
+    console.log("product.freightIn is a ")
 
-console.log(typeof product.freightIn);
-console.log(product)
+    console.log(typeof product.freightIn);
+    console.log(product)
 
 
-const p = await useDatabase().selectFrom("product").selectAll().where('id', '=', inputs.product.id).executeTakeFirst();
-console.log(p);
+    const p = await useDatabase().selectFrom("product").selectAll().where('id', '=', inputs.product.id).executeTakeFirst();
+    console.log(p);
 
     const totalCost = product.costPrice + product.freightIn;
     const grossProfit = retailPriceExVat - (totalCost + channelCost);
