@@ -130,9 +130,11 @@ model Supplier {
     }
 
     actions {
+        get getSupplier(id)
         create createSupplier() with (name)
         list listSuppliers()
         update updateSupplier(id) with (name)
+        delete deleteSupplier(id)
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
