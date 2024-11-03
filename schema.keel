@@ -88,8 +88,11 @@ model ProductFee {
 
     actions {
         create associateProductFee() with ( product.id, fee.id)
-        list listChannelProductFees(product.id?)
+        list listChannelProductFees(product.id?) {
+            @embed(fee)
+        }
     }
+
 
     @unique([fee, product])
     @on([create], updateProductPrices)
