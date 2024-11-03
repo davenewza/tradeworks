@@ -2,6 +2,7 @@ import {
   CreateProductPriceUsingRetailPrice,
   models,
   ProductPrice,
+  useDatabase
 } from "@teamkeel/sdk";
 import { recalculateProductPrices } from "./internal/recalculateProductPrices";
 
@@ -38,6 +39,11 @@ console.log("product.freightIn is a ")
 
 console.log(typeof product.freightIn);
 console.log(product)
+
+
+const p = await useDatabase().selectFrom("product").selectAll().where('id', '=', inputs.product.id).executeTakeFirst();
+console.log(p);
+
     const totalCost = product.costPrice + product.freightIn;
     const grossProfit = retailPriceExVat - (totalCost + channelCost);
     const grossProfitMargin = Math.round((grossProfit / (totalCost + channelCost)) * 100);
