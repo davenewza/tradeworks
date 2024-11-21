@@ -54,7 +54,7 @@ export async function recalculateProductPrices({
     });
 
     if (roas) {
-      adSpend = price.retailPrice / roas.targetRoas;
+      adSpend = Math.round(price.retailPrice / roas.targetRoas);
     }
 
     const retailPriceExVat = Math.round((price.retailPrice / 115) * 100);

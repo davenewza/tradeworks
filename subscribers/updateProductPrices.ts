@@ -12,6 +12,16 @@ export default UpdateProductPrices(async (ctx, event) => {
         await recalculateProductPrices({ productId: event.target.id });
       }
       break;
+      case  "ad_roas_target.created":
+        await recalculateProductPrices({ productId: event.target.data.productId, channelId: event.target.data.channelId });
+        break;
+      case "ad_roas_target.updated":
+        if (
+          event.target.data.targetRoas != event.target.previousData.targetRoas
+        ) {
+          await recalculateProductPrices({ productId: event.target.data.productId, channelId: event.target.data.channelId });
+        }
+        break;
     case "channel_fee.updated":
       if (
         event.target.data.flatFee != event.target.previousData.flatFee ||
