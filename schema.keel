@@ -1,6 +1,7 @@
 model Product {
     fields {
         name Text
+        image File?
         brand Brand
         sku Text @unique
         supplier Supplier
@@ -8,13 +9,14 @@ model Product {
         freightIn Decimal
         prices ProductPrice[]
         fees ProductFee[]
+        roasTargets AdRoasTarget[]
     }
 
     actions {
         get getProduct(id)
-        create createProduct() with (name, brand.id, sku, supplier.id, costPrice, freightIn)
+        create createProduct() with (name, image, brand.id, sku, supplier.id, costPrice, freightIn)
         list listProducts(name?, sku?, supplier.id?, brand.id?)
-        update updateProduct(id) with (name, brand.id, sku, supplier.id, costPrice, freightIn)
+        update updateProduct(id) with (name?, image?, brand.id?, sku?, supplier.id?, costPrice?, freightIn?)
         
         delete deleteProduct(id)
     }
@@ -31,6 +33,7 @@ model ProductPrice {
         product Product @relation(prices)
         totalCost Decimal
         channelCost Decimal
+        adSpend Decimal @default(0.0)
         grossProfitMargin Number
         grossProfit Decimal
         retailPrice Decimal
@@ -72,9 +75,9 @@ model Channel {
     }
 
     actions {
+        get getChannel(id)
         create createChannel() with (name)
         list listChannels()
-        get getChannel(id)
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
@@ -87,6 +90,7 @@ model ProductFee {
     }
 
     actions {
+        get productFee(id)
         create associateProductFee() with ( product.id, fee.id)
         list listChannelProductFees(product.id?) {
             @embed(fee)
@@ -119,12 +123,26 @@ model ChannelFee {
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
-message CalculatorResponse {
-    totalCost Decimal
-    grossProfitPercentage Number
-    grossProfit Decimal
-    retailPrice Decimal
+model AdRoasTarget {
+    fields {
+        product Product
+        channel Channel
+        targetRoas Decimal
+    }
+
+    actions {
+        get getChannelAdSpend(id)
+        create createChannelAdSpend() with (product.id, channel.id, targetRoas)
+        update updateChannelAdSpent(id) with (targetRoas)
+        list listChannelAdSpend(channel.id)
+        delete deleteChannelAdSpend(id)
+    }
+
+    @unique([product, channel])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
 }
+
 
 model Supplier {
     fields {
@@ -151,9 +169,9 @@ model Brand {
     }
 
     actions {
+        get getBrand(id)
         create createBrand() with ( name)
         list listBrands()
-        get getBrand(id)
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])

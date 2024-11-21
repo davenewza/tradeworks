@@ -48,6 +48,15 @@ export async function recalculateProductPrices({
       }
     }
 
+    let adSpend = 0;
+    const roas = await models.adRoasTarget.findOne({
+       productId: product.id, channelId: channelId! 
+    });
+
+    if (roas) {
+      adSpend = price.retailPrice / roas.targetRoas;
+    }
+
     const retailPriceExVat = Math.round((price.retailPrice / 115) * 100);
     const totalCost = product.costPrice + product.freightIn;
     const grossProfit = retailPriceExVat - (totalCost + channelCost);
@@ -67,6 +76,7 @@ export async function recalculateProductPrices({
       {
         grossProfitMargin: grossProfitMargin,
         totalCost: totalCost,
+        adSpend: adSpend,
         channelCost: channelCost,
         grossProfit: grossProfit,
         retailPrice: price.retailPrice,
