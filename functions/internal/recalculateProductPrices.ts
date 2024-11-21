@@ -59,9 +59,9 @@ export async function recalculateProductPrices({
 
     const retailPriceExVat = Math.round((price.retailPrice / 115) * 100);
     const totalCost = product.costPrice + product.freightIn;
-    const grossProfit = retailPriceExVat - (totalCost + channelCost);
+    const grossProfit = retailPriceExVat - (totalCost + channelCost + adSpend);
     const grossProfitMargin = Math.round(
-      (grossProfit / (totalCost + channelCost)) * 100
+      (grossProfit / (totalCost + channelCost + adSpend)) * 100
     );
 
     let discount = 0;
@@ -84,40 +84,4 @@ export async function recalculateProductPrices({
       }
     );
   }
-
-  //   const prices = await models.productPrice.findMany({
-  //     where: { productId: productId },
-  //   });
-  //   let nsp: ProductPrice | null = null;
-
-  //   for (const p of prices) {
-  //     if (p.isNormalSalesPrice) {
-  //       nsp = p;
-  //     }
-  //   }
-
-  //   if (nsp) {
-  //     for (const p of prices) {
-  //       const discount = Math.round(
-  //         ((nsp?.retailPrice - p.retailPrice) / nsp?.retailPrice) * 100
-  //       );
-  //       await models.productPrice.update(
-  //         { id: p.id },
-  //         {
-  //           discountFromNormalSalesPrice: discount,
-  //           isNormalSalesPrice: p == nsp,
-  //         }
-  //       );
-  //     }
-  //   } else {
-  //     for (const p of prices) {
-  //       await models.productPrice.update(
-  //         { id: p.id },
-  //         {
-  //           discountFromNormalSalesPrice: 0,
-  //           isNormalSalesPrice: false,
-  //         }
-  //       );
-  //     }
-  //   }
 }
