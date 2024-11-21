@@ -131,11 +131,11 @@ model AdRoasTarget {
     }
 
     actions {
-        get getChannelAdSpend(id)
-        create createChannelAdSpend() with (product.id, channel.id, targetRoas)
-        update updateChannelAdSpent(id) with (targetRoas)
-        list listChannelAdSpend(channel.id)
-        delete deleteChannelAdSpend(id)
+        get getAdRoasTarget(id)
+        create createAdRoasTarget() with (product.id, channel.id, targetRoas)
+        update updateAdRoasTarget(id) with (targetRoas)
+        list listAdRoasTargets(product.id?)
+        delete deleteAdRoasTarget(id)
     }
 
     @unique([product, channel])
