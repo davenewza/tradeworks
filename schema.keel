@@ -22,7 +22,6 @@ model Product {
     }
 
     @on([update], updateProductPrices)
-
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
@@ -95,11 +94,12 @@ model ProductFee {
         list listChannelProductFees(product.id?) {
             @embed(fee)
         }
+        delete deleteProductFee(id)
     }
 
 
     @unique([fee, product])
-    @on([create], updateProductPrices)
+    @on([create, update, delete], updateProductPrices)
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
  
@@ -119,7 +119,7 @@ model ChannelFee {
         delete deleteChannelFee(id)
     }
 
-    @on([update], updateProductPrices)
+    @on([create, update, delete], updateProductPrices)
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
@@ -139,7 +139,7 @@ model AdRoasTarget {
     }
 
     @unique([product, channel])
-    @on([create, update], updateProductPrices)
+    @on([create, update, delete], updateProductPrices)
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
@@ -175,7 +175,6 @@ model Brand {
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-
 }
 
 model Seeder {
