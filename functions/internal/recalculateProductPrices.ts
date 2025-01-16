@@ -50,7 +50,8 @@ export async function recalculateProductPrices({
 
     let adSpend = 0;
     const roas = await models.adRoasTarget.findOne({
-       productId: product.id, channelId: channelId! 
+      productId: product.id,
+      channelId: channelId!,
     });
 
     if (roas) {
