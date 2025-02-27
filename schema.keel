@@ -17,7 +17,6 @@ model Product {
         create createProduct() with (name, image, brand.id, sku, supplier.id, costPrice, freightIn)
         list listProducts(name?, sku?, supplier.id?, brand.id?)
         update updateProduct(id) with (name?, image?, brand.id?, sku?, supplier.id?, costPrice?, freightIn?)
-        
         delete deleteProduct(id)
     }
 
