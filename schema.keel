@@ -114,7 +114,12 @@ model ChannelFee {
         get getChannelFee(id)
         create createChannelFee() with (name, channel.id, flatFee?, percFee?)
         update updateChannelFee(id) with (name, flatFee?, percFee?)
-        list listChannelFees(channel.id?)
+        list listFlatChannelFees(channel.id?) {
+            @where(channelFee.flatFee != null)
+        }
+        list listPercentageChannelFees(channel.id?) {
+            @where(channelFee.percFee != null)
+        }
         delete deleteChannelFee(id)
     }
 

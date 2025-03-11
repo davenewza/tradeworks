@@ -1,0 +1,1 @@
+{"id":"list-channel-product-fees","action_name":"listChannelProductFees","response":{"$.results[*].createdAt":{"visible":false},"$.results[*].id":{"visible":false,"link":{"tool_id":"product-fee","display_order":0,"data_mapping":[{"key":"$.id","path":{"path":"$.results[*].id"}}]}},"$.results[*].productId":{"visible":false},"$.results[*].updatedAt":{"visible":false}}}
