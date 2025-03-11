@@ -1,1 +1,0 @@
-{"id":"list-ad-roas-targets","action_name":"listAdRoasTargets","response":{"$.results[*].createdAt":{"visible":false},"$.results[*].id":{"visible":false,"link":{"tool_id":"get-ad-roas-target","display_order":0,"data_mapping":[{"key":"$.id","path":{"path":"$.results[*].id"}}]}},"$.results[*].productId":{"visible":false},"$.results[*].updatedAt":{"visible":false}}}

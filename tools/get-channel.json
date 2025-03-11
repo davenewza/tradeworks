@@ -1,1 +1,0 @@
-{"id":"get-channel","action_name":"getChannel","embedded_tools":[{"id":"fees","title":"Platform Fees","tools":[{"tool_id":"list-flat-channel-fees","title":"Flat fees"},{"tool_id":"list-percentage-channel-fees","title":"Percentage fees","display_order":1,"data_mapping":[{"key":"$.where.channel.id.equals","path":{"path":"$.id"}}]}]}]}
