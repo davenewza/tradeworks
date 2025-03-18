@@ -24,6 +24,10 @@ model Product {
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
+enum ThingEnum {
+   abc
+}
+
 model ProductPrice {
     fields {
         channel Channel
@@ -37,7 +41,6 @@ model ProductPrice {
         retailPrice Decimal
         isNormalSalesPrice Boolean
         discountFromNormalSalesPrice Decimal @default(0.0)
-
     }
 
     actions {

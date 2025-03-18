@@ -1,0 +1,9 @@
+{
+  "id": "associate-product-fee",
+  "action_name": "associateProductFee",
+  "inputs": {
+    "$.product": {
+      "visible": false
+    }
+  }
+}

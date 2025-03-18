@@ -1,0 +1,13 @@
+{
+  "id": "create-channel-fee",
+  "action_name": "createChannelFee",
+  "name": "Create channel fee (flat)",
+  "inputs": {
+    "$.channel": {
+      "visible": false
+    },
+    "$.percFee": {
+      "visible": false
+    }
+  }
+}

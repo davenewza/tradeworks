@@ -1,0 +1,33 @@
+{
+  "id": "list-percentage-channel-fees",
+  "action_name": "listPercentageChannelFees",
+  "response": {
+    "$.results[*].channelId": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].flatFee": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false,
+      "link": {
+        "tool_id": "get-channel-fee",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

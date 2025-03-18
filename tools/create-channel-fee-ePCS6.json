@@ -1,0 +1,24 @@
+{
+  "id": "create-channel-fee-ePCS6",
+  "action_name": "createChannelFee",
+  "name": "Create channel fee (percentage)",
+  "inputs": {
+    "$.channel": {
+      "visible": false
+    },
+    "$.flatFee": {
+      "visible": false
+    }
+  },
+  "response": {
+    "$.channelId": {
+      "visible": false
+    },
+    "$.flatFee": {
+      "visible": false
+    },
+    "$.id": {
+      "visible": false
+    }
+  }
+}

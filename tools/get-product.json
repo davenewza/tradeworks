@@ -1,0 +1,69 @@
+{
+  "id": "get-product",
+  "action_name": "getProduct",
+  "entry_activity_actions": [
+    {
+      "tool_id": "associate-product-fee",
+      "title": "Associate flat fee",
+      "as_dialog": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.product.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": "update-product",
+      "display_order": 1
+    },
+    {
+      "tool_id": "delete-product",
+      "display_order": 2
+    }
+  ],
+  "embedded_tools": [
+    {
+      "id": "prices",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-product-prices"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "fees",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-channel-product-fees"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "roasTargets",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-ad-roas-targets"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false
+          }
+        }
+      ]
+    }
+  ]
+}

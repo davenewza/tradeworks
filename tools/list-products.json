@@ -1,0 +1,72 @@
+{
+  "id": "list-products",
+  "action_name": "listProducts",
+  "name": "Our products",
+  "response": {
+    "$.results": {
+      "display_order": 1
+    },
+    "$.results[*].brandId": {
+      "display_order": 3
+    },
+    "$.results[*].costPrice": {
+      "display_order": 7,
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "display_order": 10,
+      "visible": false
+    },
+    "$.results[*].freightIn": {
+      "display_order": 8,
+      "visible": false
+    },
+    "$.results[*].id": {
+      "display_order": 9,
+      "visible": false,
+      "link": {
+        "tool_id": "get-product",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].image": {
+      "display_order": 5,
+      "visible": false
+    },
+    "$.results[*].name": {
+      "display_order": 4
+    },
+    "$.results[*].sku": {
+      "display_order": 2
+    },
+    "$.results[*].supplierId": {
+      "display_order": 6
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 11,
+      "visible": false
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "get-product",
+      "display_order": 0
+    },
+    {
+      "tool_id": "update-product",
+      "display_order": 1
+    },
+    {
+      "tool_id": "delete-product",
+      "display_order": 2
+    }
+  ]
+}
