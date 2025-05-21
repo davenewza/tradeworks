@@ -188,3 +188,14 @@ model Seeder {
         write seed(Any) returns (Any)
     }
 }
+
+flow TestFlow {
+    @permission(roles: [Admin])
+}
+
+role Admin {
+    domains {
+        "keel.xyz"
+        "tradeworks.co.za"
+    }
+}
