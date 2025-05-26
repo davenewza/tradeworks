@@ -3,9 +3,6 @@
   "action_name": "listProducts",
   "name": "Our products",
   "response": {
-    "$.results": {
-      "display_order": 1
-    },
     "$.results[*].brandId": {
       "display_order": 3
     },
@@ -68,5 +65,8 @@
       "tool_id": "delete-product",
       "display_order": 2
     }
-  ]
+  ],
+  "filter_config": {
+    "quick_search_field": "$.where.name.contains"
+  }
 }
