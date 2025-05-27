@@ -52,6 +52,9 @@
       "visible": false
     }
   },
+  "pagination": {
+    "page_size": {}
+  },
   "entry_activity_actions": [
     {
       "tool_id": "get-product",
@@ -65,8 +68,5 @@
       "tool_id": "delete-product",
       "display_order": 2
     }
-  ],
-  "filter_config": {
-    "quick_search_field": "$.where.name.contains"
-  }
+  ]
 }
