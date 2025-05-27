@@ -18,6 +18,9 @@
       }
     }
   },
+  "pagination": {
+    "page_size": {}
+  },
   "display_layout": {
     "config": {
       "inbox_config": {

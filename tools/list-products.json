@@ -53,7 +53,9 @@
     }
   },
   "pagination": {
-    "page_size": {}
+    "page_size": {
+      "default_value": 51
+    }
   },
   "entry_activity_actions": [
     {
@@ -68,5 +70,8 @@
       "tool_id": "delete-product",
       "display_order": 2
     }
-  ]
+  ],
+  "filter_config": {
+    "quick_search_field": "$.where.name.contains"
+  }
 }
