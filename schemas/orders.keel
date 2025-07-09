@@ -5,7 +5,6 @@ model Order {
         total Decimal   
     }
 
-    
     actions {
         get getOrder(id)
         create createOrder() with (supplier.id, invoiceNumber, total)
