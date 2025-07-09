@@ -1,0 +1,7 @@
+{
+  "id": "get-brand",
+  "action_name": "getBrand",
+  "name": "Get a brand",
+  "help_text": "sdfsdfdsfsdds",
+  "entity_plural": "brandss"
+}
