@@ -10,5 +10,6 @@ model Order {
         create createOrder() with (supplier.id, invoiceNumber, total)
         list listOrders()
     }
+    
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
