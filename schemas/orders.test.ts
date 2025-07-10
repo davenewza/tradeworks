@@ -8,5 +8,6 @@ test("model api - create 2", async () => {
     name: "test one",
   });
 
+  
   expect(created.name).toBe("test one!!");
 });
