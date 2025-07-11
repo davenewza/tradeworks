@@ -5,5 +5,5 @@ beforeEach(resetDatabase);
 
 test("basic test", async () => {
   const created = await models.brand.create({ name: "Test" });
-  expect(created.name).toBe("Test");
+  expect(created.name).toBe("Tes1");
 });
