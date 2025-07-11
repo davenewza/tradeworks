@@ -3,6 +3,7 @@ import { test, expect, beforeEach } from "vitest";
 
 beforeEach(resetDatabase);
 
-test("create relationships - many to many", async () => {
-  expect(true).toBe(true);
+test("basic test", async () => {
+  const created = await models.brand.create({ name: "Test" });
+  expect(created.name).toBe("Test");
 });
