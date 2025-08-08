@@ -1,7 +1,7 @@
-import { RemoveEquipmentBoxes, models } from '@teamkeel/sdk';
+import { ResetDeliveryInfo, models } from '@teamkeel/sdk';
 
 // To learn more about what you can do with custom functions, visit https://docs.keel.so/functions
-export default RemoveEquipmentBoxes(async (ctx, inputs) => {
+export default ResetDeliveryInfo(async (ctx, inputs) => {
     const quote = await models.quote.findOne({id: inputs.id});
     if (!quote) {
         throw new Error('Quote not found');
@@ -11,4 +11,6 @@ export default RemoveEquipmentBoxes(async (ctx, inputs) => {
     for (const quoteEquipmentBox of quoteEquipmentBoxes) {
         await models.quoteEquipmentBox.delete({id: quoteEquipmentBox.id});
     }
+
+    await models.quote.update({id: quote.id }, {deliveryService: null, totalDeliveryFees: 0});
 });

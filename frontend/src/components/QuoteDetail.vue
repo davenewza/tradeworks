@@ -4,9 +4,6 @@
     <div class="flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <button @click="$emit('back')" class="btn btn-secondary">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-          </svg>
           Back to Quotes
         </button>
         <h2 class="text-2xl font-semibold text-gray-900">Quote #{{ quote.number }}</h2>
@@ -15,8 +12,9 @@
         <button 
           v-if="quote.status === 'Draft' || !quote.status" 
           @click="submitQuote" 
-          class="btn btn-primary"
-          disabled
+          class="btn bg-green-600 hover:bg-green-700 text-white"
+          :disabled="isSubmitDisabled"
+          :class="{ 'opacity-50 cursor-not-allowed': isSubmitDisabled }"
         >
           <span v-if="submittingQuote" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
           {{ submittingQuote ? 'Submitting...' : 'Submit Quote' }}
@@ -60,12 +58,6 @@
 
     <!-- Products Section -->
     <div class="card">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="text-lg font-medium text-gray-900">Products</h3>
-        <button @click="showAddProductModal = true" class="btn btn-primary">
-          Add Product
-        </button>
-      </div>
 
       <!-- Products List -->
       <div v-if="quoteProducts.length === 0" class="text-center py-8">
@@ -83,7 +75,7 @@
         <div class="flex justify-between items-center px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
           <div class="flex items-center space-x-4">
             <div class="min-h-[2rem] flex flex-col justify-center">
-              <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Description</h4>
+              <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Product</h4>
             </div>
           </div>
           <div class="flex items-center space-x-4">
@@ -136,6 +128,7 @@
             <div class="flex items-center space-x-4">
               <div class="w-12 text-center">
                 <button 
+                  v-if="!productsReadOnly"
                   @click="removeProduct(product.id)" 
                   class="text-red-600 hover:text-red-800 p-2 rounded"
                   title="Remove product"
@@ -147,6 +140,7 @@
               </div>
               <div class="w-20 text-right">
                 <input 
+                  v-if="!productsReadOnly"
                   type="number" 
                   :value="product.quantity" 
                   @change="updateProductQuantity(product.id, $event.target.value)"
@@ -154,6 +148,9 @@
                   min="0"
                   step="1"
                 />
+                <p v-else class="text-sm font-medium text-gray-900 text-center">
+                  {{ product.quantity }}
+                </p>
               </div>
               <div class="w-20 text-right">
                 <p class="text-sm font-medium text-gray-900">{{ formatCurrency(product.price) }}</p>
@@ -165,26 +162,66 @@
           </div>
         </div>
       </div>
+      
+      <!-- Product Action Buttons -->
+      <div class="flex justify-end items-center space-x-3 mt-6 pt-4 border-t border-gray-200">
+        <button 
+          @click="showAddProductModal = true" 
+          class="btn btn-primary"
+          :disabled="productsReadOnly"
+          :class="{ 'opacity-50 cursor-not-allowed': productsReadOnly }"
+        >
+          Add Product
+        </button>
+        <button 
+          @click="toggleProductsReadOnly" 
+          class="btn btn-secondary"
+        >
+          {{ productsReadOnly ? 'Edit Products' : 'Continue with Shipping' }}
+        </button>
+      </div>
     </div>
 
     <!-- Equipment Boxes Section -->
-    <div class="card">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="text-lg font-medium text-gray-900">Equipment Boxes</h3>
-        <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-2">
-            <label class="text-sm font-medium text-gray-700">Box Type:</label>
-            <select 
-              v-model="selectedBoxType" 
-              @change="onBoxTypeChange"
-              class="input text-sm"
-              :disabled="loading"
-            >
-              <option value="">No Equipment Boxes</option>
-              <option value="Cardboard">Cardboard</option>
-              <option value="PlasticEquipment">Plastic Equipment</option>
-            </select>
-          </div>
+    <div v-if="productsReadOnly" class="card">
+      <div class="mb-4">
+        <div class="flex gap-3">
+          <button
+            type="button"
+            @click="selectBoxType('PlasticEquipment')"
+            :disabled="loading"
+            :class="[
+              'flex items-center gap-3 px-3 py-2 rounded-md border transition',
+              selectedBoxType === 'PlasticEquipment' ? 'border-blue-600 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+            ]"
+          >
+            <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4" y="4" width="16" height="12" rx="2" ry="2" stroke-width="2"/>
+              <path d="M4 12h16" stroke-width="2"/>
+            </svg>
+            <div class="text-left">
+              <div class="text-sm font-medium text-gray-900">Plastic Equipment</div>
+              <div class="text-xs text-gray-500">Plastic tote box</div>
+            </div>
+          </button>
+          <button
+            type="button"
+            @click="selectBoxType('Cardboard')"
+            :disabled="loading"
+            :class="[
+              'flex items-center gap-3 px-3 py-2 rounded-md border transition',
+              selectedBoxType === 'Cardboard' ? 'border-blue-600 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+            ]"
+          >
+            <svg class="w-5 h-5 text-yellow-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 7l9-4 9 4-9 4-9-4z" stroke-width="2"/>
+              <path d="M3 7v10l9 4 9-4V7" stroke-width="2"/>
+            </svg>
+            <div class="text-left">
+              <div class="text-sm font-medium text-gray-900">Cardboard</div>
+              <div class="text-xs text-gray-500">Plain cardboard box</div>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -272,19 +309,7 @@
     </div>
 
     <!-- Shipping Details Section -->
-    <div class="card">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="text-lg font-medium text-gray-900">Shipping Details</h3>
-        <button 
-          @click="calculateDeliveryRates"
-          :disabled="loadingDeliveryRates || !selectedBoxType || equipmentBoxes.length === 0"
-          class="btn btn-primary text-sm"
-        >
-          <span v-if="loadingDeliveryRates" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
-          {{ loadingDeliveryRates ? 'Calculating...' : 'Calculate Delivery Rates' }}
-        </button>
-      </div>
-
+    <div v-if="productsReadOnly" class="card">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Total Shipment Weight</label>
@@ -300,11 +325,11 @@
           <label class="block text-sm font-medium text-gray-700 mb-2">Weight Breakdown</label>
           <div class="space-y-2">
             <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Products:</span>
+              <span class="text-gray-600">Products</span>
               <span class="font-medium">{{ formatWeight(productsWeight) }}</span>
             </div>
             <div v-if="selectedBoxType && equipmentBoxes.length > 0" class="flex justify-between text-sm">
-              <span class="text-gray-600">Equipment Boxes:</span>
+              <span class="text-gray-600">Equipment Boxes</span>
               <span class="font-medium">{{ formatWeight(equipmentBoxesWeight) }}</span>
             </div>
           </div>
@@ -313,14 +338,7 @@
 
       <!-- Delivery Rates Section -->
       <div class="mt-6 border-t pt-6">
-        <div class="flex justify-between items-center mb-4">
-          <h4 class="text-md font-medium text-gray-900">Delivery Rates</h4>
-          <div v-if="!deliveryRates && !deliveryRatesError && equipmentBoxes.length > 0" class="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md">
-            <span class="font-medium">⚠️</span> Delivery rates need to be recalculated
-          </div>
-        </div>
-        
-                <div v-if="deliveryRates">
+        <div v-if="deliveryRates">
           <!-- Delivery Summary -->
           <div class="bg-green-50 border border-green-200 rounded-lg p-4">
             <div class="flex items-center">
@@ -330,7 +348,7 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <h3 class="text-sm font-medium text-green-800">Delivery Rate Calculated</h3>
+                <h3 class="text-sm font-medium text-green-800">The Courier Guy delivery quote</h3>
                                   <div class="mt-2 text-sm text-green-700">
                     <p><strong>{{ deliveryRates.selectedDeliveryService }}</strong> - ZAR {{ formatCurrency(deliveryRates.selectedDeliveryFees) }}</p>
                     <p class="mt-1 text-xs">
@@ -356,10 +374,23 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </div>
-            <div class="ml-3">
+            <div class="ml-3 flex-1">
               <h3 class="text-sm font-medium text-red-800">Failed to calculate delivery rates</h3>
               <div class="mt-2 text-sm text-red-700">
                 <p>{{ deliveryRatesError }}</p>
+              </div>
+              <div class="mt-3">
+                <button 
+                  @click="calculateDeliveryRates"
+                  :disabled="loadingDeliveryRates"
+                  class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg v-if="loadingDeliveryRates" class="animate-spin -ml-1 mr-2 h-4 w-4 text-red-700" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ loadingDeliveryRates ? 'Retrying...' : 'Retry' }}
+                </button>
               </div>
             </div>
           </div>
@@ -373,30 +404,30 @@
         <div class="w-64 space-y-2">
           <!-- Products Subtotal -->
           <div class="flex justify-between">
-            <span class="text-gray-600">Products:</span>
+            <span class="text-gray-600">Products</span>
             <span class="font-medium">{{ formatCurrency(quote.totalProductPrice || 0) }}</span>
           </div>
           
-          <!-- Equipment Boxes Subtotal (if any) -->
-          <div v-if="quote.totalEquipmentBoxPrice && quote.totalEquipmentBoxPrice > 0" class="flex justify-between">
-            <span class="text-gray-600">Equipment Boxes:</span>
-            <span class="font-medium">{{ formatCurrency(quote.totalEquipmentBoxPrice) }}</span>
-          </div>
-          
-          <!-- Delivery Fees (if any) -->
-          <div v-if="quote.totalDeliveryFees && quote.totalDeliveryFees > 0" class="flex justify-between">
-            <span class="text-gray-600">Delivery:</span>
-            <span class="font-medium">{{ formatCurrency(quote.totalDeliveryFees) }}</span>
-          </div>
+                      <!-- Equipment Boxes Subtotal -->
+            <div class="flex justify-between">
+              <span class="text-gray-600">Equipment Boxes</span>
+              <span class="font-medium">{{ quote.totalEquipmentBoxPrice && quote.totalEquipmentBoxPrice > 0 ? formatCurrency(quote.totalEquipmentBoxPrice) : '0.00' }}</span>
+            </div>
+            
+            <!-- Delivery Fees -->
+            <div class="flex justify-between">
+              <span class="text-gray-600">Delivery</span>
+              <span class="font-medium">{{ quote.totalDeliveryFees && quote.totalDeliveryFees > 0 ? formatCurrency(quote.totalDeliveryFees) : '0.00' }}</span>
+            </div>
           
           <!-- Grand Total -->
           <div class="border-t pt-2">
             <div class="flex justify-between">
-              <span class="text-sm text-gray-600">Total excl. VAT:</span>
+              <span class="text-sm text-gray-600">Total excl. VAT</span>
               <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(grandTotal) }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-lg font-semibold">Total incl. VAT:</span>
+              <span class="text-lg font-semibold">Total incl. VAT</span>
               <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(grandTotalInclVat) }}</span>
             </div>
           </div>
@@ -474,7 +505,8 @@ export default {
       deliveryRates: null,
       loadingDeliveryRates: false,
       deliveryRatesError: null,
-      submittingQuote: false
+      submittingQuote: false,
+      productsReadOnly: false
     }
   },
   async mounted() {
@@ -485,10 +517,25 @@ export default {
     await this.loadEquipmentBoxes()
     this.initializeBoxType()
     this.checkExistingDeliveryDetails()
+    // If delivery already set on quote, lock products and show delivery sections
+    if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
+      this.productsReadOnly = true
+    }
   },
   computed: {
     // Note: Totals are now pulled from the quote response from getQuote
     // and should include equipment boxes and delivery fees from the backend
+    isDeliverySet() {
+      return !!(this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0)
+    },
+    isSubmitDisabled() {
+      return !this.isDeliverySet 
+        || !this.productsReadOnly 
+        || this.loading 
+        || this.loadingEquipmentBoxes 
+        || this.loadingDeliveryRates 
+        || this.submittingQuote
+    },
     grandTotal() {
       return this.quote.total || 0
     },
@@ -524,25 +571,31 @@ export default {
     // Reset delivery rates when products change
     'quote.products': {
       handler() {
-        this.resetDeliveryRates()
+        // Hydrate from backend if delivery details exist to avoid flicker
+        this.checkExistingDeliveryDetails()
       },
       deep: true
+    },
+    // Hydrate delivery details any time the quote object updates from parent
+    quote: {
+      handler() {
+        this.$nextTick(() => {
+          this.checkExistingDeliveryDetails()
+          // If delivery already set on quote, lock products and show delivery sections
+          if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
+            this.productsReadOnly = true
+          }
+        })
+      },
+      deep: false
     },
     // Reset delivery rates when equipment boxes change
     equipmentBoxes: {
       handler() {
-        this.resetDeliveryRates()
-        // Re-check delivery details after equipment boxes are loaded
+        // Do not clear; hydrate from backend state to prevent flicker/disappear
         this.$nextTick(() => {
           this.checkExistingDeliveryDetails()
         })
-      },
-      deep: true
-    },
-    // Reset delivery rates when quote products are updated
-    quoteProducts: {
-      handler() {
-        this.resetDeliveryRates()
       },
       deep: true
     },
@@ -558,6 +611,29 @@ export default {
     }
   },
   methods: {
+    selectBoxType(type) {
+      if (this.selectedBoxType !== type) {
+        this.selectedBoxType = type
+        // mimic native change
+        this.onBoxTypeChange()
+      }
+    },
+    async toggleProductsReadOnly() {
+      this.productsReadOnly = !this.productsReadOnly
+      
+      if (this.productsReadOnly && this.selectedBoxType) {
+        // If switching to read-only mode, calculate equipment boxes and delivery
+        await this.calculateEquipmentBoxes()
+        // Calculate delivery rates after equipment boxes are calculated
+        if (this.equipmentBoxes.length > 0) {
+          await this.calculateDeliveryRates()
+        }
+      } else if (!this.productsReadOnly) {
+        // If switching back to editing mode, reset delivery info
+        await this.resetDeliveryInfo()
+      }
+    },
+    
     async loadCustomerPriceList() {
       try {
         const { priceListService } = await import('../services/priceListService.js')
@@ -620,11 +696,6 @@ export default {
         // Refresh quote totals
         const updatedQuote = await quoteService.getQuote(this.quote.id)
         this.$emit('quote-updated', updatedQuote)
-        
-        // Recalculate equipment boxes if enabled
-        if (this.selectedBoxType) {
-          await this.calculateEquipmentBoxes()
-        }
       } catch (err) {
         console.error('Failed to update product quantity:', err)
       }
@@ -645,11 +716,6 @@ export default {
         // Refresh quote totals
         const updatedQuote = await quoteService.getQuote(this.quote.id)
         this.$emit('quote-updated', updatedQuote)
-        
-        // Recalculate equipment boxes if enabled
-        if (this.selectedBoxType) {
-          await this.calculateEquipmentBoxes()
-        }
       } catch (err) {
         console.error('Failed to remove product:', err)
       }
@@ -675,11 +741,6 @@ export default {
       // Refresh quote totals
       const updatedQuote = await quoteService.getQuote(this.quote.id)
       this.$emit('quote-updated', updatedQuote)
-      
-      // Recalculate equipment boxes if enabled
-      if (this.selectedBoxType) {
-        await this.calculateEquipmentBoxes()
-      }
     },
     
     async loadEquipmentBoxes() {
@@ -709,23 +770,34 @@ export default {
     
     async onBoxTypeChange() {
       if (!this.selectedBoxType) {
-        // Remove equipment boxes
-        await this.removeEquipmentBoxes()
+        // Reset delivery info when no box type is selected
+        await this.resetDeliveryInfo()
       } else {
         // Calculate equipment boxes for selected type
         await this.calculateEquipmentBoxes()
+        // Calculate delivery rates after equipment boxes are calculated
+        if (this.equipmentBoxes.length > 0) {
+          await this.calculateDeliveryRates()
+        }
       }
     },
     
-    async removeEquipmentBoxes() {
+    async resetDeliveryInfo() {
       try {
         this.loading = true
         const { equipmentBoxService } = await import('../services/equipmentBoxService.js')
-        await equipmentBoxService.removeEquipmentBoxes(this.quote.id)
+        await equipmentBoxService.resetDeliveryInfo(this.quote.id)
+        
+        // Reset local state
         this.equipmentBoxes = []
+        this.deliveryRates = null
+        this.deliveryRatesError = null
+        
+        // Refresh quote data to get updated totals
+        await this.refreshQuoteData()
       } catch (err) {
-        console.error('Failed to remove equipment boxes:', err)
-        alert('Failed to remove equipment boxes: ' + err.message)
+        console.error('Failed to reset delivery info:', err)
+        alert('Failed to reset delivery info: ' + err.message)
       } finally {
         this.loading = false
       }
@@ -739,6 +811,9 @@ export default {
         const { equipmentBoxService } = await import('../services/equipmentBoxService.js')
         await equipmentBoxService.calculateEquipmentBoxes(this.quote.id, this.selectedBoxType)
         await this.loadEquipmentBoxes()
+        
+        // Refresh quote data to get updated totals after equipment boxes calculation
+        await this.refreshQuoteData()
       } catch (err) {
         console.error('Failed to calculate equipment boxes:', err)
         alert('Failed to calculate equipment boxes: ' + err.message)
@@ -878,6 +953,9 @@ export default {
           ...response,
           chargedWeight: chargedWeight
         }
+        
+        // Refresh quote data to get updated totals after successful delivery calculation
+        await this.refreshQuoteData()
       } catch (error) {
         console.error('Failed to calculate delivery rates:', error)
         this.deliveryRatesError = error.message || 'Failed to calculate delivery rates'
@@ -912,8 +990,13 @@ export default {
         // Refresh the quote data from the backend
         const refreshedQuote = await quoteService.getQuote(this.quote.id)
         
+        // Update local quote data
+        
         // Emit the updated quote to parent component
         this.$emit('quote-updated', refreshedQuote)
+        
+        // Ensure UI updates after quote data change
+        await this.$nextTick()
         
         console.log('Quote data refreshed successfully')
       } catch (error) {
@@ -959,17 +1042,7 @@ export default {
     },
 
     async submitQuote() {
-      this.submittingQuote = true
-      try {
-        const updatedQuote = await quoteService.submitQuote(this.quote.id)
-        this.$emit('quote-updated', updatedQuote)
-        console.log('Quote submitted successfully')
-      } catch (error) {
-        console.error('Failed to submit quote:', error)
-        alert('Failed to submit quote: ' + error.message)
-      } finally {
-        this.submittingQuote = false
-      }
+      alert('This is not available yet')
     }
   }
 }

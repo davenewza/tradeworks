@@ -156,7 +156,7 @@ model Quote {
         write calculateEquipmentBoxes(id, boxType: BoxType) returns (Any) {
             @permission(expression: true)
         }
-        write removeEquipmentBoxes(id) returns (Any) {
+        write resetDeliveryInfo(id) returns (Any) {
             @permission(expression: true)
         }
         write calculateDelivery(id) returns (Any) {

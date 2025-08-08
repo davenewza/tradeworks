@@ -42,9 +42,9 @@ class EquipmentBoxService {
     return this.makeRequest('/calculateEquipmentBoxes', { id: quoteId, boxType: boxType })
   }
 
-  // Remove equipment boxes for a quote
-  async removeEquipmentBoxes(quoteId) {
-    return this.makeRequest('/removeEquipmentBoxes', { id: quoteId })
+  // Reset delivery info for a quote
+  async resetDeliveryInfo(quoteId) {
+    return this.makeRequest('/resetDeliveryInfo', { id: quoteId })
   }
 
   // List equipment boxes for a quote
