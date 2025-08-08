@@ -1,57 +1,57 @@
-model Shipment {
-    fields {
-        order Order
-        carrier Carrier
-        type ShipmentType
-        duties Decimal?
-        freightFees Decimal?
-        forwarderFees Decimal?
-        vesselName Text?
-        trackingUrl Text?
-        status ShipmentStatus @default(ShipmentStatus.New)
-        dateRequested Date?
-        dateShipped Date?
-        dateDelivered Date?
-    }
-    actions {
-        create newShipment() with (order.id, carrier.id, type, duties, freightFees, forwarderFees, dateRequested?, vesselName?, trackingUrl?) {
-            @permission(expression: ctx.isAuthenticated)
-        }
-        get getShipment(id) {
-            @permission(expression: ctx.isAuthenticated)
-        }
-        list listShipments() {
-            @permission(expression: ctx.isAuthenticated)
-        }
+// model Shipment {
+//     fields {
+//         order Order
+//         carrier Carrier
+//         type ShipmentType
+//         duties Decimal?
+//         freightFees Decimal?
+//         forwarderFees Decimal?
+//         vesselName Text?
+//         trackingUrl Text?
+//         status ShipmentStatus @default(ShipmentStatus.New)
+//         dateRequested Date?
+//         dateShipped Date?
+//         dateDelivered Date?
+//     }
+//     actions {
+//         create newShipment() with (order.id, carrier.id, type, duties, freightFees, forwarderFees, dateRequested?, vesselName?, trackingUrl?) {
+//             @permission(expression: ctx.isAuthenticated)
+//         }
+//         get getShipment(id) {
+//             @permission(expression: ctx.isAuthenticated)
+//         }
+//         list listShipments() {
+//             @permission(expression: ctx.isAuthenticated)
+//         }
 
-        delete deleteShipment(id) {
-            @permission(expression: ctx.isAuthenticated)
-        }
-    }
-}
+//         delete deleteShipment(id) {
+//             @permission(expression: ctx.isAuthenticated)
+//         }
+//     }
+// }
 
-enum ShipmentType {
-    Courier
-    SeaFreight
-    AirFreight
-}
+// enum ShipmentType {
+//     Courier
+//     SeaFreight
+//     AirFreight
+// }
 
-enum ShipmentStatus {
-    New
-    Received
-    Dispatched
-    Delivered
-    Cancelled
-}
+// enum ShipmentStatus {
+//     New
+//     Received
+//     Dispatched
+//     Delivered
+//     Cancelled
+// }
 
-model Carrier {
-    fields {
-        name Text
-    }
-    actions {
-        get getCarrier(id)
-        create createCarrier() with (name)
-        list listCarriers()
-    }
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list])
-}
+// model Carrier {
+//     fields {
+//         name Text
+//     }
+//     actions {
+//         get getCarrier(id)
+//         create createCarrier() with (name)
+//         list listCarriers()
+//     }
+//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list])
+// }
