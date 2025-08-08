@@ -26,7 +26,24 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
     });
 
     if (quoteProducts.length === 0) {
-        throw new Error('No products found in quote');
+        // Clear existing quote equipment boxes for this quote since there are no products
+        const existingQuoteEquipmentBoxes = await models.quoteEquipmentBox.findMany({
+            where: { quoteId: quote.id }
+        });
+        
+        for (const existingBox of existingQuoteEquipmentBoxes) {
+            await models.quoteEquipmentBox.delete({ id: existingBox.id });
+        }
+
+        // Return summary indicating no equipment boxes needed
+        return {
+            quoteId: quote.id,
+            totalVolumeNeeded: 0,
+            equipmentBoxesUsed: [],
+            totalEquipmentBoxes: 0,
+            createdQuoteEquipmentBoxes: [],
+            message: 'No products in quote - all equipment boxes removed'
+        };
     }
 
     // Calculate total volume needed for all products

@@ -219,7 +219,8 @@ model EquipmentBox {
         get getEquipmentBox(id)
         create createEquipmentBox() with (name, sku, boxType,image?,price, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         list listEquipmentBoxes()
-        update updateEquipmentBox(id) with (name, image, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        update updateEquipmentBoxImage(id) with (image)
+        update updateEquipmentBox(id) with (name, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         delete deleteEquipmentBox(id)
     }
 
