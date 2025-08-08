@@ -1,0 +1,71 @@
+{
+  "id": "list-equipment-boxes",
+  "action_name": "listEquipmentBoxes",
+  "response": {
+    "$.results[*].boxType": {
+      "display_order": 3
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].effectiveVolumeInLitres": {
+      "display_order": 14
+    },
+    "$.results[*].heightInCm": {
+      "display_order": 9
+    },
+    "$.results[*].holdingVolumeInLitres": {
+      "display_order": 12
+    },
+    "$.results[*].id": {
+      "visible": false,
+      "link": {
+        "tool_id": "get-equipment-box",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].image": {
+      "display_order": 4,
+      "visible": false
+    },
+    "$.results[*].lengthInCm": {
+      "display_order": 7
+    },
+    "$.results[*].name": {
+      "display_order": 1
+    },
+    "$.results[*].price": {
+      "display_order": 6,
+      "visible": false
+    },
+    "$.results[*].priceInclVat": {
+      "display_name": "Price (incl VAT)"
+    },
+    "$.results[*].sku": {
+      "display_order": 2
+    },
+    "$.results[*].totalVolumeInLitres": {
+      "display_order": 11
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    },
+    "$.results[*].volumeUtilisationQuotient": {
+      "display_order": 13
+    },
+    "$.results[*].weightInGrams": {
+      "display_order": 10
+    },
+    "$.results[*].widthInCm": {
+      "display_order": 8
+    }
+  }
+}
