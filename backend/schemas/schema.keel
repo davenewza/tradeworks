@@ -10,7 +10,7 @@ model Product {
         heightInCm Decimal
         weightInGrams Decimal
 
-        volume Decimal @computed(product.lengthInCm * product.widthInCm * product.heightInCm)
+        volumeInLitres Decimal @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
     }
 
     actions {
@@ -190,16 +190,16 @@ model EquipmentBox {
         heightInCm Decimal
         weightInGrams Decimal
 
-        totalVolume Decimal @computed(equipmentBox.lengthInCm * equipmentBox.widthInCm * equipmentBox.heightInCm)
-        holdingVolume Decimal
+        totalVolumeInLitres Decimal @computed(equipmentBox.lengthInCm * equipmentBox.widthInCm * equipmentBox.heightInCm / 1000)
+        holdingVolumeInLitres Decimal @default(0.0)
 
-        volumeUtilisationQuotient Decimal @default(0.7)
-        effectiveVolume Decimal @computed(equipmentBox.holdingVolume * equipmentBox.volumeUtilisationQuotient)
+        volumeUtilisationQuotient Decimal
+        effectiveVolumeInLitres Decimal @computed(equipmentBox.holdingVolumeInLitres * equipmentBox.volumeUtilisationQuotient)
     }
 
     actions {
         get getEquipmentBox(id)
-        create createEquipmentBox() with (name, sku, boxType,image?, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolume, volumeUtilisationQuotient)
+        create createEquipmentBox() with (name, sku, boxType,image?, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         list listEquipmentBoxes()
         update updateEquipmentBox(id) with (name, image, lengthInCm, widthInCm, heightInCm, weightInGrams)
         delete deleteEquipmentBox(id)

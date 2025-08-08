@@ -160,10 +160,37 @@ export default {
       loading: false,
       error: null,
       selectedQuote: null,
-      selectedPriceList: null
+      selectedPriceList: null,
+      lastHiddenTime: null
+    }
+  },
+  watch: {
+    customerId: {
+      immediate: true,
+      async handler(newCustomerId, oldCustomerId) {
+        if (newCustomerId && newCustomerId !== oldCustomerId) {
+          console.log('Customer ID changed, reloading data:', newCustomerId)
+          // Reset state and reload data when customer ID changes
+          this.selectedQuote = null
+          this.selectedPriceList = null
+          this.loading = true
+          this.error = null
+          this.priceLists = []
+          this.quotes = {}
+          await this.loadCustomerPriceLists()
+        }
+      }
     }
   },
   async mounted() {
+    // Reset state to ensure we always start with the main view
+    this.selectedQuote = null
+    this.selectedPriceList = null
+    this.loading = true
+    this.error = null
+    this.priceLists = []
+    this.quotes = {}
+    
     // Add a timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       if (this.loading) {
@@ -174,12 +201,44 @@ export default {
     }, 10000) // 10 second timeout
     
     try {
+      console.log('PriceListManager mounted - loading fresh data for customer:', this.customerId)
       await this.loadCustomerPriceLists()
     } finally {
       clearTimeout(timeout)
     }
+    
+    // Add event listener for page visibility changes to refresh data when user returns to the tab
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
+  },
+  
+  beforeUnmount() {
+    // Clean up event listener
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
   },
   methods: {
+    handleVisibilityChange() {
+      // Refresh data when user returns to the tab (after being away for more than 30 seconds)
+      if (!document.hidden && this.lastHiddenTime && (Date.now() - this.lastHiddenTime > 30000)) {
+        console.log('User returned to tab after being away, refreshing data')
+        this.refreshData()
+      }
+      this.lastHiddenTime = document.hidden ? Date.now() : null
+    },
+    
+    async refreshData() {
+      console.log('Refreshing all data...')
+      this.loading = true
+      this.error = null
+      try {
+        await this.loadCustomerPriceLists()
+      } catch (error) {
+        console.error('Error refreshing data:', error)
+        this.error = 'Failed to refresh data'
+      } finally {
+        this.loading = false
+      }
+    },
+    
     async loadCustomerPriceLists() {
       this.loading = true
       this.error = null

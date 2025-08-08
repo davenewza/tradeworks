@@ -16,7 +16,7 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
     }
 
     // Sort equipment boxes by effective volume (largest first)
-    equipmentBoxes.sort((a, b) => Number(b.effectiveVolume) - Number(a.effectiveVolume));
+    equipmentBoxes.sort((a, b) => Number(b.effectiveVolumeInLitres) - Number(a.effectiveVolumeInLitres));
 
     // Get all quote products
     const quoteProducts = await models.quoteProduct.findMany({
@@ -38,12 +38,12 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
             throw new Error(`Product not found for quote product ${quoteProduct.id}`);
         }
         
-        if (!product.volume) {
+        if (!product.volumeInLitres) {
             throw new Error(`Product ${product.name} (${product.sku}) does not have volume information`);
         }
         
         // Calculate volume for this product line item (product volume * quantity)
-        const productLineVolume = Number(product.volume) * quoteProduct.quantity;
+        const productLineVolume = Number(product.volumeInLitres) * quoteProduct.quantity;
         totalVolumeNeeded += productLineVolume;
     }
 
@@ -71,7 +71,7 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
     let remainingVolume = totalVolumeNeeded;
 
     for (const equipmentBox of equipmentBoxes) {
-        const effectiveVolume = Number(equipmentBox.effectiveVolume);
+        const effectiveVolume = Number(equipmentBox.effectiveVolumeInLitres);
         
         if (remainingVolume <= 0) {
             break;

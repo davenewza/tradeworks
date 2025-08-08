@@ -44,7 +44,11 @@
       </div>
       
       <!-- Main Application Content -->
-      <PriceListManager v-else-if="hasCustomerId" :customer-id="customerId" />
+      <PriceListManager 
+        v-else-if="hasCustomerId" 
+        :customer-id="customerId" 
+        :key="`price-list-manager-${customerId}`"
+      />
     </div>
   </div>
 </template>
@@ -81,8 +85,18 @@ export default {
     this.isAuthenticated = authService.isAuthenticated()
     
     if (this.isAuthenticated) {
-      this.currentUser = await authService.getCurrentUserCached()
-      this.customerId = authService.getCustomerId(this.currentUser)
+      // Always refetch user data on page refresh to ensure we have the latest information
+      try {
+        this.currentUser = await authService.getCurrentUser()
+        this.customerId = authService.getCustomerId(this.currentUser)
+        console.log('User data refreshed on page load:', this.currentUser)
+        console.log('Customer ID refreshed on page load:', this.customerId)
+      } catch (error) {
+        console.error('Failed to refresh user data on page load:', error)
+        // If we can't get fresh user data, try to use cached data
+        this.currentUser = await authService.getCurrentUserCached()
+        this.customerId = authService.getCustomerId(this.currentUser)
+      }
     }
   },
   methods: {
