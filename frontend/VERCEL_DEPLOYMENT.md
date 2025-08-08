@@ -43,6 +43,8 @@ Value: https://api.thecreatespace.co.za
 Environment: Production, Preview, Development
 ```
 
+**Note**: The `.env.production` file serves as a fallback if Vercel environment variables are not set, but Vercel environment variables take priority.
+
 ### 4. Deploy
 
 1. Click "Deploy" in Vercel
