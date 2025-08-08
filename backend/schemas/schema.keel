@@ -3,7 +3,6 @@ model Product {
         name Text
         brand Brand
         sku Text @unique
-        supplier Supplier
         image File
 
         lengthInCm Decimal
@@ -16,10 +15,10 @@ model Product {
 
     actions {
         get getProduct(id)
-        create createProduct() with (name, sku, image, brand.id,  supplier.id, lengthInCm, widthInCm, heightInCm, weightInGrams)//, costPrice, freightIn)
-        list listProducts(name?, sku?, supplier.id?, brand.id?)
+        create createProduct() with (name, sku, image, brand.id, lengthInCm, widthInCm, heightInCm, weightInGrams)//, costPrice, freightIn)
+        list listProducts(name?, sku?,  brand.id?)
         update updateProductDimensions(id) with (lengthInCm, widthInCm, heightInCm, weightInGrams)
-        update updateProduct(id) with (name?,  brand.id?, sku?, supplier.id?)//, costPrice?, freightIn?)
+        update updateProduct(id) with (name?,  brand.id?, sku?)//, costPrice?, freightIn?)
         delete deleteProduct(id)
     }
 
@@ -354,23 +353,23 @@ enum BoxType {
 // }
 
 
-model Supplier {
-    fields {
-        name Text
-        products Product[]
-    }
+// model Supplier {
+//     fields {
+//         name Text
+//         products Product[]
+//     }
 
-    actions {
-        get getSupplier(id)
-        create createSupplier() with (name)
-        list listSuppliers()
-        update updateSupplier(id) with (name)
-        delete deleteSupplier(id)
-    }
+//     actions {
+//         get getSupplier(id)
+//         create createSupplier() with (name)
+//         list listSuppliers()
+//         update updateSupplier(id) with (name)
+//         delete deleteSupplier(id)
+//     }
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+//     @permission(expression: true, actions:[get, create, list, update, delete])
 
-}
+// }
 
 
 model Brand {
