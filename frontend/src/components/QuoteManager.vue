@@ -59,10 +59,10 @@
               </div>
               <div class="text-right">
                 <div class="text-xl font-bold text-gray-900">
-                  ${{ formatCurrency(quote.total) }}
+                  ZAR {{ formatCurrency(quote.total) }}
                 </div>
                 <div class="text-sm text-gray-600">
-                  incl. VAT: ${{ formatCurrency(quote.totalInclVat) }}
+                  incl. VAT: ZAR {{ formatCurrency(quote.totalInclVat) }}
                 </div>
               </div>
             </div>

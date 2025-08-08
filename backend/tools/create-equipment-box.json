@@ -1,0 +1,37 @@
+{
+  "id": "create-equipment-box",
+  "action_name": "createEquipmentBox",
+  "inputs": {
+    "$.heightInCm": {
+      "display_order": 6
+    },
+    "$.holdingVolumeInLitres": {
+      "display_order": 8,
+      "help_text": "The volume this box can hold. This is normally advertised on plastic containers.  For cardboard, calculate it with WxLxH/1000"
+    },
+    "$.lengthInCm": {
+      "display_order": 4
+    },
+    "$.price": {
+      "help_text": "Should be 0 for cardboard boxes"
+    },
+    "$.volumeUtilisationQuotient": {
+      "display_order": 9,
+      "help_text": "How efficient we can pack into this box from 0 to 1. A 0.5 quotient is inefficient, 0.65 is with lots of spaces, and 0.9 is well-packed."
+    },
+    "$.weightInGrams": {
+      "display_order": 7
+    },
+    "$.widthInCm": {
+      "display_order": 5
+    }
+  },
+  "response": {
+    "$.price": {
+      "help_text": "Should be 0 for cardboard boxes."
+    },
+    "$.priceInclVat": {
+      "help_text": "Should be 0 for cardboard boxes."
+    }
+  }
+}

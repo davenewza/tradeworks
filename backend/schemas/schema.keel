@@ -182,7 +182,7 @@ model EquipmentBox {
 
         image File?
 
-        price Decimal @default(0.0)
+        price Decimal 
         priceInclVat Decimal @computed(equipmentBox.price * 1.15)
 
         lengthInCm Decimal
@@ -199,9 +199,9 @@ model EquipmentBox {
 
     actions {
         get getEquipmentBox(id)
-        create createEquipmentBox() with (name, sku, boxType,image?, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        create createEquipmentBox() with (name, sku, boxType,image?,price, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         list listEquipmentBoxes()
-        update updateEquipmentBox(id) with (name, image, lengthInCm, widthInCm, heightInCm, weightInGrams)
+        update updateEquipmentBox(id) with (name, image, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         delete deleteEquipmentBox(id)
     }
 

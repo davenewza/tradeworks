@@ -54,11 +54,11 @@
                 <p class="text-sm text-gray-600">SKU: {{ productPrice.productSku }}</p>
                 <div class="flex items-center space-x-4 mt-2">
                   <div>
-                    <span class="text-sm font-medium text-gray-900">${{ formatCurrency(productPrice.price) }}</span>
+                    <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(productPrice.price) }}</span>
                   </div>
                   <div>
                     <span class="text-xs text-gray-500">
-                      incl. VAT: ${{ formatCurrency(productPrice.priceInclVat) }}
+                      incl. VAT: ZAR {{ formatCurrency(productPrice.priceInclVat) }}
                     </span>
                   </div>
                 </div>

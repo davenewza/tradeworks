@@ -130,10 +130,10 @@
                 />
               </div>
               <div class="w-20 text-right">
-                <p class="text-sm font-medium text-gray-900">{{ formatCurrency(product.price) }}</p>
+                <p class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(product.price) }}</p>
               </div>
               <div class="w-20 text-right">
-                <p class="text-sm font-bold text-gray-900">{{ formatCurrency(product.total) }}</p>
+                <p class="text-sm font-bold text-gray-900">ZAR {{ formatCurrency(product.total) }}</p>
               </div>
               <div class="w-12 text-center">
                 <button 
