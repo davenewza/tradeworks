@@ -69,31 +69,98 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
         volumeUsed: number;
     }
     
-    const equipmentBoxesNeeded: EquipmentBoxNeeded[] = [];
+    // Use a Map to track equipment box needs and avoid duplicates
+    const equipmentBoxesMap = new Map<string, EquipmentBoxNeeded>();
     let remainingVolume = totalVolumeNeeded;
 
-    for (const equipmentBox of equipmentBoxes) {
-        const effectiveVolume = Number(equipmentBox.effectiveVolumeInLitres);
-        
-        if (remainingVolume <= 0) {
+    // Calculate cost per liter for each equipment box to determine most economical choice
+    interface BoxWithCostPerLiter {
+        id: string;
+        name: string;
+        price: number;
+        effectiveVolumeInLitres: number;
+        costPerLiter: number;
+    }
+
+    const boxesWithCostPerLiter: BoxWithCostPerLiter[] = equipmentBoxes.map(box => ({
+        id: box.id,
+        name: box.name,
+        price: Number(box.price),
+        effectiveVolumeInLitres: Number(box.effectiveVolumeInLitres),
+        costPerLiter: Number(box.price) / Number(box.effectiveVolumeInLitres)
+    }));
+
+    // Sort by cost per liter (cheapest first) for economical packing
+    boxesWithCostPerLiter.sort((a, b) => a.costPerLiter - b.costPerLiter);
+
+    console.log('Equipment boxes sorted by cost per liter:', boxesWithCostPerLiter.map(box => 
+        `${box.name}: ${box.effectiveVolumeInLitres}L @ ZAR${box.price} = ZAR${box.costPerLiter.toFixed(2)}/L`
+    ));
+
+    // Use most economical boxes first
+    while (remainingVolume > 0) {
+        let bestOption: BoxWithCostPerLiter | null = null;
+        let bestCost = Infinity;
+        let bestBoxesNeeded = 0;
+
+        // Find the most economical combination for remaining volume
+        for (const box of boxesWithCostPerLiter) {
+            const effectiveVolume = box.effectiveVolumeInLitres;
+            
+            // Calculate how many of this box type we need
+            const boxesNeeded = Math.ceil(remainingVolume / effectiveVolume);
+            const totalCost = boxesNeeded * box.price;
+            
+            // Check if this is the most economical option so far
+            if (totalCost < bestCost) {
+                bestOption = box;
+                bestCost = totalCost;
+                bestBoxesNeeded = boxesNeeded;
+            }
+        }
+
+        if (!bestOption) {
+            // Fallback: use the smallest box if no economical option found
+            const smallestBox = boxesWithCostPerLiter[boxesWithCostPerLiter.length - 1];
+            const existingBox = equipmentBoxesMap.get(smallestBox.id);
+            if (existingBox) {
+                existingBox.quantity += 1;
+                existingBox.volumeUsed += remainingVolume;
+            } else {
+                equipmentBoxesMap.set(smallestBox.id, {
+                    equipmentBoxId: smallestBox.id,
+                    price: smallestBox.price,
+                    quantity: 1,
+                    effectiveVolume: smallestBox.effectiveVolumeInLitres,
+                    volumeUsed: remainingVolume
+                });
+            }
             break;
         }
 
-        // Calculate how many of this equipment box type we need
-        const boxesNeeded = Math.ceil(remainingVolume / effectiveVolume);
-        
-        if (boxesNeeded > 0) {
-            equipmentBoxesNeeded.push({
-                equipmentBoxId: equipmentBox.id,
-                price: equipmentBox.price,
-                quantity: boxesNeeded,
-                effectiveVolume: effectiveVolume,
-                volumeUsed: Math.min(remainingVolume, effectiveVolume * boxesNeeded)
+        // Add the most economical option to our map
+        const existingBox = equipmentBoxesMap.get(bestOption.id);
+        if (existingBox) {
+            existingBox.quantity += bestBoxesNeeded;
+            existingBox.volumeUsed += Math.min(remainingVolume, bestOption.effectiveVolumeInLitres * bestBoxesNeeded);
+        } else {
+            equipmentBoxesMap.set(bestOption.id, {
+                equipmentBoxId: bestOption.id,
+                price: bestOption.price,
+                quantity: bestBoxesNeeded,
+                effectiveVolume: bestOption.effectiveVolumeInLitres,
+                volumeUsed: Math.min(remainingVolume, bestOption.effectiveVolumeInLitres * bestBoxesNeeded)
             });
-            
-            remainingVolume -= effectiveVolume * boxesNeeded;
         }
+
+        // Update remaining volume
+        remainingVolume -= bestOption.effectiveVolumeInLitres * bestBoxesNeeded;
+        
+        console.log(`Selected ${bestBoxesNeeded}x ${bestOption.name} (${bestOption.effectiveVolumeInLitres}L each) for ZAR${bestCost.toFixed(2)}. Remaining volume: ${remainingVolume.toFixed(2)}L`);
     }
+
+    // Convert map to array
+    const equipmentBoxesNeeded = Array.from(equipmentBoxesMap.values());
 
     // Create quote equipment boxes
     const createdQuoteEquipmentBoxes: any[] = [];

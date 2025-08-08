@@ -155,10 +155,10 @@
                 />
               </div>
               <div class="w-20 text-right">
-                <p class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(product.price) }}</p>
+                <p class="text-sm font-medium text-gray-900">{{ formatCurrency(product.price) }}</p>
               </div>
               <div class="w-20 text-right">
-                <p class="text-sm font-bold text-gray-900">ZAR {{ formatCurrency(product.total) }}</p>
+                <p class="text-sm font-bold text-gray-900">{{ formatCurrency(product.total) }}</p>
               </div>
               <div class="w-12 text-center">
                 <button 
@@ -346,9 +346,10 @@
                     <p><strong>{{ deliveryRates.selectedDeliveryService }}</strong> - ZAR {{ formatCurrency(deliveryRates.selectedDeliveryFees) }}</p>
                     <p class="mt-1 text-xs">
                       {{ deliveryRates.totalParcels }} parcels • 
-                      {{ deliveryRates.totalWeightKg?.toFixed(2) || '0.00' }} kg • 
-                      {{ formatVolume(deliveryRates.totalVolumeCm3) }} • 
-                      {{ deliveryRates.totalVolumeCm3 ? (deliveryRates.totalVolumeCm3 / 1000).toFixed(2) : '0.00' }} L used
+                      Actual Weight {{ deliveryRates.totalWeightKg?.toFixed(2) || '0.00' }} kg
+                      <span v-if="deliveryRates.chargedWeight">
+                        • Charged Weight {{ deliveryRates.chargedWeight.toFixed(0) }} kg
+                      </span>
                     </p>
                   </div>
               </div>
@@ -384,7 +385,7 @@
           <!-- Products Subtotal -->
           <div class="flex justify-between">
             <span class="text-gray-600">Products:</span>
-            <span class="font-medium">ZAR {{ formatCurrency(quote.totalProductPrice || 0) }}</span>
+            <span class="font-medium">{{ formatCurrency(quote.totalProductPrice || 0) }}</span>
           </div>
           
           <!-- Equipment Boxes Subtotal (if any) -->
@@ -396,18 +397,22 @@
           <!-- Delivery Fees (if any) -->
           <div v-if="quote.totalDeliveryFees && quote.totalDeliveryFees > 0" class="flex justify-between">
             <span class="text-gray-600">Delivery:</span>
-            <span class="font-medium">ZAR {{ formatCurrency(quote.totalDeliveryFees) }}</span>
+            <span class="font-medium">{{ formatCurrency(quote.totalDeliveryFees) }}</span>
           </div>
           
           <!-- Grand Total -->
           <div class="border-t pt-2">
             <div class="flex justify-between">
-              <span class="text-lg font-semibold">Total:</span>
-              <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(grandTotal) }}</span>
+              <span class="text-sm text-gray-600">Total excl. VAT:</span>
+              <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(grandTotal) }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-sm text-gray-600">incl. VAT:</span>
-              <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(grandTotalInclVat) }}</span>
+              <span class="text-lg font-semibold">VAT:</span>
+              <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(Vat) }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-lg font-semibold">Total incl. VAT:</span>
+              <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(grandTotalInclVat) }}</span>
             </div>
           </div>
         </div>
@@ -501,6 +506,9 @@ export default {
     // and should include equipment boxes and delivery fees from the backend
     grandTotal() {
       return this.quote.total || 0
+    },
+    vat() {
+      return this.quote.vat || 0
     },
     grandTotalInclVat() {
       return this.quote.totalInclVat || 0
@@ -871,7 +879,17 @@ export default {
       this.deliveryRates = null
       
       try {
-        this.deliveryRates = await deliveryService.calculateDelivery(this.quote.id)
+        const response = await deliveryService.calculateDelivery(this.quote.id)
+        
+        // Extract the charged weight from the cheapest rate (first in availableRates)
+        const chargedWeight = response.availableRates && response.availableRates.length > 0 
+          ? response.availableRates[0].weights.chargedWeight 
+          : null
+        
+        this.deliveryRates = {
+          ...response,
+          chargedWeight: chargedWeight
+        }
       } catch (error) {
         console.error('Failed to calculate delivery rates:', error)
         this.deliveryRatesError = error.message || 'Failed to calculate delivery rates'
@@ -943,6 +961,8 @@ export default {
             }
             return sum
           }, 0) : 0
+          // Note: chargedWeight is only available after fresh delivery calculation
+          // For existing delivery details, we don't have the charged weight from the API
         }
         console.log('Hydrated existing delivery details:', this.deliveryRates)
       } else {
