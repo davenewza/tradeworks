@@ -127,7 +127,7 @@
       <img 
         :src="imagePreview.src" 
         :alt="imagePreview.alt"
-        class="w-48 h-48 object-cover rounded"
+        class="w-60 h-60 object-contain rounded bg-white"
       />
     </div>
   </div>
@@ -220,8 +220,8 @@ export default {
         // Calculate initial position with offset to avoid going off-screen
         const offsetX = 10
         const offsetY = 10
-        const previewWidth = 200 // w-48 = 12rem = 192px + padding
-        const previewHeight = 200 // h-48 = 12rem = 192px + padding
+        const previewWidth = 250 // increased ~25% for larger preview
+        const previewHeight = 250 // increased ~25% for larger preview
         
         let x = event.clientX + offsetX
         let y = event.clientY + offsetY
@@ -251,8 +251,8 @@ export default {
         // Calculate position with offset to avoid going off-screen
         const offsetX = 10
         const offsetY = 10
-        const previewWidth = 200 // w-48 = 12rem = 192px + padding
-        const previewHeight = 200 // h-48 = 12rem = 192px + padding
+        const previewWidth = 250 // match increased preview size
+        const previewHeight = 250 // match increased preview size
         
         let x = event.clientX + offsetX
         let y = event.clientY + offsetY
