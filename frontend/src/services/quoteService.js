@@ -1,4 +1,4 @@
-const API_BASE = '/api/json'
+import { API_BASE } from '../config/api.js'
 
 class QuoteService {
   async makeRequest(endpoint, data = null) {

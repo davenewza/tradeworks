@@ -1,6 +1,8 @@
+import { API_BASE } from '../config/api.js'
+
 class EquipmentBoxService {
   constructor() {
-    this.baseUrl = 'http://localhost:8000/api/json'
+    this.baseUrl = API_BASE
   }
 
   async makeRequest(endpoint, data = null) {

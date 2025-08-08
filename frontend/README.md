@@ -16,6 +16,15 @@ A modern Vue.js single-page application for managing customer quotes with a clea
 - Node.js (v16 or higher)
 - Backend API running on `http://localhost:8000`
 
+## Environment Variables
+
+The application uses the following environment variable:
+
+- `VITE_API_URL`: The URL of the backend API (defaults to `http://localhost:8000` for local development)
+
+For local development, this is automatically handled by the Vite proxy configuration.
+For production deployment (e.g., Vercel), set this environment variable to your API URL.
+
 ## Installation
 
 1. Install dependencies:
