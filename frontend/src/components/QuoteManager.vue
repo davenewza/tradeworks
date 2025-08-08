@@ -49,7 +49,17 @@
           >
             <div class="flex justify-between items-start">
               <div>
-                <h3 class="text-lg font-medium text-gray-900 mb-1">Quote #{{ quote.number }}</h3>
+                <div class="flex items-center gap-2 mb-1">
+                  <h3 class="text-lg font-medium text-gray-900">Quote #{{ quote.number }}</h3>
+                  <span :class="[
+                    'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                    quote.status === 'Submitted' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  ]">
+                    {{ formatQuoteStatus(quote.status) }}
+                  </span>
+                </div>
                 <p class="text-sm text-gray-600 mb-2">
                   Created: {{ formatDate(quote.createdAt) }}
                 </p>
@@ -182,6 +192,11 @@ export default {
     
     formatCurrency(amount) {
       return parseFloat(amount).toFixed(2)
+    },
+
+    formatQuoteStatus(status) {
+      if (!status) return 'Draft'
+      return status === 'Submitted' ? 'Submitted' : 'Draft'
     }
   }
 }

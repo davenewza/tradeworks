@@ -8,6 +8,8 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
         throw new Error('Quote not found');
     }
 
+    await models.quote.update({id: quote.id}, {boxType: inputs.boxType});
+
     // Get all available equipment boxes, sorted by effective volume (largest first)
     const equipmentBoxes = await models.equipmentBox.findMany({ where: { boxType: inputs.boxType } });
 

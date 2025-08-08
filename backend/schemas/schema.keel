@@ -128,14 +128,20 @@ model QuoteProduct {
 model Quote {
     fields {
         number Text @sequence(prefix: "Q")
+        status QuoteStatus @default(QuoteStatus.Draft)
         customerPriceList CustomerPriceList
         products QuoteProduct[]
+        boxType BoxType @default(BoxType.Cardboard)
         equipmentBoxes QuoteEquipmentBox[]
-        total Decimal @computed(SUM(quote.products.total) + SUM(quote.equipmentBoxes.total))
+        totalProductPrice Decimal @computed(SUM(quote.products.total))
+        totalEquipmentBoxPrice Decimal @computed(SUM(quote.equipmentBoxes.total))
+        total Decimal @computed(quote.totalProductPrice + quote.totalEquipmentBoxPrice + quote.totalDeliveryFees)
         totalInclVat Decimal @computed(quote.total * 1.15)
         vat Decimal @computed(quote.totalInclVat - quote.total)
-
         totalWeightInGrams Decimal @computed(SUM(quote.products.totalWeightInGrams) + SUM(quote.equipmentBoxes.totalWeightInGrams))
+        deliveryService Text?
+        totalDeliveryFees Decimal @default(0.0)
+        
     }
 
     actions {
@@ -143,15 +149,27 @@ model Quote {
         create createQuote() with (customerPriceList.id)
         list listQuotes(customerPriceList.customer.id?)
         delete deleteQuote(id)
+        update updateQuoteDelivery(id) with (deliveryService,totalDeliveryFees)
+        update submitQuote(id) {
+            @set(quote.status = QuoteStatus.Submitted)
+        }
         write calculateEquipmentBoxes(id, boxType: BoxType) returns (Any) {
             @permission(expression: true)
         }
         write removeEquipmentBoxes(id) returns (Any) {
             @permission(expression: true)
         }
+        write calculateDelivery(id) returns (Any) {
+            @permission(expression: true)
+        }
     }
 
-    @permission(expression: true, actions:[get, create, list, delete])
+    @permission(expression: true, actions:[get, create, list, delete, update])
+}
+
+enum QuoteStatus {
+    Draft
+    Submitted
 }
 
 model QuoteEquipmentBox {

@@ -115,6 +115,24 @@ class QuoteService {
     })
   }
 
+  // Update quote delivery fees
+  async updateQuoteDelivery(quoteId, deliveryService, deliveryFees) {
+    return await this.makeRequest('/updateQuoteDelivery', {
+      where: {
+        id: quoteId
+      },
+      values: {
+        deliveryService: deliveryService,
+        totalDeliveryFees: deliveryFees
+      }
+    })
+  }
+
+  // Submit a quote
+  async submitQuote(quoteId) {
+    return await this.makeRequest('/submitQuote', { id: quoteId })
+  }
+
   // Delete a quote product
   async deleteQuoteProduct(productId) {
     return await this.makeRequest('/deleteQuoteProduct', { id: productId })

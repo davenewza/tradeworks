@@ -12,6 +12,18 @@
         <h2 class="text-2xl font-semibold text-gray-900">Quote #{{ quote.number }}</h2>
       </div>
       <div class="flex space-x-2">
+        <button 
+          v-if="quote.status === 'Draft' || !quote.status" 
+          @click="submitQuote" 
+          class="btn btn-primary"
+          :disabled="submittingQuote"
+        >
+          <span v-if="submittingQuote" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+          <svg v-else class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          {{ submittingQuote ? 'Submitting...' : 'Submit Quote' }}
+        </button>
         <button @click="deleteQuote" class="btn btn-danger">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -23,10 +35,23 @@
 
     <!-- Quote Info -->
     <div class="card">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Quote Number</label>
           <p class="text-lg font-semibold text-gray-900">{{ quote.number }}</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <div class="flex items-center">
+            <span :class="[
+              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+              quote.status === 'Submitted' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            ]">
+              {{ formatQuoteStatus(quote.status) }}
+            </span>
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Created</label>
@@ -241,17 +266,17 @@
                 </p>
               </div>
             </div>
-            <div class="flex items-center space-x-4">
-              <div class="w-20 text-right">
-                <p class="text-sm font-medium text-gray-900">{{ equipmentBox.quantity }}</p>
+                          <div class="flex items-center space-x-4">
+                <div class="w-20 text-right">
+                  <p class="text-sm font-medium text-gray-900">{{ equipmentBox.quantity }}</p>
+                </div>
+                <div class="w-20 text-right">
+                  <p class="text-sm font-medium text-gray-900">{{ formatCurrency(equipmentBox.price) }}</p>
+                </div>
+                <div class="w-20 text-right">
+                  <p class="text-sm font-bold text-gray-900">{{ formatCurrency(equipmentBox.total) }}</p>
+                </div>
               </div>
-              <div class="w-20 text-right">
-                <p class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(equipmentBox.price) }}</p>
-              </div>
-              <div class="w-20 text-right">
-                <p class="text-sm font-bold text-gray-900">ZAR {{ formatCurrency(equipmentBox.total) }}</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -261,6 +286,14 @@
     <div class="card">
       <div class="flex justify-between items-center mb-6">
         <h3 class="text-lg font-medium text-gray-900">Shipping Details</h3>
+        <button 
+          @click="calculateDeliveryRates"
+          :disabled="loadingDeliveryRates || !selectedBoxType || equipmentBoxes.length === 0"
+          class="btn btn-primary text-sm"
+        >
+          <span v-if="loadingDeliveryRates" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+          {{ loadingDeliveryRates ? 'Calculating...' : 'Calculate Delivery Rates' }}
+        </button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -288,6 +321,60 @@
           </div>
         </div>
       </div>
+
+      <!-- Delivery Rates Section -->
+      <div class="mt-6 border-t pt-6">
+        <div class="flex justify-between items-center mb-4">
+          <h4 class="text-md font-medium text-gray-900">Delivery Rates</h4>
+          <div v-if="!deliveryRates && !deliveryRatesError && equipmentBoxes.length > 0" class="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md">
+            <span class="font-medium">⚠️</span> Delivery rates need to be recalculated
+          </div>
+        </div>
+        
+                <div v-if="deliveryRates">
+          <!-- Delivery Summary -->
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-green-800">Delivery Rate Calculated</h3>
+                                  <div class="mt-2 text-sm text-green-700">
+                    <p><strong>{{ deliveryRates.selectedDeliveryService }}</strong> - ZAR {{ formatCurrency(deliveryRates.selectedDeliveryFees) }}</p>
+                    <p class="mt-1 text-xs">
+                      {{ deliveryRates.totalParcels }} parcels • 
+                      {{ deliveryRates.totalWeightKg?.toFixed(2) || '0.00' }} kg • 
+                      {{ formatVolume(deliveryRates.totalVolumeCm3) }} • 
+                      {{ deliveryRates.totalVolumeCm3 ? (deliveryRates.totalVolumeCm3 / 1000).toFixed(2) : '0.00' }} L used
+                    </p>
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delivery Rates Error -->
+      <div v-if="deliveryRatesError" class="mt-6 border-t pt-6">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-red-800">Failed to calculate delivery rates</h3>
+              <div class="mt-2 text-sm text-red-700">
+                <p>{{ deliveryRatesError }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Totals Section -->
@@ -296,20 +383,26 @@
         <div class="w-64 space-y-2">
           <!-- Products Subtotal -->
           <div class="flex justify-between">
-            <span class="text-gray-600">Products Subtotal:</span>
-            <span class="font-medium">ZAR {{ formatCurrency(quote.total) }}</span>
+            <span class="text-gray-600">Products:</span>
+            <span class="font-medium">ZAR {{ formatCurrency(quote.totalProductPrice || 0) }}</span>
           </div>
           
-          <!-- Equipment Boxes Subtotal (if enabled) -->
-          <div v-if="selectedBoxType && equipmentBoxes.length > 0" class="flex justify-between">
+          <!-- Equipment Boxes Subtotal (if any) -->
+          <div v-if="quote.totalEquipmentBoxPrice && quote.totalEquipmentBoxPrice > 0" class="flex justify-between">
             <span class="text-gray-600">Equipment Boxes:</span>
-            <span class="font-medium">ZAR {{ formatCurrency(equipmentBoxesTotal) }}</span>
+            <span class="font-medium">{{ formatCurrency(quote.totalEquipmentBoxPrice) }}</span>
+          </div>
+          
+          <!-- Delivery Fees (if any) -->
+          <div v-if="quote.totalDeliveryFees && quote.totalDeliveryFees > 0" class="flex justify-between">
+            <span class="text-gray-600">Delivery:</span>
+            <span class="font-medium">ZAR {{ formatCurrency(quote.totalDeliveryFees) }}</span>
           </div>
           
           <!-- Grand Total -->
           <div class="border-t pt-2">
             <div class="flex justify-between">
-              <span class="text-lg font-semibold">Grand Total:</span>
+              <span class="text-lg font-semibold">Total:</span>
               <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(grandTotal) }}</span>
             </div>
             <div class="flex justify-between">
@@ -356,6 +449,7 @@
 import AddProductModal from './AddProductModal.vue'
 import { quoteService } from '../services/quoteService.js'
 import { productService } from '../services/productService.js'
+import { deliveryService } from '../services/deliveryService.js'
 
 export default {
   name: 'QuoteDetail',
@@ -386,27 +480,30 @@ export default {
         alt: '',
         x: 0,
         y: 0
-      }
+      },
+      deliveryRates: null,
+      loadingDeliveryRates: false,
+      deliveryRatesError: null,
+      submittingQuote: false
     }
   },
   async mounted() {
+    await this.refreshQuoteData()
     await this.loadCustomerPriceList()
     await this.loadQuoteProducts()
     await this.loadProductDetails()
     await this.loadEquipmentBoxes()
+    this.initializeBoxType()
+    this.checkExistingDeliveryDetails()
   },
   computed: {
-    equipmentBoxesTotal() {
-      return this.equipmentBoxes.reduce((sum, box) => sum + (box.total || 0), 0)
-    },
-    equipmentBoxesTotalInclVat() {
-      return this.equipmentBoxes.reduce((sum, box) => sum + (box.totalInclVat || 0), 0)
-    },
+    // Note: Totals are now pulled from the quote response from getQuote
+    // and should include equipment boxes and delivery fees from the backend
     grandTotal() {
-      return (this.quote.total || 0) + this.equipmentBoxesTotal
+      return this.quote.total || 0
     },
     grandTotalInclVat() {
-      return (this.quote.totalInclVat || 0) + this.equipmentBoxesTotalInclVat
+      return this.quote.totalInclVat || 0
     },
     productsWeight() {
       return this.quoteProducts.reduce((totalWeight, quoteProduct) => {
@@ -428,6 +525,43 @@ export default {
     },
     totalShipmentWeight() {
       return this.productsWeight + this.equipmentBoxesWeight
+    }
+  },
+  watch: {
+    // Reset delivery rates when products change
+    'quote.products': {
+      handler() {
+        this.resetDeliveryRates()
+      },
+      deep: true
+    },
+    // Reset delivery rates when equipment boxes change
+    equipmentBoxes: {
+      handler() {
+        this.resetDeliveryRates()
+        // Re-check delivery details after equipment boxes are loaded
+        this.$nextTick(() => {
+          this.checkExistingDeliveryDetails()
+        })
+      },
+      deep: true
+    },
+    // Reset delivery rates when quote products are updated
+    quoteProducts: {
+      handler() {
+        this.resetDeliveryRates()
+      },
+      deep: true
+    },
+    // Update selected box type when quote boxType changes
+    'quote.boxType': {
+      handler(newBoxType) {
+        if (newBoxType && newBoxType !== this.selectedBoxType) {
+          this.selectedBoxType = newBoxType
+          console.log('Box type updated from quote:', newBoxType)
+        }
+      },
+      immediate: true
     }
   },
   methods: {
@@ -717,6 +851,117 @@ export default {
     
     hideImagePreview() {
       this.imagePreview.show = false
+    },
+    
+    resetDeliveryRates() {
+      // Reset delivery rates when quote parameters change
+      this.deliveryRates = null
+      this.deliveryRatesError = null
+      this.loadingDeliveryRates = false
+    },
+    
+    async calculateDeliveryRates() {
+      if (!this.selectedBoxType || this.equipmentBoxes.length === 0) {
+        this.deliveryRatesError = 'Please calculate equipment boxes first before calculating delivery rates.'
+        return
+      }
+      
+      this.loadingDeliveryRates = true
+      this.deliveryRatesError = null
+      this.deliveryRates = null
+      
+      try {
+        this.deliveryRates = await deliveryService.calculateDelivery(this.quote.id)
+      } catch (error) {
+        console.error('Failed to calculate delivery rates:', error)
+        this.deliveryRatesError = error.message || 'Failed to calculate delivery rates'
+      } finally {
+        this.loadingDeliveryRates = false
+      }
+    },
+    
+    formatDeliveryDate(dateString) {
+      if (!dateString) return 'N/A'
+      
+      try {
+        const date = new Date(dateString)
+        return date.toLocaleDateString('en-ZA', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })
+      } catch (error) {
+        console.error('Error formatting delivery date:', error)
+        return 'Invalid date'
+      }
+    },
+
+    formatQuoteStatus(status) {
+      if (!status) return 'Draft'
+      return status === 'Submitted' ? 'Submitted' : 'Draft'
+    },
+
+    async refreshQuoteData() {
+      try {
+        // Refresh the quote data from the backend
+        const refreshedQuote = await quoteService.getQuote(this.quote.id)
+        
+        // Emit the updated quote to parent component
+        this.$emit('quote-updated', refreshedQuote)
+        
+        console.log('Quote data refreshed successfully')
+      } catch (error) {
+        console.error('Failed to refresh quote data:', error)
+        // Don't show alert here as it might be too intrusive
+        // The quote will still work with the existing data
+      }
+    },
+
+    initializeBoxType() {
+      // Set the box type based on the quote's boxType field
+      if (this.quote.boxType) {
+        this.selectedBoxType = this.quote.boxType
+        console.log('Initialized box type from quote:', this.quote.boxType)
+      }
+    },
+
+    checkExistingDeliveryDetails() {
+      // Check if the quote already has delivery details set
+      if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
+        // Hydrate the delivery rates with existing data
+        this.deliveryRates = {
+          selectedDeliveryService: this.quote.deliveryService,
+          selectedDeliveryFees: this.quote.totalDeliveryFees,
+          // We'll need to calculate these from equipment boxes if available
+          totalParcels: this.equipmentBoxes.length > 0 ? this.equipmentBoxes.reduce((sum, box) => sum + box.quantity, 0) : 0,
+          totalWeightKg: this.totalShipmentWeight / 1000, // Convert from grams to kg
+          totalVolumeCm3: this.equipmentBoxes.length > 0 ? this.equipmentBoxes.reduce((sum, box) => {
+            const equipmentBoxDetail = this.equipmentBoxDetails[box.equipmentBoxId]
+            if (equipmentBoxDetail) {
+              const volume = (equipmentBoxDetail.lengthInCm * equipmentBoxDetail.widthInCm * equipmentBoxDetail.heightInCm) * box.quantity
+              return sum + volume
+            }
+            return sum
+          }, 0) : 0
+        }
+        console.log('Hydrated existing delivery details:', this.deliveryRates)
+      } else {
+        console.log('No existing delivery details found')
+      }
+    },
+
+    async submitQuote() {
+      this.submittingQuote = true
+      try {
+        const updatedQuote = await quoteService.submitQuote(this.quote.id)
+        this.$emit('quote-updated', updatedQuote)
+        console.log('Quote submitted successfully')
+      } catch (error) {
+        console.error('Failed to submit quote:', error)
+        alert('Failed to submit quote: ' + error.message)
+      } finally {
+        this.submittingQuote = false
+      }
     }
   }
 }
