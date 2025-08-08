@@ -1,4 +1,5 @@
 import { API_BASE } from '../config/api.js'
+import { authService } from './authService.js'
 
 class EquipmentBoxService {
   constructor() {
@@ -7,11 +8,19 @@ class EquipmentBoxService {
 
   async makeRequest(endpoint, data = null) {
     const url = `${this.baseUrl}${endpoint}`
+    const headers = {
+      'Content-Type': 'application/json',
+    }
+    
+    // Add authentication header if available
+    const token = authService.getToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
     const options = {
       method: data ? 'POST' : 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     }
 
     if (data) {

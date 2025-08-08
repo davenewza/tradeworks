@@ -1,12 +1,21 @@
 import { API_BASE } from '../config/api.js'
+import { authService } from './authService.js'
 
 class QuoteService {
   async makeRequest(endpoint, data = null) {
+    const headers = {
+      'Content-Type': 'application/json',
+    }
+    
+    // Add authentication header if available
+    const token = authService.getToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: data ? JSON.stringify(data) : undefined,
     })
 

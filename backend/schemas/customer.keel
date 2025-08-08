@@ -1,5 +1,33 @@
 model User {
     fields {
         identity Identity @unique 
+        email Text? @computed(user.identity.email)
+        firstName Text?
+        lastName Text?
+        customer Customer?
     }
+    actions {
+        create createMe() {
+            @set(user.identity = ctx.identity)
+        }
+        get getMe() {
+            @where(user.identity == ctx.identity)
+        }
+        get getUser(id) 
+        update assignToCustomer(id) with (customer.id) 
+        list listUsers() 
+    }
+    @permission(expression: ctx.isAuthenticated, actions:[create, get, update, list])
 }
+
+// model CustomerUser {
+//     fields {
+//         customer Customer
+//         user User
+//     }
+//     actions {
+//         get getCustomerUser(id)
+//         create createCustomerUser() with (customer.id, user.id)
+//         list listCustomerUsers()
+//     }
+// }
