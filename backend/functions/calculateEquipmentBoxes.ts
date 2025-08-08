@@ -90,55 +90,58 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
     const equipmentBoxesMap = new Map<string, EquipmentBoxNeeded>();
     let remainingVolume = totalVolumeNeeded;
 
-    // Calculate cost per liter for each equipment box to determine most economical choice
-    interface BoxWithCostPerLiter {
-        id: string;
-        name: string;
-        price: number;
-        effectiveVolumeInLitres: number;
-        costPerLiter: number;
-    }
-
-    const boxesWithCostPerLiter: BoxWithCostPerLiter[] = equipmentBoxes.map(box => ({
-        id: box.id,
-        name: box.name,
-        price: Number(box.price),
-        effectiveVolumeInLitres: Number(box.effectiveVolumeInLitres),
-        costPerLiter: Number(box.price) / Number(box.effectiveVolumeInLitres)
-    }));
-
-    // Sort by cost per liter (cheapest first) for economical packing
-    boxesWithCostPerLiter.sort((a, b) => a.costPerLiter - b.costPerLiter);
-
-    console.log('Equipment boxes sorted by cost per liter:', boxesWithCostPerLiter.map(box => 
-        `${box.name}: ${box.effectiveVolumeInLitres}L @ ZAR${box.price} = ZAR${box.costPerLiter.toFixed(2)}/L`
-    ));
-
-    // Use most economical boxes first
-    while (remainingVolume > 0) {
-        let bestOption: BoxWithCostPerLiter | null = null;
-        let bestCost = Infinity;
-        let bestBoxesNeeded = 0;
-
-        // Find the most economical combination for remaining volume
-        for (const box of boxesWithCostPerLiter) {
-            const effectiveVolume = box.effectiveVolumeInLitres;
-            
-            // Calculate how many of this box type we need
-            const boxesNeeded = Math.ceil(remainingVolume / effectiveVolume);
-            const totalCost = boxesNeeded * box.price;
-            
-            // Check if this is the most economical option so far
-            if (totalCost < bestCost) {
-                bestOption = box;
-                bestCost = totalCost;
-                bestBoxesNeeded = boxesNeeded;
-            }
+    // Use largest boxes first for most of the volume
+    for (let i = 0; i < equipmentBoxes.length - 1; i++) {
+        const equipmentBox = equipmentBoxes[i];
+        const effectiveVolume = Number(equipmentBox.effectiveVolumeInLitres);
+        
+        if (remainingVolume <= 0) {
+            break;
         }
 
-        if (!bestOption) {
-            // Fallback: use the smallest box if no economical option found
-            const smallestBox = boxesWithCostPerLiter[boxesWithCostPerLiter.length - 1];
+        // Calculate how many of this equipment box type we need
+        const boxesNeeded = Math.floor(remainingVolume / effectiveVolume);
+        
+        if (boxesNeeded > 0) {
+            equipmentBoxesMap.set(equipmentBox.id, {
+                equipmentBoxId: equipmentBox.id,
+                price: equipmentBox.price,
+                quantity: boxesNeeded,
+                effectiveVolume: effectiveVolume,
+                volumeUsed: effectiveVolume * boxesNeeded
+            });
+            
+            remainingVolume -= effectiveVolume * boxesNeeded;
+            console.log(`Selected ${boxesNeeded}x ${equipmentBox.name} (${effectiveVolume}L each). Remaining volume: ${remainingVolume.toFixed(2)}L`);
+        }
+    }
+
+    // For the final remaining volume, find the smallest box that can fit it
+    if (remainingVolume > 0) {
+        // Sort equipment boxes by effective volume (smallest first) to find the smallest that fits
+        const sortedBySmallest = [...equipmentBoxes].sort((a, b) => Number(a.effectiveVolumeInLitres) - Number(b.effectiveVolumeInLitres));
+        
+        // Find the smallest box that can fit the remaining volume
+        const smallestBoxThatFits = sortedBySmallest.find(box => Number(box.effectiveVolumeInLitres) >= remainingVolume);
+        
+        if (smallestBoxThatFits) {
+            const existingBox = equipmentBoxesMap.get(smallestBoxThatFits.id);
+            if (existingBox) {
+                existingBox.quantity += 1;
+                existingBox.volumeUsed += remainingVolume;
+            } else {
+                equipmentBoxesMap.set(smallestBoxThatFits.id, {
+                    equipmentBoxId: smallestBoxThatFits.id,
+                    price: smallestBoxThatFits.price,
+                    quantity: 1,
+                    effectiveVolume: Number(smallestBoxThatFits.effectiveVolumeInLitres),
+                    volumeUsed: remainingVolume
+                });
+            }
+            console.log(`Selected 1x ${smallestBoxThatFits.name} (${smallestBoxThatFits.effectiveVolumeInLitres}L) for remaining volume: ${remainingVolume.toFixed(2)}L`);
+        } else {
+            // If no box is small enough, use the smallest available box
+            const smallestBox = sortedBySmallest[0];
             const existingBox = equipmentBoxesMap.get(smallestBox.id);
             if (existingBox) {
                 existingBox.quantity += 1;
@@ -148,32 +151,12 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
                     equipmentBoxId: smallestBox.id,
                     price: smallestBox.price,
                     quantity: 1,
-                    effectiveVolume: smallestBox.effectiveVolumeInLitres,
+                    effectiveVolume: Number(smallestBox.effectiveVolumeInLitres),
                     volumeUsed: remainingVolume
                 });
             }
-            break;
+            console.log(`Selected 1x ${smallestBox.name} (${smallestBox.effectiveVolumeInLitres}L) for remaining volume: ${remainingVolume.toFixed(2)}L`);
         }
-
-        // Add the most economical option to our map
-        const existingBox = equipmentBoxesMap.get(bestOption.id);
-        if (existingBox) {
-            existingBox.quantity += bestBoxesNeeded;
-            existingBox.volumeUsed += Math.min(remainingVolume, bestOption.effectiveVolumeInLitres * bestBoxesNeeded);
-        } else {
-            equipmentBoxesMap.set(bestOption.id, {
-                equipmentBoxId: bestOption.id,
-                price: bestOption.price,
-                quantity: bestBoxesNeeded,
-                effectiveVolume: bestOption.effectiveVolumeInLitres,
-                volumeUsed: Math.min(remainingVolume, bestOption.effectiveVolumeInLitres * bestBoxesNeeded)
-            });
-        }
-
-        // Update remaining volume
-        remainingVolume -= bestOption.effectiveVolumeInLitres * bestBoxesNeeded;
-        
-        console.log(`Selected ${bestBoxesNeeded}x ${bestOption.name} (${bestOption.effectiveVolumeInLitres}L each) for ZAR${bestCost.toFixed(2)}. Remaining volume: ${remainingVolume.toFixed(2)}L`);
     }
 
     // Convert map to array
