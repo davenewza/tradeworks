@@ -33,15 +33,15 @@ model ProductPrice {
         productName Text @computed(productPrice.product.name)
         productSku Text @computed(productPrice.product.sku)
         priceList PriceList
-        price Decimal 
-        priceInclVat Decimal @computed(productPrice.price * 1.15)
+        price Decimal @computed(productPrice.priceInclVat / 115 * 100)
+        priceInclVat Decimal 
     }
 
     actions {
-        //get getProductPrice(id)
-        create createProductPrice() with (product.id, priceList.id, price)
+        get getProductPrice(id)
+        create createProductPrice() with (product.id, priceList.id, priceInclVat)
         list listProductPrices(priceList.id)
-        update updateProductPrice(id) with (price)
+        update updateProductPrice(id) with (priceInclVat)
         delete deleteProductPrice(id)
     }
 
@@ -54,7 +54,7 @@ model PriceList {
     fields {
         name Text
         description Text?
-        numberOfProducts Number @computed(COUNT(priceList.products))
+        numberOfProducts Number @computed(COUNT(priceList.products.id))
         products ProductPrice[]
     }
 
@@ -161,7 +161,7 @@ model Quote {
         }
         write calculateDelivery(id) returns (Any) {
             @permission(expression: true)
-        }
+        }   
     }
 
     @permission(expression: true, actions:[get, create, list, delete, update])

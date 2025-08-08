@@ -23,6 +23,7 @@
       }
     },
     "$.results[*].price": {
+      "display_name": "Price excl VAT",
       "display_order": 5
     },
     "$.results[*].priceInclVat": {

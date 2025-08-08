@@ -1,0 +1,12 @@
+{
+  "id": "get-product-price",
+  "action_name": "getProductPrice",
+  "response": {
+    "$.price": {
+      "display_name": "Price excl VAT"
+    },
+    "$.priceInclVat": {
+      "display_name": "Price incl VAT"
+    }
+  }
+}
