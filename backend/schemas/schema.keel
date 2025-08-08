@@ -46,14 +46,13 @@ model ProductPrice {
     }
 
     @unique([product, priceList])
-
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 model PriceList {
     fields {
         name Text
-        description Text?
+        description Text? 
         numberOfProducts Number @computed(COUNT(priceList.products.id))
         products ProductPrice[]
     }
@@ -217,10 +216,10 @@ model EquipmentBox {
 
     actions {
         get getEquipmentBox(id)
-        create createEquipmentBox() with (name, sku, boxType,image?,priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        create createEquipmentBox() with (name, sku, boxType,image?, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         list listEquipmentBoxes()
         update updateEquipmentBoxImage(id) with (image)
-        update updateEquipmentBox(id) with (name, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        update updateEquipmentBox(id) with (name, sku, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         delete deleteEquipmentBox(id)
     }
 
@@ -232,188 +231,21 @@ enum BoxType {
     PlasticEquipment
 }
 
-// model ProductDimensions {
-//     fields {
-//         product Product @unique
-//         lengthInCm Decimal
-//         widthInCm Decimal
-//         heightInCm Decimal
-//         volume Decimal @computed(productDimensions.lengthInCm * productDimensions.widthInCm * productDimensions.heightInCm)
-//     }
-//     actions {
-//         get getDimensions(id)
-//         create createDimensions() with (product.id,lengthInCm, widthInCm, heightInCm)
-//         update updateDimensions(id) with (lengthInCm, widthInCm, heightInCm)
-//         delete deleteDimensions(id)
-//     }
-
-//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-// }
-
-
-
-// model ProductPrice {
-//     fields {
-//         channel Channel
-//         description Text
-//         product Product @relation(prices)
-//         totalCost Decimal
-//         channelCost Decimal
-//         adSpend Decimal @default(0.0)
-//         grossProfitMargin Number
-//         grossProfit Decimal
-//         retailPrice Decimal
-//         isNormalSalesPrice Boolean
-//         discountFromNormalSalesPrice Decimal @default(0.0)
-//     }
-
-//     actions {
-//         get getProductPrice(id)
-//         create createProductPriceUsingGrossProfitMargin() with (channel.id, description, product.id, grossProfitMargin, isNormalSalesPrice) {
-//             @function
-//         }
-//         create createProductPriceUsingRetailPrice() with (channel.id, description, product.id, retailPrice, isNormalSalesPrice) {
-//             @function
-//         }
-//         update updateProductPriceUsingGrossProfitMargin(id) with (grossProfitMargin, isNormalSalesPrice) {
-//             @function
-//         }
-//         update updateProductPriceUsingRetailPrice(id) with (retailPrice, isNormalSalesPrice) {
-//             @function
-//         }
-//         list listProductPrices(product.id) {
-//             @orderBy(isNormalSalesPrice: desc)
-//         }
-//         delete deleteProductPrice(id) {
-//             @function
-//         }
-//     }
-
-//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-// }
-
-// model Channel {
-//     fields {
-//         name Text @unique
-//         fees ChannelFee[]
-//     }
-
-//     actions {
-//         get getChannel(id)
-//         create createChannel() with (name)
-//         list listChannels()
-//     }
-
-//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-// }
-
-// model ProductFee {
-//     fields {
-//         product Product
-//         fee ChannelFee
-//     }
-
-//     actions {
-//         get productFee(id)
-//         create associateProductFee() with ( product.id, fee.id)
-//         list listChannelProductFees(product.id?) {
-//             @embed(fee)
-//         }
-//         delete deleteProductFee(id)
-//     }
-
-
-//     @unique([fee, product])
-//     @on([create, update, delete], updateProductPrices)
-//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-// }
- 
-// model ChannelFee {
-//     fields {
-//         name Text
-//         channel Channel
-//         flatFee Decimal?
-//         percFee Decimal?
-//     }
-
-//     actions {
-//         get getChannelFee(id)
-//         create createChannelFee() with (name, channel.id, flatFee?, percFee?)
-//         update updateChannelFee(id) with (name, flatFee?, percFee?)
-//         list listFlatChannelFees(channel.id?) {
-//             @where(channelFee.flatFee != null)
-//         }
-//         list listPercentageChannelFees(channel.id?) {
-//             @where(channelFee.percFee != null)
-//         }
-//         delete deleteChannelFee(id)
-//     }
-
-//     @on([create, update, delete], updateProductPrices)
-//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-// }
-
-// model AdRoasTarget {
-//     fields {
-//         product Product
-//         channel Channel
-//         targetRoas Decimal
-//     }
-
-//     actions {
-//         get getAdRoasTarget(id)
-//         create createAdRoasTarget() with (product.id, channel.id, targetRoas)
-//         update updateAdRoasTarget(id) with (targetRoas)
-//         list listAdRoasTargets(product.id?)
-//         delete deleteAdRoasTarget(id)
-//     }
-
-//     @unique([product, channel])
-//     @on([create, update, delete], updateProductPrices)
-//     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-// }
-
-
-// model Supplier {
-//     fields {
-//         name Text
-//         products Product[]
-//     }
-
-//     actions {
-//         get getSupplier(id)
-//         create createSupplier() with (name)
-//         list listSuppliers()
-//         update updateSupplier(id) with (name)
-//         delete deleteSupplier(id)
-//     }
-
-//     @permission(expression: true, actions:[get, create, list, update, delete])
-
-// }
-
-
 model Brand {
     fields {
         name Text
+        logo File?
     }
 
     actions {
         get getBrand(id)
-        create createBrand() with ( name)
+        create createBrand() with (name, logo?)
         list listBrands()
+        update updateBrandLogo(id) with (logo)
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
-
-model Seeder {
-    actions {
-        write seed(Any) returns (Any)
-    }
-}
-
-
 
 role Admin {
     domains {
