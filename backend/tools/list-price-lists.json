@@ -1,0 +1,24 @@
+{
+  "id": "list-price-lists",
+  "action_name": "listPriceLists",
+  "response": {
+    "$.results[*].id": {
+      "visible": false,
+      "link": {
+        "tool_id": "get-price-list",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

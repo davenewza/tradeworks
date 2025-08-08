@@ -53,14 +53,16 @@ model ProductPrice {
 model PriceList {
     fields {
         name Text
+        description Text?
+        numberOfProducts Number @computed(COUNT(priceList.products))
         products ProductPrice[]
     }
 
     actions {
         get getPriceList(id)
-        create createPriceList() with (name)
+        create createPriceList() with (name, description?)
         list listPriceLists()
-        update updatePriceList(id) with (name)
+        update updatePriceList(id) with (name, description?)
         delete deletePriceList(id)
     }
 
