@@ -396,10 +396,6 @@
               <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(grandTotal) }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-lg font-semibold">VAT:</span>
-              <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(Vat) }}</span>
-            </div>
-            <div class="flex justify-between">
               <span class="text-lg font-semibold">Total incl. VAT:</span>
               <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(grandTotalInclVat) }}</span>
             </div>
@@ -762,7 +758,10 @@ export default {
     },
     
     formatCurrency(amount) {
-      return parseFloat(amount).toFixed(2)
+      return parseFloat(amount).toLocaleString('en-ZA', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
     },
     
     formatVolume(volume) {
