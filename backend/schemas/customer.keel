@@ -17,17 +17,5 @@ model User {
         update assignToCustomer(id) with (customer.id) 
         list listUsers() 
     }
-    @permission(expression: ctx.isAuthenticated, actions:[create, get, update, list])
+    @permission(expression: ctx.isAuthenticated, actions: [create, get, update, list])
 }
-
-// model CustomerUser {
-//     fields {
-//         customer Customer
-//         user User
-//     }
-//     actions {
-//         get getCustomerUser(id)
-//         create createCustomerUser() with (customer.id, user.id)
-//         list listCustomerUsers()
-//     }
-// }

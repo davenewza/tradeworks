@@ -62,8 +62,12 @@
       <!-- Products List -->
       <div v-if="quoteProducts.length === 0" class="text-center py-8">
         <div class="text-gray-500 mb-4">
-          <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+          <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21v-4h6"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7l3 3-3 3-3-3 3-3z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 6l3 3"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h3"/>
           </svg>
         </div>
         <h4 class="text-lg font-medium text-gray-900 mb-2">No products added</h4>
@@ -100,7 +104,7 @@
           class="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 transition-colors"
         >
           <div class="flex justify-between items-center">
-            <div class="flex items-center space-x-4">
+              <div class="flex items-center space-x-4">
               <div class="relative w-12 h-12">
                 <img 
                   v-if="productDetails[product.productId]?.image?.url" 
@@ -127,16 +131,16 @@
             </div>
             <div class="flex items-center space-x-4">
               <div class="w-12 text-center">
-                <button 
+            <button 
                   v-if="!productsReadOnly"
-                  @click="removeProduct(product.id)" 
+              @click="removeProduct(product.id)" 
                   class="text-red-600 hover:text-red-800 p-2 rounded"
-                  title="Remove product"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                </button>
+              title="Remove product"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </button>
               </div>
               <div class="w-20 text-right">
                 <input 
@@ -176,6 +180,8 @@
         <button 
           @click="toggleProductsReadOnly" 
           class="btn btn-secondary"
+          :disabled="!productsReadOnly && quoteProducts.length === 0"
+          :class="{ 'opacity-50 cursor-not-allowed': !productsReadOnly && quoteProducts.length === 0 }"
         >
           {{ productsReadOnly ? 'Edit Products' : 'Continue with Shipping' }}
         </button>
@@ -278,10 +284,21 @@
         >
           <div class="flex justify-between items-center">
             <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
-                </svg>
+              <div class="relative w-12 h-12">
+                <img
+                  v-if="equipmentBoxDetails[equipmentBox.equipmentBoxId]?.image?.url"
+                  :src="equipmentBoxDetails[equipmentBox.equipmentBoxId].image.url"
+                  :alt="equipmentBoxDetails[equipmentBox.equipmentBoxId]?.name || 'Equipment Box'"
+                  class="w-12 h-12 object-cover rounded-lg cursor-pointer"
+                  @mouseenter="showBoxImagePreview(equipmentBox.equipmentBoxId, $event)"
+                  @mousemove="updateImagePreviewPosition($event)"
+                  @mouseleave="hideImagePreview"
+                />
+                <div v-else class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                  </svg>
+                </div>
               </div>
               <div class="min-h-[2rem] flex flex-col justify-center">
                 <h4 class="font-medium text-gray-900">
@@ -401,7 +418,7 @@
     <!-- Totals Section -->
     <div class="card">
       <div class="flex justify-end">
-        <div class="w-64 space-y-2">
+        <div class="w-80 space-y-2">
           <!-- Products Subtotal -->
           <div class="flex justify-between">
             <span class="text-gray-600">Products</span>
@@ -415,10 +432,10 @@
             </div>
             
             <!-- Delivery Fees -->
-            <div class="flex justify-between">
+          <div class="flex justify-between">
               <span class="text-gray-600">Delivery</span>
               <span class="font-medium">{{ quote.totalDeliveryFees && quote.totalDeliveryFees > 0 ? formatCurrency(quote.totalDeliveryFees) : '0.00' }}</span>
-            </div>
+          </div>
           
           <!-- Grand Total -->
           <div class="border-t pt-2">
@@ -454,15 +471,15 @@
       />
     </div>
 
-          <!-- Add Product Modal -->
-      <AddProductModal 
-        v-if="showAddProductModal"
-        :quote-id="quote.id"
+    <!-- Add Product Modal -->
+    <AddProductModal 
+      v-if="showAddProductModal"
+      :quote-id="quote.id"
         :price-list-id="customerPriceList?.priceListId"
         :existing-quote-products="quoteProducts"
-        @close="showAddProductModal = false"
-        @product-added="handleProductAdded"
-      />
+      @close="showAddProductModal = false"
+      @product-added="handleProductAdded"
+    />
   </div>
 </template>
 
@@ -922,6 +939,31 @@ export default {
     
     hideImagePreview() {
       this.imagePreview.show = false
+    },
+
+    showBoxImagePreview(equipmentBoxId, event) {
+      const box = this.equipmentBoxDetails[equipmentBoxId]
+      if (box?.image?.url) {
+        const offsetX = 10
+        const offsetY = 10
+        const previewWidth = 200
+        const previewHeight = 200
+        let x = event.clientX + offsetX
+        let y = event.clientY + offsetY
+        if (x + previewWidth > window.innerWidth) {
+          x = event.clientX - previewWidth - offsetX
+        }
+        if (y + previewHeight > window.innerHeight) {
+          y = event.clientY - previewHeight - offsetY
+        }
+        this.imagePreview = {
+          show: true,
+          src: box.image.url,
+          alt: box.name || 'Equipment Box',
+          x,
+          y
+        }
+      }
     },
     
     resetDeliveryRates() {

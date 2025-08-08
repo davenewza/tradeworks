@@ -22,7 +22,7 @@ model Product {
         delete deleteProduct(id)
     }
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 
@@ -47,7 +47,7 @@ model ProductPrice {
 
     @unique([product, priceList])
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 model PriceList {
@@ -66,7 +66,7 @@ model PriceList {
         delete deletePriceList(id)
     }
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 model Customer {
@@ -82,7 +82,7 @@ model Customer {
         delete deleteCustomer(id)
     }
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 model CustomerPriceList {
@@ -98,7 +98,7 @@ model CustomerPriceList {
     }
 
     @unique([customer, priceList])
-    @permission(expression: true, actions:[get, create, list, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete])
 }
 
 model QuoteProduct {
@@ -121,7 +121,7 @@ model QuoteProduct {
         delete deleteQuoteProduct(id)
     }
     @unique([quote, productPrice])
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 
@@ -154,17 +154,17 @@ model Quote {
             @set(quote.status = QuoteStatus.Submitted)
         }
         write calculateEquipmentBoxes(id, boxType: BoxType) returns (Any) {
-            @permission(expression: true)
+            @permission(expression: ctx.isAuthenticated)
         }
         write resetDeliveryInfo(id) returns (Any) {
-            @permission(expression: true)
+            @permission(expression: ctx.isAuthenticated)
         }
         write calculateDelivery(id) returns (Any) {
-            @permission(expression: true)
+            @permission(expression: ctx.isAuthenticated)
         }   
     }
 
-    @permission(expression: true, actions:[get, create, list, delete, update])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete, update])
 }
 
 enum QuoteStatus {
@@ -188,7 +188,7 @@ model QuoteEquipmentBox {
     }
 
     @unique([quote, equipmentBox])
-    @permission(expression: true, actions:[get, create, list, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete])
 }
 
 model EquipmentBox {
@@ -200,8 +200,8 @@ model EquipmentBox {
 
         image File?
 
-        price Decimal 
-        priceInclVat Decimal @computed(equipmentBox.price * 1.15)
+        price Decimal @computed(equipmentBox.priceInclVat / 115 * 100)
+        priceInclVat Decimal 
 
         lengthInCm Decimal
         widthInCm Decimal
@@ -217,14 +217,14 @@ model EquipmentBox {
 
     actions {
         get getEquipmentBox(id)
-        create createEquipmentBox() with (name, sku, boxType,image?,price, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        create createEquipmentBox() with (name, sku, boxType,image?,priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         list listEquipmentBoxes()
         update updateEquipmentBoxImage(id) with (image)
-        update updateEquipmentBox(id) with (name, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        update updateEquipmentBox(id) with (name, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
         delete deleteEquipmentBox(id)
     }
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 enum BoxType {
@@ -404,7 +404,7 @@ model Brand {
         list listBrands()
     }
 
-    @permission(expression: true, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
 model Seeder {
