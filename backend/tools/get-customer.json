@@ -1,0 +1,37 @@
+{
+  "id": "get-customer",
+  "action_name": "getCustomer",
+  "response": {
+    "$.createdAt": {
+      "display_order": 3
+    },
+    "$.id": {
+      "display_order": 2
+    },
+    "$.updatedAt": {
+      "display_order": 4
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "create-customer-price-list",
+      "title": "Assign price list",
+      "as_dialog": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.customer.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    }
+  ],
+  "embedded_tools": [
+    {
+      "id": "priceLists",
+      "deleted": true
+    }
+  ]
+}

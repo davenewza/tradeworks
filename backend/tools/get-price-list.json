@@ -1,0 +1,43 @@
+{
+  "id": "get-price-list",
+  "action_name": "getPriceList",
+  "sections": [
+    {
+      "name": "cbdc81c4-b8af-4c18-ad4c-c9373b92ccfe",
+      "title": "New section",
+      "display_order": 2,
+      "visible": true
+    }
+  ],
+  "entry_activity_actions": [
+    {
+      "tool_id": "create-product-price",
+      "title": "Add product",
+      "as_dialog": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.priceList.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    }
+  ],
+  "embedded_tools": [
+    {
+      "id": "products",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-product-prices"
+          },
+          "response_overrides": {
+            "$.results[*].priceListId": false
+          }
+        }
+      ]
+    }
+  ]
+}

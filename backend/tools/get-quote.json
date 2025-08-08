@@ -1,0 +1,69 @@
+{
+  "id": "get-quote",
+  "action_name": "getQuote",
+  "response": {
+    "$.equipmentBoxes": {
+      "link": {
+        "tool_id": "list-quote-equipment-boxes",
+        "deleted": true
+      }
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "create-quote-product",
+      "title": "Add",
+      "as_dialog": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.quote.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    }
+  ],
+  "embedded_tools": [
+    {
+      "id": "products",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-quote-products"
+          },
+          "response_overrides": {
+            "$.results[*].quoteId": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "custom-embed-6e5y166y",
+      "title": "Equipment boxes",
+      "display_order": 2,
+      "visible": true,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-quote-equipment-boxes",
+            "display_order": 0,
+            "data_mapping": [
+              {
+                "key": "$.where.quote.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "equipmentBoxes",
+      "deleted": true
+    }
+  ]
+}

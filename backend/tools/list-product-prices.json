@@ -1,0 +1,52 @@
+{
+  "id": "list-product-prices",
+  "action_name": "listProductPrices",
+  "response": {
+    "$.results[*].createdAt": {
+      "display_order": 8,
+      "visible": false
+    },
+    "$.results[*].id": {
+      "display_order": 7,
+      "visible": false,
+      "link": {
+        "tool_id": "get-product-price",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].price": {
+      "display_order": 5
+    },
+    "$.results[*].priceInclVat": {
+      "display_name": "Price incl VAT",
+      "display_order": 6
+    },
+    "$.results[*].priceListId": {
+      "display_order": 4,
+      "visible": false
+    },
+    "$.results[*].productId": {
+      "display_order": 2
+    },
+    "$.results[*].productName": {
+      "display_order": 3,
+      "visible": false
+    },
+    "$.results[*].productSku": {
+      "display_name": "SKU",
+      "display_order": 1
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 9,
+      "visible": false
+    }
+  }
+}

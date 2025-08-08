@@ -1,0 +1,9 @@
+{
+  "id": "create-product-price",
+  "action_name": "createProductPrice",
+  "inputs": {
+    "$.priceList": {
+      "visible": false
+    }
+  }
+}

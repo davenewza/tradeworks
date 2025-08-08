@@ -1,0 +1,33 @@
+{
+  "id": "get-product",
+  "action_name": "getProduct",
+  "response": {
+    "$.brandId": {
+      "display_order": 2
+    },
+    "$.heightInCm": {
+      "display_order": 8
+    },
+    "$.lengthInCm": {
+      "display_order": 6
+    },
+    "$.name": {
+      "display_order": 1
+    },
+    "$.sku": {
+      "display_order": 3
+    },
+    "$.supplierId": {
+      "display_order": 5
+    },
+    "$.volume": {
+      "display_order": 10
+    },
+    "$.weightInGrams": {
+      "display_order": 9
+    },
+    "$.widthInCm": {
+      "display_order": 7
+    }
+  }
+}
