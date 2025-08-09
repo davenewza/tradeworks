@@ -33,6 +33,10 @@ class DeliveryAddressService {
         const errorData = await response.json()
         if (errorData?.message) message = errorData.message
       } catch (_) {}
+      if (typeof message === 'string' && message.toLowerCase().includes('token has expired')) {
+        authService.logout()
+        window.location.reload()
+      }
       throw new Error(message)
     }
     return response.json()

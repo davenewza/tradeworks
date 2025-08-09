@@ -21,7 +21,13 @@ class QuoteService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      const message = errorData.message || `HTTP error! status: ${response.status}`
+      if (typeof message === 'string' && message.toLowerCase().includes('token has expired')) {
+        authService.logout()
+        // Hard reload to reset app state
+        window.location.reload()
+      }
+      throw new Error(message)
     }
 
     return response.json()
