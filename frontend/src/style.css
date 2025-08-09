@@ -2,14 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import Outfit font */
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Outfit'), url('https://fonts.gstatic.com/s/outfit/v11/QGYyz_wNahGAdqQ43Rh_cqDpp_k.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Outfit'), url('https://fonts.gstatic.com/s/outfit/v11/QGYyz_wNahGAdqQ43Rh_cqDpp_k.woff2') format('woff2');
+}
+
 @layer base {
   html {
     /* Always reserve space for the vertical scrollbar to prevent layout shift */
     overflow-y: scroll;
   }
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-white text-brand-navy font-sans;
   }
+  h1, h2, h3, h4, h5, h6 { @apply font-semibold; }
 }
 
 @layer components {
@@ -18,22 +35,22 @@
   }
   
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    @apply bg-brand-navy text-white hover:bg-[#0a1039];
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply bg-white text-brand-navy border border-brand-navy/20 hover:bg-brand-navy hover:text-white;
   }
   
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700;
+    @apply bg-brand-red text-white hover:bg-[#d10a23];
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-lg shadow-sm border border-brand-grey/30 p-6;
   }
   
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full px-3 py-2 border border-brand-grey rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent;
   }
 }

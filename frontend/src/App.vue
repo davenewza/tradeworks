@@ -2,7 +2,9 @@
   <div id="app" class="min-h-screen bg-gray-50">
     <!-- Authentication Check -->
     <div v-if="!isAuthenticated" class="min-h-screen">
-      <LoginForm @login-success="handleLoginSuccess" />
+      <div class="max-w-6xl mx-auto px-4 py-8">
+        <LoginForm @login-success="handleLoginSuccess" />
+      </div>
     </div>
     
     <!-- Profile Completion Dialog -->
@@ -14,14 +16,19 @@
     />
     
     <!-- Main Application -->
-    <div v-else-if="isAuthenticated && !showProfileDialog" class="container mx-auto px-4 py-8">
+    <div v-else-if="isAuthenticated && !showProfileDialog" class="max-w-6xl mx-auto px-4 py-8">
       <header class="mb-8">
         <div class="flex justify-between items-center">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">CREATESPACE</h1>
-            <p class="text-gray-600">Quote Generation System</p>
+            <div class="flex items-center gap-3 mb-1">
+              <img v-if="logoOk" :src="logoSrc" alt="CREATESPACE" class="h-10 md:h-7 w-auto" @error="logoOk = false" />
+              <h1 v-else class="text-3xl font-bold text-gray-900">CREATESPACE</h1>
+            </div>
           </div>
           <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">
+              Welcome, {{ currentUser?.firstName || currentUser?.id || 'User' }}
+            </span>
             <button
               v-if="hasCustomerId"
               @click="showAddresses = true"
@@ -29,9 +36,6 @@
             >
               Manage Delivery Addresses
             </button>
-            <span class="text-sm text-gray-600">
-              Welcome, {{ currentUser?.firstName || currentUser?.id || 'User' }}
-            </span>
             <button
               @click="handleLogout"
               class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
@@ -41,8 +45,6 @@
           </div>
         </div>
       </header>
-      
-
       
       <!-- Customer Assignment Check -->
       <div v-if="!hasCustomerId" class="card text-center py-12">
@@ -87,7 +89,9 @@ export default {
       showProfileDialog: false,
       loginData: null,
       customerId: null,
-      showAddresses: false
+      showAddresses: false,
+      logoOk: true,
+      logoSrc: `${import.meta.env.BASE_URL}createspace-logo.png`
     }
   },
   computed: {
