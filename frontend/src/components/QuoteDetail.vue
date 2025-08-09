@@ -458,13 +458,13 @@
         <div v-if="deliveryRates">
           <!-- Delivery Summary -->
           <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div class="flex items-center">
+            <div class="flex items-start justify-between">
               <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <div class="ml-3">
+              <div class="ml-3 flex-1">
                 <h3 class="text-sm font-medium text-green-800">The Courier Guy delivery quote</h3>
                                   <div class="mt-2 text-sm text-green-700">
                     <p><strong>{{ deliveryRates.selectedDeliveryService }}</strong> - ZAR {{ formatCurrency(deliveryRates.selectedDeliveryFees) }}</p>
@@ -476,6 +476,15 @@
                       </span>
                     </p>
                   </div>
+              </div>
+              <div class="ml-3">
+                <button 
+                  v-if="hasDeliveryInfo"
+                  class="text-xs text-green-700 hover:text-green-900 underline"
+                  @click="openDeliveryInfoDialog"
+                >
+                  View details
+                </button>
               </div>
             </div>
           </div>
@@ -548,6 +557,83 @@
               <span class="text-lg font-bold text-gray-900">ZAR {{ formatCurrency(grandTotalInclVat) }}</span>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery Info Dialog -->
+    <div v-if="showDeliveryInfoDialog" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black bg-opacity-50" @click="closeDeliveryInfoDialog"></div>
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 class="text-lg font-semibold text-gray-900">Delivery details</h3>
+          <button @click="closeDeliveryInfoDialog" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="p-4 overflow-auto max-h-[calc(90vh-160px)] space-y-6">
+          <!-- Selected service -->
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-base font-semibold text-gray-900">{{ quote.deliveryService || parsedDelivery.selectedRate?.service_level?.name || 'Selected service' }}</div>
+                <div class="text-sm text-gray-700 mt-1">Price: ZAR {{ formatCurrency(quote.totalDeliveryFees || parsedDelivery.selectedRate?.rate || 0) }}</div>
+                <div class="text-sm text-gray-700 mt-1 flex flex-wrap gap-4">
+                  <span v-if="quote.chargedWeightInGrams || parsedDelivery.selectedRate?.charged_weight">Charged: {{ formatChargedKg }} kg</span>
+                  <span v-if="parsedDelivery.selectedRate?.actual_weight">Actual: {{ parsedDelivery.selectedRate.actual_weight.toFixed(2) }} kg</span>
+                  <span v-if="parsedDelivery.selectedRate?.volumetric_weight">Volumetric: {{ parsedDelivery.selectedRate.volumetric_weight.toFixed(2) }} kg</span>
+                </div>
+                <div v-if="parsedDelivery.selectedRate?.service_level?.delivery_date_from || parsedDelivery.selectedRate?.service_level?.delivery_date_to" class="text-xs text-gray-600 mt-1">
+                  Delivery window: 
+                  <span v-if="parsedDelivery.selectedRate?.service_level?.delivery_date_from">{{ formatDeliveryDate(parsedDelivery.selectedRate.service_level.delivery_date_from) }}</span>
+                  <span v-if="parsedDelivery.selectedRate?.service_level?.delivery_date_to"> - {{ formatDeliveryDate(parsedDelivery.selectedRate.service_level.delivery_date_to) }}</span>
+                </div>
+              </div>
+              <div class="text-right text-sm text-gray-700">
+                <div v-if="parsedDelivery.selectedRate?.rate_excluding_vat">Excl. VAT: ZAR {{ formatCurrency(parsedDelivery.selectedRate.rate_excluding_vat) }}</div>
+                <div v-if="parsedDelivery.selectedRate?.base_rate?.vat">VAT: ZAR {{ formatCurrency(parsedDelivery.selectedRate.base_rate.vat) }}</div>
+                <div v-if="parsedDelivery.selectedRate?.base_rate?.vat_percentage">VAT %: {{ parsedDelivery.selectedRate.base_rate.vat_percentage }}%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alternative rates -->
+          <div v-if="parsedDelivery.otherRates.length" class="border border-gray-200 rounded-lg p-4">
+            <div class="text-sm font-medium text-gray-900 mb-3">Available services</div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-600">
+                    <th class="py-2 pr-4">Service</th>
+                    <th class="py-2 pr-4">Price (ZAR)</th>
+                    <th class="py-2 pr-4">Charged (kg)</th>
+                    <th class="py-2 pr-4">Actual (kg)</th>
+                    <th class="py-2 pr-4">Volumetric (kg)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in parsedDelivery.otherRates" :key="r._key" class="border-t">
+                    <td class="py-2 pr-4 text-gray-800">{{ r.service_level?.name || '-' }}</td>
+                    <td class="py-2 pr-4 text-gray-800">{{ formatCurrency(r.rate || 0) }}</td>
+                    <td class="py-2 pr-4 text-gray-800">{{ r.charged_weight != null ? r.charged_weight.toFixed(0) : '-' }}</td>
+                    <td class="py-2 pr-4 text-gray-800">{{ r.actual_weight != null ? r.actual_weight.toFixed(2) : '-' }}</td>
+                    <td class="py-2 pr-4 text-gray-800">{{ r.volumetric_weight != null ? r.volumetric_weight.toFixed(2) : '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Raw JSON toggle -->
+          <div>
+            <button class="text-xs text-gray-600 hover:text-gray-800 underline" @click="showRawJson = !showRawJson">{{ showRawJson ? 'Hide raw JSON' : 'Show raw JSON' }}</button>
+            <div v-if="showRawJson" class="mt-2">
+              <pre class="text-xs text-gray-800 whitespace-pre-wrap break-words">{{ formattedDeliveryInfo }}</pre>
+            </div>
+          </div>
+        </div>
+        <div class="p-4 border-t border-gray-200 flex justify-end">
+          <button @click="closeDeliveryInfoDialog" class="btn btn-secondary">Close</button>
         </div>
       </div>
     </div>
@@ -632,7 +718,9 @@ export default {
       loadingAddresses: false,
       selectedAddressId: '',
       addressSubmitAttempted: false,
-      showAddressDialog: false
+      showAddressDialog: false,
+      showDeliveryInfoDialog: false,
+      showRawJson: false
     }
   },
   async mounted() {
@@ -654,6 +742,37 @@ export default {
     }
   },
   computed: {
+    hasDeliveryInfo() {
+      return !!this.quote?.deliveryRawJson
+    },
+    formattedDeliveryInfo() {
+      try {
+        return JSON.stringify(this.quote?.deliveryRawJson ?? {}, null, 2)
+      } catch (_) {
+        // In case it's a string that's not JSON, just show it
+        return String(this.quote?.deliveryRawJson ?? '')
+      }
+    },
+    parsedDelivery() {
+      const raw = this.quote?.deliveryRawJson
+      let data = {}
+      if (!raw) return { selectedRate: null, otherRates: [] }
+      if (typeof raw === 'string') {
+        try { data = JSON.parse(raw) } catch (_) { data = {} }
+      } else {
+        data = raw
+      }
+      const rates = Array.isArray(data.rates) ? data.rates : []
+      const sorted = [...rates].sort((a, b) => (a.rate ?? Infinity) - (b.rate ?? Infinity))
+      const selectedRate = sorted[0] || null
+      const otherRates = sorted.slice(1).map((r, idx) => ({ ...r, _key: idx }))
+      return { selectedRate, otherRates }
+    },
+    formatChargedKg() {
+      if (this.quote?.chargedWeightInGrams) return (this.quote.chargedWeightInGrams / 1000).toFixed(0)
+      const cw = this.parsedDelivery.selectedRate?.charged_weight
+      return cw != null ? Number(cw).toFixed(0) : '0'
+    },
     selectedAddress() {
       const list = this.deliveryAddresses || []
       return list.find(a => a.id === this.selectedAddressId) || {}
@@ -746,6 +865,12 @@ export default {
     }
   },
   methods: {
+    openDeliveryInfoDialog() {
+      this.showDeliveryInfoDialog = true
+    },
+    closeDeliveryInfoDialog() {
+      this.showDeliveryInfoDialog = false
+    },
     openAddressDialog() {
       if (this.productsReadOnly) return
       this.showAddressDialog = true

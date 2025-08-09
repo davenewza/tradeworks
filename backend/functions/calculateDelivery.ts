@@ -178,9 +178,13 @@ export default CalculateDelivery(async (ctx, inputs) => {
         console.log(`Selected cheapest rate: ${cheapestRate.service_level.name} at ZAR ${cheapestRate.rate}`);
 
         // Update the quote with the cheapest delivery option
+        const chargedWeightKg = Number(cheapestRate.charged_weight)
+        const chargedWeightInGrams = Number.isFinite(chargedWeightKg) ? Math.round(chargedWeightKg * 1000) : null
         await models.quote.update({ id: quote.id }, {
             deliveryService: cheapestRate.service_level.name,
-            totalDeliveryFees: cheapestRate.rate
+            totalDeliveryFees: cheapestRate.rate_excluding_vat,
+            chargedWeightInGrams: chargedWeightInGrams ?? undefined,
+            deliveryRawJson: apiResponse
         });
 
         // Calculate total weight and volume for summary

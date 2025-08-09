@@ -105,13 +105,18 @@ model Quote {
         equipmentBoxes QuoteEquipmentBox[]
         totalProductPrice Decimal @computed(SUM(quote.products.total))
         totalEquipmentBoxPrice Decimal @computed(SUM(quote.equipmentBoxes.total))
-        total Decimal @computed(quote.totalProductPrice + quote.totalEquipmentBoxPrice + quote.totalDeliveryFees)
-        totalInclVat Decimal @computed(quote.total * 1.15)
-        vat Decimal @computed(quote.totalInclVat - quote.total)
+       
         totalWeightInGrams Decimal @computed(SUM(quote.products.totalWeightInGrams) + SUM(quote.equipmentBoxes.totalWeightInGrams))
+        
         deliveryService Text?
         totalDeliveryFees Decimal @default(0.0)
         deliveryAddress DeliveryAddress?
+        chargedWeightInGrams Decimal?
+        deliveryRawJson Text?
+
+        total Decimal @computed(quote.totalProductPrice + quote.totalEquipmentBoxPrice + quote.totalDeliveryFees)
+        totalInclVat Decimal @computed(quote.total * 1.15)
+        vat Decimal @computed(quote.totalInclVat - quote.total)
         
     }
 
