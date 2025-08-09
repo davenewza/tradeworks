@@ -31,6 +31,10 @@
           <input v-model="form.name" type="text" class="input w-full" placeholder="e.g., Warehouse, Office" required />
           <p v-if="submitAttempted && !form.name" class="mt-1 text-xs text-red-600">Name is required</p>
         </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Organisation</label>
+          <input v-model="form.organisation" type="text" class="input w-full" placeholder="e.g., Acme Ltd" />
+        </div>
         
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Address Line 1 <span class="text-red-600">*</span></label>
@@ -42,18 +46,23 @@
           <input v-model="form.addressLine2" type="text" class="input w-full" />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">City <span class="text-red-600">*</span></label>
-          <input v-model="form.city" type="text" class="input w-full" required />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Suburb <span class="text-red-600">*</span></label>
+          <input v-model="form.suburb" type="text" class="input w-full" required />
+          <p v-if="submitAttempted && !form.suburb" class="mt-1 text-xs text-red-600">Suburb is required</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">City <span v-if="!editingAddress" class="text-red-600">*</span></label>
+          <input v-model="form.city" type="text" class="input w-full" :disabled="!!editingAddress" />
           <p v-if="submitAttempted && !form.city" class="mt-1 text-xs text-red-600">City is required</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Province <span class="text-red-600">*</span></label>
-          <input v-model="form.province" type="text" class="input w-full" required />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Province <span v-if="!editingAddress" class="text-red-600">*</span></label>
+          <input v-model="form.province" type="text" class="input w-full" :disabled="!!editingAddress" />
           <p v-if="submitAttempted && !form.province" class="mt-1 text-xs text-red-600">Province is required</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code <span class="text-red-600">*</span></label>
-          <input v-model="form.postalCode" type="text" class="input w-full" required />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code <span v-if="!editingAddress" class="text-red-600">*</span></label>
+          <input v-model="form.postalCode" type="text" class="input w-full" :disabled="!!editingAddress" />
           <p v-if="submitAttempted && !form.postalCode" class="mt-1 text-xs text-red-600">Postal Code is required</p>
         </div>
         <div class="md:col-span-2">
@@ -133,9 +142,11 @@ export default {
       isFormOpen: false,
       form: {
         name: '',
+        organisation: '',
         addressLine1: '',
         addressLine2: '',
         deliveryNotes: '',
+        suburb: '',
         city: '',
         province: '',
         postalCode: ''
@@ -147,9 +158,10 @@ export default {
       const required = [
         this.form.name,
         this.form.addressLine1,
-        this.form.city,
-        this.form.province,
-        this.form.postalCode
+        this.form.suburb,
+        (!this.editingAddress ? this.form.city : 'ok'),
+        (!this.editingAddress ? this.form.province : 'ok'),
+        (!this.editingAddress ? this.form.postalCode : 'ok')
       ]
       return required.every(v => typeof v === 'string' && v.trim().length > 0)
     }
@@ -174,9 +186,11 @@ export default {
       this.editingAddress = null
       this.form = {
         name: '',
+        organisation: '',
         addressLine1: '',
         addressLine2: '',
         deliveryNotes: '',
+        suburb: '',
         city: '',
         province: '',
         postalCode: ''
@@ -196,9 +210,11 @@ export default {
       this.editingAddress = address
       this.form = {
         name: address.name || '',
+        organisation: address.organisation || '',
         addressLine1: address.addressLine1 || '',
         addressLine2: address.addressLine2 || '',
         deliveryNotes: address.deliveryNotes || '',
+        suburb: address.suburb || '',
         city: address.city || '',
         province: address.province || '',
         postalCode: address.postalCode || ''
@@ -216,8 +232,8 @@ export default {
         this.error = null
         if (this.editingAddress) {
           // Only send allowed fields on update
-          const { name, addressLine1, addressLine2, deliveryNotes } = this.form
-          await deliveryAddressService.updateDeliveryAddress(this.editingAddress.id, { name, addressLine1, addressLine2, deliveryNotes })
+          const { name, organisation, addressLine1, addressLine2, suburb, deliveryNotes } = this.form
+          await deliveryAddressService.updateDeliveryAddress(this.editingAddress.id, { name, organisation, addressLine1, addressLine2, suburb, deliveryNotes })
         } else {
           await deliveryAddressService.createDeliveryAddress({ ...this.form }, this.customerId)
         }

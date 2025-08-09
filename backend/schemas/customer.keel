@@ -57,8 +57,10 @@ model DeliveryAddress {
     fields {
         customer Customer
         name Text
+        organisation Text?
         addressLine1 Text
         addressLine2 Text @default("")
+        suburb Text 
         city Text
         province Text
         postalCode Text
@@ -69,12 +71,12 @@ model DeliveryAddress {
 
     actions {
         get getDeliveryAddress(id)
-        create createDeliveryAddress() with (customer.id, name, addressLine1, addressLine2?, city, province, postalCode, deliveryNotes?)
+        create createDeliveryAddress() with (customer.id, organisation?, name, addressLine1, addressLine2?, suburb, city, province, postalCode, deliveryNotes?)
         list listDeliveryAddresses(customer.id) {
             @where(deliveryAddress.isActive == true)
         }
         // city, province, postalCode, country cannot be edited
-        update updateDeliveryAddress(id) with (name, addressLine1, addressLine2?, deliveryNotes?)
+        update updateDeliveryAddress(id) with (name, organisation, addressLine1, addressLine2?, suburb?, deliveryNotes?)
         update deactivateDeliveryAddress(id) {
             @set(deliveryAddress.isActive = false)
         }

@@ -56,6 +56,28 @@
       </div>
     </div>
 
+    <!-- Delivery Address Selection -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-2">
+        <label class="block text-sm font-medium text-gray-700">Delivery Address <span class="text-red-600" v-if="!productsReadOnly">*</span></label>
+        <span v-if="!productsReadOnly && addressSubmitAttempted && !selectedAddressId" class="text-xs text-red-600">Address is required</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <select 
+          class="input w-full md:w-1/2" 
+          v-model="selectedAddressId"
+          :disabled="productsReadOnly || loadingAddresses"
+          @change="onAddressChange"
+        >
+          <option value="" disabled>Select an address</option>
+          <option v-for="addr in deliveryAddresses" :key="addr.id" :value="addr.id">
+            {{ addr.organisation ? addr.organisation + ' — ' : '' }}{{ addr.name }} — {{ addr.addressLine1 }}, {{ addr.suburb }}, {{ addr.city }}
+          </option>
+        </select>
+        <button class="btn btn-secondary" @click="$emit('back')" v-if="false">Manage Addresses</button>
+      </div>
+    </div>
+
     <!-- Products Section -->
     <div class="card">
 
@@ -180,8 +202,8 @@
         <button 
           @click="toggleProductsReadOnly" 
           class="btn btn-secondary"
-          :disabled="!productsReadOnly && quoteProducts.length === 0"
-          :class="{ 'opacity-50 cursor-not-allowed': !productsReadOnly && quoteProducts.length === 0 }"
+          :disabled="(!productsReadOnly && (quoteProducts.length === 0 || !selectedAddressId))"
+          :class="{ 'opacity-50 cursor-not-allowed': (!productsReadOnly && (quoteProducts.length === 0 || !selectedAddressId)) }"
         >
           {{ productsReadOnly ? 'Edit Products' : 'Continue with Shipping' }}
         </button>
@@ -498,6 +520,10 @@ export default {
     quote: {
       type: Object,
       required: true
+    },
+    customerId: {
+      type: String,
+      required: false
     }
   },
   data() {
@@ -523,7 +549,11 @@ export default {
       loadingDeliveryRates: false,
       deliveryRatesError: null,
       submittingQuote: false,
-      productsReadOnly: false
+      productsReadOnly: false,
+      deliveryAddresses: [],
+      loadingAddresses: false,
+      selectedAddressId: '',
+      addressSubmitAttempted: false
     }
   },
   async mounted() {
@@ -533,6 +563,11 @@ export default {
     await this.loadProductDetails()
     await this.loadEquipmentBoxes()
     this.initializeBoxType()
+    await this.loadDeliveryAddresses()
+    // hydrate selected from quote if present
+    if (this.quote.deliveryAddressId) {
+      this.selectedAddressId = this.quote.deliveryAddressId
+    }
     this.checkExistingDeliveryDetails()
     // If delivery already set on quote, lock products and show delivery sections
     if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
@@ -628,6 +663,33 @@ export default {
     }
   },
   methods: {
+    async loadDeliveryAddresses() {
+      try {
+        if (!this.customerId) return
+        this.loadingAddresses = true
+        const { deliveryAddressService } = await import('../services/deliveryAddressService.js')
+        const result = await deliveryAddressService.listDeliveryAddresses(this.customerId)
+        this.deliveryAddresses = Array.isArray(result) ? result : (result.results || [])
+      } catch (e) {
+        console.error('Failed to load delivery addresses', e)
+        this.deliveryAddresses = []
+      } finally {
+        this.loadingAddresses = false
+      }
+    },
+
+    async onAddressChange() {
+      try {
+        // update quote delivery address on change
+        await quoteService.updateQuoteDeliveryAddress(this.quote.id, this.selectedAddressId)
+        const updatedQuote = await quoteService.getQuote(this.quote.id)
+        this.$emit('quote-updated', updatedQuote)
+      } catch (e) {
+        console.error('Failed to update quote delivery address', e)
+        alert('Failed to update delivery address: ' + (e.message || 'Unknown error'))
+      }
+    },
+
     selectBoxType(type) {
       if (this.selectedBoxType !== type) {
         this.selectedBoxType = type
@@ -636,6 +698,13 @@ export default {
       }
     },
     async toggleProductsReadOnly() {
+      if (!this.productsReadOnly) {
+        // going into shipping mode; require address
+        this.addressSubmitAttempted = true
+        if (!this.selectedAddressId) {
+          return
+        }
+      }
       this.productsReadOnly = !this.productsReadOnly
       
       if (this.productsReadOnly && this.selectedBoxType) {
@@ -647,6 +716,7 @@ export default {
         }
       } else if (!this.productsReadOnly) {
         // If switching back to editing mode, reset delivery info
+        this.addressSubmitAttempted = false
         await this.resetDeliveryInfo()
       }
     },

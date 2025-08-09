@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Always reserve space for the vertical scrollbar to prevent layout shift */
+    overflow-y: scroll;
+  }
   body {
     @apply bg-gray-50 text-gray-900;
   }

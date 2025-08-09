@@ -55,10 +55,12 @@ class DeliveryAddressService {
       customer: { id: customerId },
       name: address.name,
       addressLine1: address.addressLine1,
+      suburb: address.suburb,
       city: address.city,
       province: address.province,
       postalCode: address.postalCode,
     }
+    if (address.organisation) payload.organisation = address.organisation
     if (address.addressLine2) payload.addressLine2 = address.addressLine2
     if (address.deliveryNotes) payload.deliveryNotes = address.deliveryNotes
     return this.makeRequest('/createDeliveryAddress', payload)
@@ -67,9 +69,11 @@ class DeliveryAddressService {
   async updateDeliveryAddress(id, updates) {
     // Values allowed: name, addressLine1, addressLine2, deliveryNotes
     const values = {}
+    if (typeof updates.organisation === 'string') values.organisation = updates.organisation
     if (typeof updates.name === 'string') values.name = updates.name
     if (typeof updates.addressLine1 === 'string') values.addressLine1 = updates.addressLine1
     if (typeof updates.addressLine2 === 'string') values.addressLine2 = updates.addressLine2
+    if (typeof updates.suburb === 'string') values.suburb = updates.suburb
     if (typeof updates.deliveryNotes === 'string') values.deliveryNotes = updates.deliveryNotes
     return this.makeRequest('/updateDeliveryAddress', { where: { id }, values })
   }

@@ -18,6 +18,7 @@
     <div v-else-if="selectedQuote">
       <QuoteDetail 
         :quote="selectedQuote" 
+        :customer-id="customerId"
         @back="selectedQuote = null"
         @quote-updated="handleQuoteUpdated"
         @quote-deleted="handleQuoteDeleted"

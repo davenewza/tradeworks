@@ -16,16 +16,6 @@ const COLLECTION_ADDRESS = {
     code: "7130"
 };
 
-const DELIVERY_ADDRESS = {
-    type: "residential",
-    company: "",
-    street_address: "10 Midas Avenue",
-    local_area: "Olympus AH",
-    city: "Pretoria",
-    zone: "Gauteng",
-    country: "ZA",
-    code: "0081"
-};
 
 // To learn more about what you can do with custom functions, visit https://docs.keel.so/functions
 export default CalculateDelivery(async (ctx, inputs) => {
@@ -35,6 +25,17 @@ export default CalculateDelivery(async (ctx, inputs) => {
     if (!quote) {
         throw new Error('Quote not found');
     }
+
+    if (!quote.deliveryAddressId) {
+        throw new Error('No delivery address assigned to this quote.');
+    }
+    
+    const deliveryAddress = await models.deliveryAddress.findOne({ id: quote.deliveryAddressId });
+    
+    if (!deliveryAddress) {
+        throw new Error('Delivery address not found for this quote.');
+    }
+    
 
     // Get all equipment boxes for this quote
     const quoteEquipmentBoxes = await models.quoteEquipmentBox.findMany({
@@ -127,7 +128,16 @@ export default CalculateDelivery(async (ctx, inputs) => {
     // Prepare the API request body
     const requestBody = {
         collection_address: COLLECTION_ADDRESS,
-        delivery_address: DELIVERY_ADDRESS,
+        delivery_address: {
+            type: "business",
+            company: "",
+            street_address: deliveryAddress.addressLine1 + ", " + deliveryAddress.addressLine2,
+            local_area: deliveryAddress.suburb,
+            city: deliveryAddress.city,
+            zone: deliveryAddress.province,
+            country: deliveryAddress.country,
+            code: deliveryAddress.postalCode
+        },
         parcels: parcels
     };
 
@@ -188,7 +198,7 @@ export default CalculateDelivery(async (ctx, inputs) => {
             equipmentBoxWeightKg: totalWeightKg - totalProductWeightKg,
             productDetails: productDetails,
             collectionAddress: COLLECTION_ADDRESS,
-            deliveryAddress: DELIVERY_ADDRESS,
+            //deliveryAddress: DELIVERY_ADDRESS,
             selectedDeliveryService: cheapestRate.service_level.name,
             selectedDeliveryFees: cheapestRate.rate,
             availableRates: rates.map((rate: any) => ({

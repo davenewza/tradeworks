@@ -111,6 +111,7 @@ model Quote {
         totalWeightInGrams Decimal @computed(SUM(quote.products.totalWeightInGrams) + SUM(quote.equipmentBoxes.totalWeightInGrams))
         deliveryService Text?
         totalDeliveryFees Decimal @default(0.0)
+        deliveryAddress DeliveryAddress?
         
     }
 
@@ -125,6 +126,7 @@ model Quote {
             @where(quote.status == QuoteStatus.Submitted)
         }
         delete deleteQuote(id)
+        update updateQuoteDeliveryAddress(id) with (deliveryAddress.id)
         update updateQuoteDelivery(id) with (deliveryService,totalDeliveryFees)
         update submitQuote(id) {
             @set(quote.status = QuoteStatus.Submitted)

@@ -128,6 +128,18 @@ class QuoteService {
     })
   }
 
+  // Update quote delivery address
+  async updateQuoteDeliveryAddress(quoteId, deliveryAddressId) {
+    return await this.makeRequest('/updateQuoteDeliveryAddress', {
+      where: {
+        id: quoteId
+      },
+      values: {
+        deliveryAddress: deliveryAddressId ? { id: deliveryAddressId } : null
+      }
+    })
+  }
+
   // Submit a quote
   async submitQuote(quoteId) {
     return await this.makeRequest('/submitQuote', { id: quoteId })
