@@ -1,0 +1,48 @@
+{
+  "id": "list-submitted-quotes",
+  "action_name": "listSubmittedQuotes",
+  "response": {
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].customerPriceListId": {
+      "visible": false
+    },
+    "$.results[*].deliveryService": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false,
+      "link": {
+        "tool_id": "get-quote",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].total": {
+      "visible": false
+    },
+    "$.results[*].totalDeliveryFees": {
+      "visible": false
+    },
+    "$.results[*].totalEquipmentBoxPrice": {
+      "visible": false
+    },
+    "$.results[*].totalProductPrice": {
+      "visible": false
+    },
+    "$.results[*].totalWeightInGrams": {
+      "visible": false
+    },
+    "$.results[*].vat": {
+      "visible": false
+    }
+  }
+}

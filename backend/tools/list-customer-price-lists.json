@@ -1,0 +1,18 @@
+{
+  "id": "list-customer-price-lists",
+  "action_name": "listCustomerPriceLists",
+  "response": {
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].customerId": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

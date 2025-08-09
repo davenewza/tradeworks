@@ -1,0 +1,15 @@
+{
+  "id": "list-delivery-addresses",
+  "action_name": "listDeliveryAddresses",
+  "response": {
+    "$.results[*].customerId": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false
+    },
+    "$.results[*].isActive": {
+      "visible": false
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "list-users",
+  "action_name": "listUsers",
+  "response": {
+    "$.results[*].customerId": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false,
+      "link": {
+        "tool_id": "get-user",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].identityId": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

@@ -22,6 +22,13 @@
             <p class="text-gray-600">Quote Generation System</p>
           </div>
           <div class="flex items-center space-x-4">
+            <button
+              v-if="hasCustomerId"
+              @click="showAddresses = true"
+              class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 border border-blue-200"
+            >
+              Manage Delivery Addresses
+            </button>
             <span class="text-sm text-gray-600">
               Welcome, {{ currentUser?.firstName || currentUser?.id || 'User' }}
             </span>
@@ -45,9 +52,14 @@
       
       <!-- Main Application Content -->
       <PriceListManager 
-        v-else-if="hasCustomerId" 
+        v-else-if="hasCustomerId && !showAddresses" 
         :customer-id="customerId" 
         :key="`price-list-manager-${customerId}`"
+      />
+      <DeliveryAddresses 
+        v-else-if="hasCustomerId && showAddresses" 
+        :customer-id="customerId"
+        @close="showAddresses = false" 
       />
     </div>
   </div>
@@ -57,6 +69,7 @@
 import PriceListManager from './components/PriceListManager.vue'
 import LoginForm from './components/LoginForm.vue'
 import UserProfileDialog from './components/UserProfileDialog.vue'
+import DeliveryAddresses from './components/DeliveryAddresses.vue'
 import { authService } from './services/authService.js'
 
 export default {
@@ -64,7 +77,8 @@ export default {
   components: {
     PriceListManager,
     LoginForm,
-    UserProfileDialog
+    UserProfileDialog,
+    DeliveryAddresses
   },
   data() {
     return {
@@ -72,7 +86,8 @@ export default {
       currentUser: null,
       showProfileDialog: false,
       loginData: null,
-      customerId: null
+      customerId: null,
+      showAddresses: false
     }
   },
   computed: {

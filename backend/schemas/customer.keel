@@ -15,7 +15,70 @@ model User {
         }
         get getUser(id) 
         update assignToCustomer(id) with (customer.id) 
-        list listUsers() 
+        list listUsers(customer.id?) 
     }
     @permission(expression: ctx.isAuthenticated, actions: [create, get, update, list])
+}
+
+model Customer {
+    fields {
+        name Text
+        deliveryAddresses DeliveryAddress[]
+        priceLists CustomerPriceList[]
+    }
+
+    actions {
+        get getCustomer(id)
+        create createCustomer() with (name)
+        list listCustomers()
+        delete deleteCustomer(id)
+    }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+}
+
+model CustomerPriceList {
+    fields {
+        customer Customer
+        priceList PriceList
+    }
+
+    actions {
+        create createCustomerPriceList() with (customer.id, priceList.id)
+        list listCustomerPriceLists(customer.id)
+        delete deleteCustomerPriceList(id)
+    }
+
+    @unique([customer, priceList])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete])
+}
+
+model DeliveryAddress {
+    fields {
+        customer Customer
+        name Text
+        addressLine1 Text
+        addressLine2 Text @default("")
+        city Text
+        province Text
+        postalCode Text
+        country Text @default("South Africa")
+        deliveryNotes Text @default("")
+        isActive Boolean @default(true)
+    }
+
+    actions {
+        get getDeliveryAddress(id)
+        create createDeliveryAddress() with (customer.id, name, addressLine1, addressLine2?, city, province, postalCode, deliveryNotes?)
+        list listDeliveryAddresses(customer.id) {
+            @where(deliveryAddress.isActive == true)
+        }
+        // city, province, postalCode, country cannot be edited
+        update updateDeliveryAddress(id) with (name, addressLine1, addressLine2?, deliveryNotes?)
+        update deactivateDeliveryAddress(id) {
+            @set(deliveryAddress.isActive = false)
+        }
+    }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }

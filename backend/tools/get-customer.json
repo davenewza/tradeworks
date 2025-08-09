@@ -8,6 +8,9 @@
     "$.id": {
       "display_order": 2
     },
+    "$.priceLists": {
+      "display_order": 1
+    },
     "$.updatedAt": {
       "display_order": 4
     }
@@ -26,11 +29,118 @@
           }
         }
       ]
+    },
+    {
+      "tool_id": "create-delivery-address",
+      "title": "New delivery address",
+      "as_dialog": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.customer.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
     }
   ],
   "embedded_tools": [
     {
+      "id": "custom-embed-67360v0c",
+      "title": "Quotes",
+      "display_order": 1,
+      "visible": true,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-draft-quotes",
+            "display_order": 2,
+            "data_mapping": [
+              {
+                "key": "$.where.customerPriceList.customer.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "action_link": {
+            "tool_id": "list-submitted-quotes",
+            "display_order": 3,
+            "data_mapping": [
+              {
+                "key": "$.where.customerPriceList.customer.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "priceLists",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-customer-price-lists"
+          },
+          "response_overrides": {
+            "$.results[*].customerId": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "custom-embed-330i014p",
+      "title": "Users",
+      "display_order": 3,
+      "visible": true,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-users",
+            "display_order": 0,
+            "data_mapping": [
+              {
+                "key": "$.where.customer.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "custom-embed-5u3x0g4m",
+      "title": "Delivery addresses",
+      "display_order": 4,
+      "visible": true,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-delivery-addresses",
+            "display_order": 0,
+            "data_mapping": [
+              {
+                "key": "$.where.customer.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "deliveryAddresses",
       "deleted": true
     }
   ]

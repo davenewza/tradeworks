@@ -68,37 +68,8 @@ model PriceList {
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
-model Customer {
-    fields {
-        name Text
-        priceLists CustomerPriceList[]
-    }
 
-    actions {
-        get getCustomer(id)
-        create createCustomer() with (name)
-        list listCustomers()
-        delete deleteCustomer(id)
-    }
 
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-}
-
-model CustomerPriceList {
-    fields {
-        customer Customer
-        priceList PriceList
-    }
-
-    actions {
-        create createCustomerPriceList() with (customer.id, priceList.id)
-        list listCustomerPriceLists(customer.id?)
-        delete deleteCustomerPriceList(id)
-    }
-
-    @unique([customer, priceList])
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete])
-}
 
 model QuoteProduct {
     fields {
@@ -146,7 +117,13 @@ model Quote {
     actions {
         get getQuote(id)
         create createQuote() with (customerPriceList.id)
-        list listQuotes(customerPriceList.customer.id?)
+        list listQuotes(customerPriceList.customer.id?, status?)
+        list listDraftQuotes(customerPriceList.customer.id) {
+            @where(quote.status == QuoteStatus.Draft)
+        } 
+        list listSubmittedQuotes(customerPriceList.customer.id) {
+            @where(quote.status == QuoteStatus.Submitted)
+        }
         delete deleteQuote(id)
         update updateQuoteDelivery(id) with (deliveryService,totalDeliveryFees)
         update submitQuote(id) {
