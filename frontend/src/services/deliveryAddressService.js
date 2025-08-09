@@ -65,6 +65,9 @@ class DeliveryAddressService {
       postalCode: address.postalCode,
     }
     if (address.organisation) payload.organisation = address.organisation
+    if (address.contactPerson) payload.contactPerson = address.contactPerson
+    if (address.contactPhone) payload.contactPhone = address.contactPhone
+    if (address.contactEmail) payload.contactEmail = address.contactEmail
     if (address.addressLine2) payload.addressLine2 = address.addressLine2
     if (address.deliveryNotes) payload.deliveryNotes = address.deliveryNotes
     return this.makeRequest('/createDeliveryAddress', payload)
@@ -74,6 +77,9 @@ class DeliveryAddressService {
     // Values allowed: name, addressLine1, addressLine2, deliveryNotes
     const values = {}
     if (typeof updates.organisation === 'string') values.organisation = updates.organisation
+    if (typeof updates.contactPerson === 'string') values.contactPerson = updates.contactPerson
+    if (typeof updates.contactPhone === 'string') values.contactPhone = updates.contactPhone
+    if (typeof updates.contactEmail === 'string') values.contactEmail = updates.contactEmail
     if (typeof updates.name === 'string') values.name = updates.name
     if (typeof updates.addressLine1 === 'string') values.addressLine1 = updates.addressLine1
     if (typeof updates.addressLine2 === 'string') values.addressLine2 = updates.addressLine2

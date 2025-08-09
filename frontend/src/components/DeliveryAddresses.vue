@@ -35,6 +35,19 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Organisation</label>
           <input v-model="form.organisation" type="text" class="input w-full" placeholder="e.g., Acme Ltd" />
         </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+          <input v-model="form.contactPerson" type="text" class="input w-full" placeholder="e.g., Jane Doe" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+          <input v-model="form.contactPhone" type="tel" class="input w-full" placeholder="e.g., 082 123 4567" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+          <input v-model="form.contactEmail" type="email" class="input w-full" placeholder="e.g., jane@example.com" />
+        </div>
         
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Address Line 1 <span class="text-red-600">*</span></label>
@@ -94,22 +107,34 @@
 
       <div v-else class="space-y-3">
         <div v-for="address in addresses" :key="address.id" class="border border-gray-200 rounded-lg p-4">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="flex items-center gap-2">
-                <h4 class="font-medium text-gray-900">{{ address.name || 'Address' }}</h4>
-                <span v-if="address.isActive === false" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">Inactive</span>
-              </div>
-              <p class="text-sm text-gray-700">{{ address.addressLine1 }}</p>
-              <p v-if="address.addressLine2" class="text-sm text-gray-500">{{ address.addressLine2 }}</p>
-              <p class="text-sm text-gray-700">{{ address.city }}, {{ address.province }} {{ address.postalCode }}</p>
-              <p v-if="address.deliveryNotes" class="text-xs text-gray-500 mt-1">{{ address.deliveryNotes }}</p>
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <h4 class="text-base font-semibold text-gray-900">{{ address.name || 'Address' }}</h4>
+              <span v-if="address.isActive === false" class="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">Inactive</span>
             </div>
             <div class="flex items-center gap-2">
               <button @click="startEdit(address)" class="btn btn-secondary btn-sm">Edit</button>
               <button @click="deactivate(address)" class="btn btn-danger btn-sm" :disabled="deactivatingId === address.id">
                 {{ deactivatingId === address.id ? 'Deactivating...' : 'Deactivate' }}
               </button>
+            </div>
+          </div>
+          <div class="md:grid md:grid-cols-2 md:gap-6">
+            <!-- Left: Name/Org/Contact -->
+            <div class="space-y-1">
+              <p v-if="address.organisation" class="text-sm text-gray-700">{{ address.organisation }}</p>
+              <div v-if="address.contactPerson || address.contactPhone || address.contactEmail" class="space-y-0.5">
+                <p v-if="address.contactPerson" class="text-sm text-gray-700">Contact: {{ address.contactPerson }}</p>
+                <p v-if="address.contactPhone" class="text-sm text-gray-700">Phone: {{ address.contactPhone }}</p>
+                <p v-if="address.contactEmail" class="text-sm text-gray-700">Email: {{ address.contactEmail }}</p>
+              </div>
+            </div>
+            <!-- Right: Physical Address -->
+            <div class="space-y-1 mt-3 md:mt-6">
+              <p class="text-sm text-gray-700">{{ address.addressLine1 }}</p>
+              <p v-if="address.addressLine2" class="text-sm text-gray-700">{{ address.addressLine2 }}</p>
+              <p class="text-sm text-gray-700">{{ address.suburb }}, {{ address.city }}, {{ address.province }} {{ address.postalCode }}</p>
+              <p v-if="address.deliveryNotes" class="text-sm text-gray-700">{{ address.deliveryNotes }}</p>
             </div>
           </div>
         </div>
@@ -143,6 +168,9 @@ export default {
       form: {
         name: '',
         organisation: '',
+        contactPerson: '',
+        contactPhone: '',
+        contactEmail: '',
         addressLine1: '',
         addressLine2: '',
         deliveryNotes: '',
@@ -187,6 +215,9 @@ export default {
       this.form = {
         name: '',
         organisation: '',
+        contactPerson: '',
+        contactPhone: '',
+        contactEmail: '',
         addressLine1: '',
         addressLine2: '',
         deliveryNotes: '',
@@ -211,6 +242,9 @@ export default {
       this.form = {
         name: address.name || '',
         organisation: address.organisation || '',
+        contactPerson: address.contactPerson || '',
+        contactPhone: address.contactPhone || '',
+        contactEmail: address.contactEmail || '',
         addressLine1: address.addressLine1 || '',
         addressLine2: address.addressLine2 || '',
         deliveryNotes: address.deliveryNotes || '',
@@ -232,8 +266,8 @@ export default {
         this.error = null
         if (this.editingAddress) {
           // Only send allowed fields on update
-          const { name, organisation, addressLine1, addressLine2, suburb, deliveryNotes } = this.form
-          await deliveryAddressService.updateDeliveryAddress(this.editingAddress.id, { name, organisation, addressLine1, addressLine2, suburb, deliveryNotes })
+          const { name, organisation, contactPerson, contactPhone, contactEmail, addressLine1, addressLine2, suburb, deliveryNotes } = this.form
+          await deliveryAddressService.updateDeliveryAddress(this.editingAddress.id, { name, organisation, contactPerson, contactPhone, contactEmail, addressLine1, addressLine2, suburb, deliveryNotes })
         } else {
           await deliveryAddressService.createDeliveryAddress({ ...this.form }, this.customerId)
         }

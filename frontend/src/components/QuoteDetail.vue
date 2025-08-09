@@ -56,25 +56,103 @@
       </div>
     </div>
 
-    <!-- Delivery Address Selection -->
+    <!-- Delivery Address Selection (Dialog + Card) -->
     <div class="card">
       <div class="flex items-center justify-between mb-2">
         <label class="block text-sm font-medium text-gray-700">Delivery Address <span class="text-red-600" v-if="!productsReadOnly">*</span></label>
         <span v-if="!productsReadOnly && addressSubmitAttempted && !selectedAddressId" class="text-xs text-red-600">Address is required</span>
       </div>
-      <div class="flex items-center gap-3">
-        <select 
-          class="input w-full md:w-1/2" 
-          v-model="selectedAddressId"
-          :disabled="productsReadOnly || loadingAddresses"
-          @change="onAddressChange"
-        >
-          <option value="" disabled>Select an address</option>
-          <option v-for="addr in deliveryAddresses" :key="addr.id" :value="addr.id">
-            {{ addr.organisation ? addr.organisation + ' — ' : '' }}{{ addr.name }} — {{ addr.addressLine1 }}, {{ addr.suburb }}, {{ addr.city }}
-          </option>
-        </select>
-        <button class="btn btn-secondary" @click="$emit('back')" v-if="false">Manage Addresses</button>
+      <div class="flex items-start gap-4">
+        <div class="w-full">
+          <div v-if="loadingAddresses" class="rounded-lg border border-gray-200 p-4 text-sm text-gray-500 bg-gray-50">Loading addresses...</div>
+          <div 
+            v-else-if="!selectedAddressId" 
+            class="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-600 transition"
+            :class="{ 'cursor-pointer hover:border-blue-400': !productsReadOnly && !loadingAddresses, 'cursor-not-allowed': productsReadOnly || loadingAddresses }"
+            role="button"
+            tabindex="0"
+            @click="openAddressDialog"
+            @keydown.enter="openAddressDialog"
+          >
+            No address selected
+          </div>
+          <div 
+            v-else 
+            class="rounded-lg border border-gray-200 p-4 bg-white transition w-full"
+            :class="{ 'cursor-pointer hover:border-blue-400': !productsReadOnly && !loadingAddresses, 'cursor-not-allowed': productsReadOnly || loadingAddresses }"
+            role="button"
+            tabindex="0"
+            @click="openAddressDialog"
+            @keydown.enter="openAddressDialog"
+          >
+            <div class="md:grid md:grid-cols-2 md:gap-6">
+              <!-- Left: Name/Org/Contact -->
+              <div class="space-y-1">
+                <div class="text-base font-semibold text-gray-900">{{ selectedAddress.name }}</div>
+                <div v-if="selectedAddress.organisation" class="text-sm text-gray-700">{{ selectedAddress.organisation }}</div>
+                <div v-if="selectedAddress.contactPerson || selectedAddress.contactPhone || selectedAddress.contactEmail" class="space-y-0.5">
+                  <p v-if="selectedAddress.contactPerson" class="text-sm text-gray-700">Contact: {{ selectedAddress.contactPerson }}</p>
+                  <p v-if="selectedAddress.contactPhone" class="text-sm text-gray-700">Phone: {{ selectedAddress.contactPhone }}</p>
+                  <p v-if="selectedAddress.contactEmail" class="text-sm text-gray-700">Email: {{ selectedAddress.contactEmail }}</p>
+                </div>
+              </div>
+              <!-- Right: Physical Address -->
+              <div class="space-y-1 mt-3 md:mt-6">
+                <div class="text-sm text-gray-700">{{ selectedAddress.addressLine1 }}</div>
+                <div v-if="selectedAddress.addressLine2" class="text-sm text-gray-700">{{ selectedAddress.addressLine2 }}</div>
+                <div class="text-sm text-gray-700">{{ selectedAddress.suburb }}, {{ selectedAddress.city }}, {{ selectedAddress.province }} {{ selectedAddress.postalCode }}</div>
+                <div v-if="selectedAddress.deliveryNotes" class="text-sm text-gray-700">{{ selectedAddress.deliveryNotes }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Address Picker Dialog -->
+      <div v-if="showAddressDialog" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black bg-opacity-50" @click="closeAddressDialog"></div>
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden">
+          <div class="flex items-center justify-between p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Select Delivery Address</h3>
+            <button @click="closeAddressDialog" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+            <div v-if="deliveryAddresses.length === 0" class="text-center text-sm text-gray-600 py-8">No delivery addresses found.</div>
+            <div v-else class="space-y-4">
+              <div 
+                v-for="addr in deliveryAddresses" 
+                :key="addr.id"
+                class="border rounded-lg p-4 hover:border-blue-500 hover:shadow cursor-pointer transition w-full"
+                @click="selectAddress(addr.id)"
+              >
+                <div class="md:grid md:grid-cols-2 md:gap-6">
+                  <!-- Left: Name/Org/Contact -->
+                  <div class="space-y-1">
+                    <div class="text-base font-semibold text-gray-900">{{ addr.name }}</div>
+                    <div v-if="addr.organisation" class="text-sm text-gray-700">{{ addr.organisation }}</div>
+                    <div v-if="addr.contactPerson || addr.contactPhone || addr.contactEmail" class="space-y-0.5">
+                      <p v-if="addr.contactPerson" class="text-sm text-gray-700">Contact: {{ addr.contactPerson }}</p>
+                      <p v-if="addr.contactPhone" class="text-sm text-gray-700">Phone: {{ addr.contactPhone }}</p>
+                      <p v-if="addr.contactEmail" class="text-sm text-gray-700">Email: {{ addr.contactEmail }}</p>
+                    </div>
+                  </div>
+                  <!-- Right: Physical Address -->
+                  <div class="space-y-1 mt-3 md:mt-6">
+                    <div class="text-sm text-gray-700">{{ addr.addressLine1 }}</div>
+                    <div v-if="addr.addressLine2" class="text-sm text-gray-700">{{ addr.addressLine2 }}</div>
+                    <div class="text-sm text-gray-700">{{ addr.suburb }}, {{ addr.city }}, {{ addr.province }} {{ addr.postalCode }}</div>
+                    <div v-if="addr.deliveryNotes" class="text-sm text-gray-700">{{ addr.deliveryNotes }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="p-4 border-t border-gray-200 flex justify-end">
+            <button @click="closeAddressDialog" class="btn btn-secondary">Close</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -553,7 +631,8 @@ export default {
       deliveryAddresses: [],
       loadingAddresses: false,
       selectedAddressId: '',
-      addressSubmitAttempted: false
+      addressSubmitAttempted: false,
+      showAddressDialog: false
     }
   },
   async mounted() {
@@ -575,6 +654,10 @@ export default {
     }
   },
   computed: {
+    selectedAddress() {
+      const list = this.deliveryAddresses || []
+      return list.find(a => a.id === this.selectedAddressId) || {}
+    },
     // Note: Totals are now pulled from the quote response from getQuote
     // and should include equipment boxes and delivery fees from the backend
     isDeliverySet() {
@@ -663,6 +746,19 @@ export default {
     }
   },
   methods: {
+    openAddressDialog() {
+      if (this.productsReadOnly) return
+      this.showAddressDialog = true
+    },
+    closeAddressDialog() {
+      this.showAddressDialog = false
+    },
+    selectAddress(id) {
+      if (this.productsReadOnly) return
+      this.selectedAddressId = id
+      this.onAddressChange()
+      this.closeAddressDialog()
+    },
     async loadDeliveryAddresses() {
       try {
         if (!this.customerId) return

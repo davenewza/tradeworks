@@ -66,17 +66,28 @@ model DeliveryAddress {
         postalCode Text
         country Text @default("South Africa")
         deliveryNotes Text @default("")
+
+        contactPerson Text?
+        contactPhone Text?
+        contactEmail Text?
+
         isActive Boolean @default(true)
     }
 
     actions {
         get getDeliveryAddress(id)
-        create createDeliveryAddress() with (customer.id, organisation?, name, addressLine1, addressLine2?, suburb, city, province, postalCode, deliveryNotes?)
+        create createDeliveryAddress() with (customer.id, 
+            organisation?, name, addressLine1, addressLine2?, 
+            suburb, city, province, postalCode, deliveryNotes?,
+            contactPerson?, contactPhone?, contactEmail?)
         list listDeliveryAddresses(customer.id) {
             @where(deliveryAddress.isActive == true)
         }
         // city, province, postalCode, country cannot be edited
-        update updateDeliveryAddress(id) with (name, organisation, addressLine1, addressLine2?, suburb?, deliveryNotes?)
+        update updateDeliveryAddress(id) with (
+            name, organisation, addressLine1, addressLine2?, 
+            suburb?, deliveryNotes?, contactPerson?, 
+            contactPhone?, contactEmail?)
         update deactivateDeliveryAddress(id) {
             @set(deliveryAddress.isActive = false)
         }
