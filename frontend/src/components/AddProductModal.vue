@@ -94,7 +94,8 @@ export default {
     },
     priceListId: {
       type: String,
-      required: true
+      required: false,
+      default: ''
     },
     existingQuoteProducts: {
       type: Array,
@@ -116,7 +117,17 @@ export default {
     async loadProductPrices() {
       this.loading = true
       try {
-        this.productPrices = await productService.getProductPricesByPriceList(this.priceListId)
+        let priceListId = this.priceListId
+        if (!priceListId) {
+          // Try to infer from quoteId → fetch quote to get CPL id, then resolve its priceListId
+          const quote = await quoteService.getQuote(this.quoteId)
+          const { priceListService } = await import('../services/priceListService.js')
+          // Load CPL to get its priceListId
+          const cpls = await priceListService.getCustomerPriceLists(quote.customerPriceList?.customer?.id || '')
+          const match = cpls.find(cpl => cpl.id === quote.customerPriceListId)
+          priceListId = match?.priceListId || ''
+        }
+        this.productPrices = priceListId ? await productService.getProductPricesByPriceList(priceListId) : []
         this.filteredProductPrices = this.filterAvailableProducts(this.productPrices)
       } catch (err) {
         console.error('Failed to load product prices:', err)

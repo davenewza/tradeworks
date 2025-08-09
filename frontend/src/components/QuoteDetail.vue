@@ -724,18 +724,23 @@ export default {
     async loadCustomerPriceList() {
       try {
         const { priceListService } = await import('../services/priceListService.js')
-        // Get the customer price list by its ID to find the actual price list ID
-        const customerPriceList = await priceListService.getCustomerPriceList(this.quote.customerPriceListId)
-        if (customerPriceList) {
-          this.customerPriceList = customerPriceList
+        // Fetch all CPLs for this customer, then find the one matching the quote's CPL id
+        if (this.customerId) {
+          const lists = await priceListService.getCustomerPriceLists(this.customerId)
+          const match = lists.find(l => l.id === this.quote.customerPriceListId)
+          if (match) {
+            this.customerPriceList = match
+          } else {
+            console.warn('Customer price list not found for quote. Falling back to empty priceListId')
+            this.customerPriceList = { priceListId: '' }
+          }
         } else {
-          // Fallback - assume the customerPriceListId is actually the price list ID
-          this.customerPriceList = { priceListId: this.quote.customerPriceListId }
+          console.warn('No customerId provided to QuoteDetail; cannot resolve priceListId')
+          this.customerPriceList = { priceListId: '' }
         }
       } catch (err) {
         console.error('Failed to load customer price list:', err)
-        // Fallback - assume the customerPriceListId is actually the price list ID
-        this.customerPriceList = { priceListId: this.quote.customerPriceListId }
+        this.customerPriceList = { priceListId: '' }
       }
     },
     
