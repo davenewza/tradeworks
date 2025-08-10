@@ -1,0 +1,8 @@
+environment:
+  - name: SHIPLOGIC_API_URL
+    value: "https://api.shiplogic.com/v2/rates?provider_id=123"
+  - name: DELIVERY_MULTIPLIER
+    value: "sad1.1"
+
+secrets:
+  - name: SHIPLOGIC_API_KEY

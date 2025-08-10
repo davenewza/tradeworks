@@ -1,13 +1,8 @@
 import { CalculateDelivery, models } from '@teamkeel/sdk';
 
-// Shiplogic API configuration
-const SHIPLOGIC_API_URL = 'https://api.shiplogic.com/v2/rates?provider_id=123';
-const SHIPLOGIC_API_KEY = '9480346aa35d4aec9ba1c067990e4503';
-
-// Default addresses (these could be made configurable)
 const COLLECTION_ADDRESS = {
     type: "business",
-    company: "CREATESPACE",
+    company: "Tradeworks",
     street_address: "65 Oak Street",
     local_area: "Somerset West",
     city: "Somerset West",
@@ -16,10 +11,7 @@ const COLLECTION_ADDRESS = {
     code: "7130"
 };
 
-
-// To learn more about what you can do with custom functions, visit https://docs.keel.so/functions
 export default CalculateDelivery(async (ctx, inputs) => {
-    // Get the quote
     const quote = await models.quote.findOne({ id: inputs.id });
 
     if (!quote) {
@@ -125,31 +117,31 @@ export default CalculateDelivery(async (ctx, inputs) => {
 
     console.log(`Total parcels to ship: ${parcels.length}`);
 
-    // Prepare the API request body
+    const deliveryAddressObject = {
+        type: "business",
+        company: deliveryAddress.organisation || "",
+        street_address: deliveryAddress.addressLine1 + ", " + deliveryAddress.addressLine2,
+        local_area: deliveryAddress.suburb || "",
+        city: deliveryAddress.city,
+        zone: deliveryAddress.province,
+        country: deliveryAddress.country,
+        code: deliveryAddress.postalCode
+    };
+
     const requestBody = {
         collection_address: COLLECTION_ADDRESS,
-        delivery_address: {
-            type: "business",
-            company: "",
-            street_address: deliveryAddress.addressLine1 + ", " + deliveryAddress.addressLine2,
-            local_area: deliveryAddress.suburb,
-            city: deliveryAddress.city,
-            zone: deliveryAddress.province,
-            country: deliveryAddress.country,
-            code: deliveryAddress.postalCode
-        },
+        delivery_address: deliveryAddressObject,
         parcels: parcels
     };
 
     console.log('Calling Shiplogic API with request:', JSON.stringify(requestBody, null, 2));
 
     try {
-        // Call the Shiplogic API
-        const response = await fetch(SHIPLOGIC_API_URL, {
+        const response = await fetch(ctx.env.SHIPLOGIC_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SHIPLOGIC_API_KEY}`
+                'Authorization': `Bearer ${ctx.secrets.SHIPLOGIC_API_KEY}`
             },
             body: JSON.stringify(requestBody)
         });
@@ -177,12 +169,14 @@ export default CalculateDelivery(async (ctx, inputs) => {
 
         console.log(`Selected cheapest rate: ${cheapestRate.service_level.name} at ZAR ${cheapestRate.rate}`);
 
+       
+
         // Update the quote with the cheapest delivery option
         const chargedWeightKg = Number(cheapestRate.charged_weight)
         const chargedWeightInGrams = Number.isFinite(chargedWeightKg) ? Math.round(chargedWeightKg * 1000) : null
         await models.quote.update({ id: quote.id }, {
             deliveryService: cheapestRate.service_level.name,
-            totalDeliveryFees: cheapestRate.rate_excluding_vat,
+            totalDeliveryFees: cheapestRate.rate_excluding_vat * 1.1,
             chargedWeightInGrams: chargedWeightInGrams ?? undefined,
             deliveryRawJson: apiResponse
         });
@@ -202,7 +196,7 @@ export default CalculateDelivery(async (ctx, inputs) => {
             equipmentBoxWeightKg: totalWeightKg - totalProductWeightKg,
             productDetails: productDetails,
             collectionAddress: COLLECTION_ADDRESS,
-            //deliveryAddress: DELIVERY_ADDRESS,
+            deliveryAddress: deliveryAddressObject,
             selectedDeliveryService: cheapestRate.service_level.name,
             selectedDeliveryFees: cheapestRate.rate,
             availableRates: rates.map((rate: any) => ({
@@ -216,10 +210,10 @@ export default CalculateDelivery(async (ctx, inputs) => {
                     collectionCutOffTime: rate.service_level.collection_cut_off_time
                 },
                 pricing: {
-                    rate: rate.rate,
-                    rateExcludingVat: rate.rate_excluding_vat,
-                    vat: rate.base_rate.vat,
-                    vatPercentage: rate.base_rate.vat_percentage
+                    rate: rate.rate * 1.1,
+                    rateExcludingVat: rate.rate_excluding_vat * 1.1,
+                    vat: rate.base_rate.vat * 1.1,
+                    vatPercentage: rate.base_rate.vat_percentage * 1.1
                 },
                 weights: {
                     chargedWeight: rate.charged_weight,
