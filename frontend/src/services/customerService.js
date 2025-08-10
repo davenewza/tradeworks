@@ -1,18 +1,28 @@
-const API_BASE = '/api/json'
+import { API_BASE } from '../config/api.js'
+import { authService } from './authService.js'
 
 class CustomerService {
   async makeRequest(endpoint, data = null) {
+    const headers = {
+      'Content-Type': 'application/json'
+    }
+    const token = authService.getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: data ? JSON.stringify(data) : undefined,
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      const message = errorData.message || `HTTP error! status: ${response.status}`
+      if (typeof message === 'string' && message.toLowerCase().includes('token has expired')) {
+        authService.logout()
+        window.location.reload()
+      }
+      throw new Error(message)
     }
 
     return response.json()

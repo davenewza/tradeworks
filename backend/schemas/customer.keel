@@ -35,10 +35,9 @@ model Customer {
         get getCustomer(id)
         create createCustomer() with (name)
         list listCustomers()
-        delete deleteCustomer(id)
     }
 
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update])
 }
 
 model CustomerPriceList {

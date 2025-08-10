@@ -1,0 +1,81 @@
+model Brand {
+    fields {
+        name Text
+        logo File?
+    }
+
+    actions {
+        get getBrand(id)
+        create createBrand() with (name, logo?)
+        list listBrands()
+        update updateBrandLogo(id) with (logo)
+    }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+}
+
+model Product {
+    fields {
+        name Text
+        brand Brand
+        sku Text @unique
+        image File
+
+        lengthInCm Decimal
+        widthInCm Decimal
+        heightInCm Decimal
+        weightInGrams Decimal
+
+        volumeInLitres Decimal @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
+    }
+
+    actions {
+        get getProduct(id)
+        create createProduct() with (name, sku, image, brand.id, lengthInCm, widthInCm, heightInCm, weightInGrams)//, costPrice, freightIn)
+        list listProducts(name?, sku?,  brand.id?)
+        update updateProductDimensions(id) with (lengthInCm, widthInCm, heightInCm, weightInGrams)
+        update updateProduct(id) with (name?,  brand.id?, sku?)//, costPrice?, freightIn?)
+        delete deleteProduct(id)
+    }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+}
+
+model EquipmentBox {
+    fields {
+        name Text
+        sku Text? 
+        boxType BoxType 
+        image File?
+
+        price Decimal @computed(equipmentBox.priceInclVat / 115 * 100)
+        priceInclVat Decimal 
+
+        lengthInCm Decimal
+        widthInCm Decimal
+        heightInCm Decimal
+        weightInGrams Decimal
+
+        totalVolumeInLitres Decimal @computed(equipmentBox.lengthInCm * equipmentBox.widthInCm * equipmentBox.heightInCm / 1000)
+        holdingVolumeInLitres Decimal @default(0.0)
+
+        volumeUtilisationQuotient Decimal
+        effectiveVolumeInLitres Decimal @computed(equipmentBox.holdingVolumeInLitres * equipmentBox.volumeUtilisationQuotient)
+    }
+
+    actions {
+        get getEquipmentBox(id)
+        create createEquipmentBox() with (name, sku, boxType,image?, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        list listEquipmentBoxes()
+        update updateEquipmentBoxImage(id) with (image)
+        update updateEquipmentBox(id) with (name, sku, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        delete deleteEquipmentBox(id)
+    }
+
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+}
+
+enum BoxType {
+    Cardboard
+    PlasticEquipment
+}

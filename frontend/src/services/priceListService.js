@@ -99,6 +99,25 @@ class PriceListService {
   async deleteCustomerPriceList(customerPriceListId) {
     return await this.makeRequest('/deleteCustomerPriceList', { id: customerPriceListId })
   }
+
+  // List change log entries for a price list
+  async listPriceListChangeLog(priceListId) {
+    const response = await this.makeRequest('/listPriceListChangeLog', {
+      where: {
+        priceList: { id: { equals: priceListId } }
+      },
+      orderBy: [{ createdAt: 'Desc' }],
+      include: {
+        createdBy: true
+      }
+    })
+    const results = response.results || []
+    // Hydrate display name if user object present, or keep ID for follow-up hydration
+    return results.map(e => {
+      const createdByName = e.createdBy ? [e.createdBy.firstName, e.createdBy.lastName].filter(Boolean).join(' ') || e.createdBy.email || e.createdBy.id : e.createdByName
+      return { ...e, createdByName }
+    })
+  }
 }
 
 export const priceListService = new PriceListService()

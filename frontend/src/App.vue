@@ -27,7 +27,7 @@
           </div>
           <div class="flex items-center space-x-4">
             <span class="text-sm text-gray-600">
-              Welcome, {{ currentUser?.firstName || currentUser?.id || 'User' }}
+              Welcome, {{ welcomeText }}
             </span>
             <button
               v-if="hasCustomerId"
@@ -73,6 +73,7 @@ import LoginForm from './components/LoginForm.vue'
 import UserProfileDialog from './components/UserProfileDialog.vue'
 import DeliveryAddresses from './components/DeliveryAddresses.vue'
 import { authService } from './services/authService.js'
+import { customerService } from './services/customerService.js'
 
 export default {
   name: 'App',
@@ -91,12 +92,17 @@ export default {
       customerId: null,
       showAddresses: false,
       logoOk: true,
-      logoSrc: `${import.meta.env.BASE_URL}createspace-logo.png`
+      logoSrc: `${import.meta.env.BASE_URL}createspace-logo.png`,
+      customerName: ''
     }
   },
   computed: {
     hasCustomerId() {
       return !!this.customerId
+    },
+    welcomeText() {
+      const user = this.currentUser?.firstName || this.currentUser?.id || 'User'
+      return this.customerName ? `${user} (${this.customerName})` : user
     }
   },
   async mounted() {
@@ -123,6 +129,7 @@ export default {
       try {
         this.currentUser = await authService.getCurrentUser()
         this.customerId = authService.getCustomerId(this.currentUser)
+        await this.loadCustomerName()
         console.log('User data refreshed on page load:', this.currentUser)
         console.log('Customer ID refreshed on page load:', this.customerId)
       } catch (error) {
@@ -130,6 +137,7 @@ export default {
         // If we can't get fresh user data, try to use cached data
         this.currentUser = await authService.getCurrentUserCached()
         this.customerId = authService.getCustomerId(this.currentUser)
+        await this.loadCustomerName()
       }
     }
   },
@@ -149,6 +157,7 @@ export default {
         // Existing user, get their profile
         this.currentUser = await authService.getCurrentUser()
         this.customerId = authService.getCustomerId(this.currentUser)
+        await this.loadCustomerName()
       }
     },
     
@@ -162,6 +171,7 @@ export default {
         )
         console.log('User created with profile:', this.currentUser)
         this.customerId = authService.getCustomerId(this.currentUser)
+        await this.loadCustomerName()
         this.showProfileDialog = false
       } catch (error) {
         console.error('Failed to save profile:', error)
@@ -181,6 +191,17 @@ export default {
       this.showProfileDialog = false
       this.loginData = null
       this.customerId = null
+      this.customerName = ''
+    },
+    async loadCustomerName() {
+      try {
+        if (!this.customerId) return
+        const customer = await customerService.getCustomer(this.customerId)
+        this.customerName = customer?.name || customer?.companyName || ''
+      } catch (e) {
+        console.warn('Failed to load customer name', e)
+        this.customerName = ''
+      }
     }
   }
 }

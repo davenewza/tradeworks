@@ -2,21 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Outfit font */
-@font-face {
-  font-family: 'Outfit';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: local('Outfit'), url('https://fonts.gstatic.com/s/outfit/v11/QGYyz_wNahGAdqQ43Rh_cqDpp_k.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Outfit';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: local('Outfit'), url('https://fonts.gstatic.com/s/outfit/v11/QGYyz_wNahGAdqQ43Rh_cqDpp_k.woff2') format('woff2');
-}
+/* Outfit font is loaded via index.html Google Fonts link */
 
 @layer base {
   html, body, #app {
@@ -24,10 +10,11 @@
   }
   html {
     /* Always reserve space for the vertical scrollbar to prevent layout shift */
-    overflow-y: auto;
+    overflow-y: scroll;
   }
   body {
-    @apply bg-white text-brand-navy font-sans;
+    background-color: #F9FAFB; 
+    @apply text-brand-navy font-sans;
   }
   h1, h2, h3, h4, h5, h6 { @apply font-semibold; }
 }

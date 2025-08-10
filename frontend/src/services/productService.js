@@ -57,6 +57,12 @@ class ProductService {
     })
     return response.results || []
   }
+
+  // List all brands
+  async listBrands() {
+    const response = await this.makeRequest('/listBrands', {})
+    return response.results || []
+  }
 }
 
 export const productService = new ProductService()
