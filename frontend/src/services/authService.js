@@ -88,6 +88,40 @@ class AuthService {
     }
   }
 
+  // Exchange authorization_code from SSO redirect for Keel tokens
+  async exchangeAuthorizationCode(code) {
+    const formData = new URLSearchParams()
+    formData.append('grant_type', 'authorization_code')
+    formData.append('code', code)
+
+    const tokenBase = this.baseUrl.replace('/api/json', '')
+    const response = await fetch(`${tokenBase}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || errorData.error_description || 'SSO token exchange failed')
+    }
+
+    const data = await response.json()
+    this.setToken(data.access_token)
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token)
+    }
+    return data
+  }
+
+  // Get available auth providers (for SSO)
+  async getAuthProviders() {
+    const tokenBase = this.baseUrl.replace('/api/json', '')
+    const res = await fetch(`${tokenBase}/auth/providers`, { method: 'GET' })
+    if (!res.ok) throw new Error('Failed to load auth providers')
+    return res.json()
+  }
+
   // Get user record using getMe
   async getCurrentUser() {
     try {

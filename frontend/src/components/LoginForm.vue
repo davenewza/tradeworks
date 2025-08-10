@@ -1,12 +1,15 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-0 px-4 sm:px-6 lg:px-8 overflow-hidden">
     <div class="max-w-md w-full space-y-8">
       <div>
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <div class="flex justify-center mb-8">
+          <img src="/createspace-logo.png" alt="CREATESPACE" class="h-10 w-auto" />
+        </div>
+        <h2 class="mt-4 text-center text-3xl font-extrabold text-gray-900">
           Sign in to your account
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600">
-          Enter your credentials to access the CREATESPACE quote generation system
+          Enter your credentials to access the order management system
         </p>
       </div>
       
@@ -79,6 +82,15 @@
           </button>
         </div>
       </form>
+
+      <div class="relative my-6">
+        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>
+        <div class="relative flex justify-center text-sm"><span class="px-2 bg-gray-50 text-gray-500">Or</span></div>
+      </div>
+      <button @click="signInWithGoogle" type="button" class="w-full inline-flex items-center justify-center gap-2 border border-gray-300 rounded-md px-4 py-2 hover:bg-gray-100">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-5 h-5"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12    s5.373-12,12-12c3.059,0,5.842,1.153,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24    s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.108,18.961,13,24,13c3.059,0,5.842,1.153,7.961,3.039l5.657-5.657    C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c4.983,0,9.514-1.917,12.961-5.039l-5.981-5.064C29.047,35.091,26.715,36,24,36    c-5.202,0-9.619-3.317-11.277-7.951l-6.534,5.036C9.582,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.103,5.597c0,0,0,0,0,0l6.581,5.561    c-0.465,0.427,7.219-5.289,7.219-15.238C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+        <span>Continue with Google</span>
+      </button>
     </div>
 
     <!-- Forgot Password Modal -->
@@ -179,6 +191,16 @@ export default {
         this.resetError = error.message || 'Failed to send reset link. Please try again.'
       } finally {
         this.resetLoading = false
+      }
+    },
+    async signInWithGoogle() {
+      try {
+        const providers = await authService.getAuthProviders()
+        const google = (providers || []).find(p => (p.name || '').toLowerCase().includes('google') || (p.type || '').toLowerCase().includes('google'))
+        const target = google?.authorizeUrl || `${authService.baseUrl.replace('/api/json','')}/auth/authorize/google`
+        window.location.href = target
+      } catch (e) {
+        this.error = e.message || 'Google sign-in not available'
       }
     }
   }

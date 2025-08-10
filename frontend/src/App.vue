@@ -2,7 +2,7 @@
   <div id="app" class="min-h-screen bg-gray-50">
     <!-- Authentication Check -->
     <div v-if="!isAuthenticated" class="min-h-screen">
-      <div class="max-w-6xl mx-auto px-4 py-8">
+      <div class="max-w-6xl mx-auto px-4 py-0">
         <LoginForm @login-success="handleLoginSuccess" />
       </div>
     </div>
@@ -100,6 +100,21 @@ export default {
     }
   },
   async mounted() {
+    // Handle SSO redirect (authorization code)
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      if (code && !authService.isAuthenticated()) {
+        await authService.exchangeAuthorizationCode(code)
+        // Clean the URL
+        const url = new URL(window.location.href)
+        url.searchParams.delete('code')
+        window.history.replaceState({}, '', url.toString())
+      }
+    } catch (e) {
+      console.error('SSO exchange failed:', e)
+    }
+
     // Check authentication status
     this.isAuthenticated = authService.isAuthenticated()
     

@@ -19,9 +19,12 @@
 }
 
 @layer base {
+  html, body, #app {
+    min-height: 100%;
+  }
   html {
     /* Always reserve space for the vertical scrollbar to prevent layout shift */
-    overflow-y: scroll;
+    overflow-y: auto;
   }
   body {
     @apply bg-white text-brand-navy font-sans;
