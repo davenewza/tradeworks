@@ -25,8 +25,6 @@ model Product {
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
-
-
 model ProductPrice {
     fields {
         product Product
@@ -68,9 +66,6 @@ model PriceList {
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
 
-
-
-
 model QuoteProduct {
     fields {
         quote Quote
@@ -91,12 +86,14 @@ model QuoteProduct {
         delete deleteQuoteProduct(id)
     }
     @unique([quote, productPrice])
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
-}
 
+    @permission(expression: ctx.isAuthenticated && quoteProduct.quote.status == QuoteStatus.Draft, actions:[create,update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[list])
+}
 
 model Quote {
     fields {
+        name Text @default("")
         number Text @sequence(prefix: "Q")
         status QuoteStatus @default(QuoteStatus.Draft)
         customerPriceList CustomerPriceList
@@ -117,12 +114,21 @@ model Quote {
         total Decimal @computed(quote.totalProductPrice + quote.totalEquipmentBoxPrice + quote.totalDeliveryFees)
         totalInclVat Decimal @computed(quote.total * 1.15)
         vat Decimal @computed(quote.totalInclVat - quote.total)
-        
+
+        createdBy User? 
+        submittedAt Timestamp?
+        submittedBy User? 
+        approvedAt Timestamp?
+        approvedBy User? 
     }
 
     actions {
+        create createQuote() with (customerPriceList.id) {
+            @set(quote.name = "")
+            @set(quote.createdBy = ctx.identity.user)
+        }
+
         get getQuote(id)
-        create createQuote() with (customerPriceList.id)
         list listQuotes(customerPriceList.customer.id?, status?)
         list listDraftQuotes(customerPriceList.customer.id) {
             @where(quote.status == QuoteStatus.Draft)
@@ -130,11 +136,30 @@ model Quote {
         list listSubmittedQuotes(customerPriceList.customer.id) {
             @where(quote.status == QuoteStatus.Submitted)
         }
-        delete deleteQuote(id)
-        update updateQuoteDeliveryAddress(id) with (deliveryAddress.id)
-        update updateQuoteDelivery(id) with (deliveryService,totalDeliveryFees)
+        list listApprovedQuotes(customerPriceList.customer.id) {
+            @where(quote.status == QuoteStatus.Approved)
+        }
+
+        update updateQuoteName(id) with (name) {
+            @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
+        }
+        update updateQuoteDeliveryAddress(id) with (deliveryAddress.id) {
+            @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
+        }
+        update updateQuoteDelivery(id) with (deliveryService,totalDeliveryFees) {
+            @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
+        }
         update submitQuote(id) {
+            @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
             @set(quote.status = QuoteStatus.Submitted)
+            @set(quote.submittedAt = ctx.now)
+            @set(quote.submittedBy = ctx.identity.user)
+        }
+        update approveQuote(id) {
+            @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Submitted)
+            @set(quote.status = QuoteStatus.Approved)
+            @set(quote.approvedAt = ctx.now)
+            @set(quote.approvedBy = ctx.identity.user)
         }
         write calculateEquipmentBoxes(id, boxType: BoxType) returns (Any) {
             @permission(expression: ctx.isAuthenticated)
@@ -145,14 +170,19 @@ model Quote {
         write calculateDelivery(id) returns (Any) {
             @permission(expression: ctx.isAuthenticated)
         }   
+        delete deleteQuote(id) {
+            @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
+        }
     }
 
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete, update])
+   
+    @permission(expression: ctx.isAuthenticated, actions:[get, create, list])
 }
 
 enum QuoteStatus {
     Draft
     Submitted
+    Approved
 }
 
 model QuoteEquipmentBox {
@@ -171,7 +201,9 @@ model QuoteEquipmentBox {
     }
 
     @unique([quote, equipmentBox])
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, delete])
+
+    @permission(expression: ctx.isAuthenticated && quoteEquipmentBox.quote.status == QuoteStatus.Draft, actions:[create,update, delete])
+    @permission(expression: ctx.isAuthenticated, actions:[get, list])
 }
 
 model EquipmentBox {

@@ -53,6 +53,10 @@ class DeliveryAddressService {
     })
   }
 
+  async getDeliveryAddress(addressId) {
+    return this.makeRequest('/getDeliveryAddress', { id: addressId })
+  }
+
   async createDeliveryAddress(address, customerId) {
     // Only send allowed fields per OpenAPI: name, addressLine1, city, province, postalCode, optional addressLine2, deliveryNotes, and customer
     const payload = {

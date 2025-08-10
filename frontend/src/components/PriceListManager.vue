@@ -86,8 +86,49 @@
               <h4 class="text-lg font-medium text-gray-900">Quotes</h4>
               <span class="text-sm text-gray-600">{{ quotes[priceList.customerPriceListId]?.length || 0 }} quotes</span>
             </div>
+
+            <!-- Status Filter -->
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+              <button
+                class="px-3 py-1.5 rounded-full text-xs font-medium border"
+                :class="statusFilters[priceList.customerPriceListId] === 'All' ? 'bg-gray-800 text-white border-gray-800' : 'text-gray-700 border-gray-300 hover:border-gray-400'"
+                @click="setStatusFilter(priceList.customerPriceListId, 'All')"
+              >
+                All ({{ getStatusCounts(priceList.customerPriceListId).all }})
+              </button>
+              <button
+                class="px-3 py-1.5 rounded-full text-xs font-medium border"
+                :class="statusFilters[priceList.customerPriceListId] === 'Draft' ? 'bg-yellow-500 text-white border-yellow-500' : 'text-yellow-800 border-yellow-300 hover:border-yellow-400'"
+                @click="setStatusFilter(priceList.customerPriceListId, 'Draft')"
+              >
+                Draft ({{ getStatusCounts(priceList.customerPriceListId).Draft }})
+              </button>
+              <button
+                class="px-3 py-1.5 rounded-full text-xs font-medium border"
+                :class="statusFilters[priceList.customerPriceListId] === 'Submitted' ? 'bg-blue-600 text-white border-blue-600' : 'text-blue-800 border-blue-300 hover:border-blue-400'"
+                @click="setStatusFilter(priceList.customerPriceListId, 'Submitted')"
+              >
+                Submitted ({{ getStatusCounts(priceList.customerPriceListId).Submitted }})
+              </button>
+              <button
+                class="px-3 py-1.5 rounded-full text-xs font-medium border"
+                :class="statusFilters[priceList.customerPriceListId] === 'Approved' ? 'bg-green-600 text-white border-green-600' : 'text-green-800 border-green-300 hover:border-green-400'"
+                @click="setStatusFilter(priceList.customerPriceListId, 'Approved')"
+              >
+                Approved ({{ getStatusCounts(priceList.customerPriceListId).Approved }})
+              </button>
+              <div class="ml-auto w-full md:w-64">
+                <input
+                  :value="searchTerms[priceList.customerPriceListId] || ''"
+                  @input="setSearchTerm(priceList.customerPriceListId, $event.target.value)"
+                  type="text"
+                  class="input h-9 text-sm"
+                  placeholder="Search quotes..."
+                />
+              </div>
+            </div>
             
-            <div v-if="!quotes[priceList.customerPriceListId] || quotes[priceList.customerPriceListId].length === 0" class="text-center py-6">
+            <div v-if="!getFilteredQuotes(priceList.customerPriceListId).length" class="text-center py-6">
               <div class="text-gray-500 mb-2">
                 <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -98,7 +139,7 @@
             
             <div v-else class="space-y-3">
               <div 
-                v-for="quote in quotes[priceList.customerPriceListId]" 
+                v-for="quote in getFilteredQuotes(priceList.customerPriceListId)" 
                 :key="quote.id" 
                 class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                 @click="selectQuote(quote)"
@@ -106,18 +147,20 @@
                 <div class="flex justify-between items-start">
                   <div>
                     <div class="flex items-center gap-2 mb-1">
-                      <h5 class="font-medium text-gray-900">Quote #{{ quote.number }}</h5>
+                      <h5 class="font-medium text-gray-900">{{ quote.name || ('Quote #' + (quote.number || '')) }} <span class="text-sm text-gray-600" v-if="quote.number">• #{{ quote.number }}</span></h5>
                       <span :class="[
                         'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                        quote.status === 'Submitted' 
+                        quote.status === 'Approved' 
                           ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
+                          : (quote.status === 'Submitted' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-yellow-100 text-yellow-800')
                       ]">
                         {{ formatQuoteStatus(quote.status) }}
                       </span>
                     </div>
                     <p class="text-sm text-gray-600">
-                      Created: {{ formatDate(quote.createdAt) }}
+                      Created By: {{ quote.createdByName || '—' }}
                     </p>
                     <p class="text-sm text-gray-600">
                       Last updated: {{ formatDate(quote.updatedAt) }}
@@ -166,7 +209,9 @@ export default {
       error: null,
       selectedQuote: null,
       selectedPriceList: null,
-      lastHiddenTime: null
+      lastHiddenTime: null,
+      statusFilters: {},
+      searchTerms: {}
     }
   },
   watch: {
@@ -221,6 +266,54 @@ export default {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
   },
   methods: {
+    async hydrateCreatorsForList(cplId) {
+      try {
+        const list = this.quotes[cplId] || []
+        const missing = list.filter(q => (q.createdById || q.createdBy) && !q.createdByName)
+        if (missing.length === 0) return
+        const { userService } = await import('../services/userService.js')
+        await Promise.all(missing.map(async q => {
+          try {
+            const id = q.createdById || q.createdBy
+            const u = await userService.getUser(id)
+            q.createdByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+          } catch {}
+        }))
+        // Force reactive update
+        this.quotes = { ...this.quotes }
+      } catch (e) {
+        console.warn('Failed to hydrate creator names', e)
+      }
+    },
+    getStatusCounts(cplId) {
+      const list = this.quotes[cplId] || []
+      const counts = { Draft: 0, Submitted: 0, Approved: 0 }
+      for (const q of list) {
+        const s = (q.status || 'Draft')
+        if (s in counts) counts[s]++
+      }
+      return { ...counts, all: list.length }
+    },
+    setStatusFilter(cplId, value) {
+      this.$set ? this.$set(this.statusFilters, cplId, value) : (this.statusFilters = { ...this.statusFilters, [cplId]: value })
+    },
+    getFilteredQuotes(cplId) {
+      const list = this.quotes[cplId] || []
+      const filter = this.statusFilters[cplId] || 'All'
+      const term = (this.searchTerms[cplId] || '').trim().toLowerCase()
+      let filtered = filter === 'All' ? list : list.filter(q => (q.status || 'Draft') === filter)
+      if (term) {
+        filtered = filtered.filter(q => {
+          const name = (q.name || '').toLowerCase()
+          const number = (q.number || '').toString().toLowerCase()
+          return name.includes(term) || number.includes(term)
+        })
+      }
+      return filtered
+    },
+    setSearchTerm(cplId, value) {
+      this.$set ? this.$set(this.searchTerms, cplId, value) : (this.searchTerms = { ...this.searchTerms, [cplId]: value })
+    },
     handleVisibilityChange() {
       // Refresh data when user returns to the tab (after being away for more than 30 seconds)
       if (!document.hidden && this.lastHiddenTime && (Date.now() - this.lastHiddenTime > 30000)) {
@@ -295,6 +388,8 @@ export default {
           const quotes = await quoteService.getQuotesByCustomerPriceList(priceList.customerPriceListId)
           this.quotes[priceList.customerPriceListId] = quotes
           console.log('Quotes loaded for price list:', priceList.customerPriceListId, quotes)
+          // Hydrate creator names for this list
+          this.hydrateCreatorsForList(priceList.customerPriceListId)
         }
         console.log('All quotes loaded:', this.quotes)
       } catch (err) {
@@ -352,11 +447,12 @@ export default {
     },
     
     formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
+      if (!dateString) return '—'
+      const d = new Date(dateString)
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = d.toLocaleString('en-GB', { month: 'short' })
+      const year = d.getFullYear()
+      return `${day} ${month} ${year}`
     },
     
     formatCurrency(amount) {
@@ -368,8 +464,10 @@ export default {
     },
 
     formatQuoteStatus(status) {
-      if (!status) return 'Draft'
-      return status === 'Submitted' ? 'Submitted' : 'Draft'
+      const s = status || 'Draft'
+      if (s === 'Approved') return 'Approved'
+      if (s === 'Submitted') return 'Submitted'
+      return 'Draft'
     }
   }
 }

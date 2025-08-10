@@ -181,13 +181,14 @@ export default {
     },
     
     formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      if (!dateString) return '—'
+      const d = new Date(dateString)
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = d.toLocaleString('en-GB', { month: 'short' })
+      const year = d.getFullYear()
+      const hours = String(d.getHours()).padStart(2, '0')
+      const minutes = String(d.getMinutes()).padStart(2, '0')
+      return `${day} ${month} ${year} ${hours}:${minutes}`
     },
     
     formatCurrency(amount) {

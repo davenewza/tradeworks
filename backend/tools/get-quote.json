@@ -12,7 +12,7 @@
   "entry_activity_actions": [
     {
       "tool_id": "create-quote-product",
-      "title": "Add",
+      "title": "Add Product",
       "as_dialog": true,
       "display_order": 0,
       "data_mapping": [
@@ -23,6 +23,20 @@
           }
         }
       ]
+    },
+    {
+      "tool_id": "calculate-delivery",
+      "display_order": 1
+    },
+    {
+      "tool_id": "reset-delivery-info",
+      "display_order": 2
+    },
+    {
+      "tool_id": "approve-quote",
+      "as_dialog": false,
+      "display_order": 3,
+      "emphasize": true
     }
   ],
   "embedded_tools": [

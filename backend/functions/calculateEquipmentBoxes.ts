@@ -1,4 +1,4 @@
-import { CalculateEquipmentBoxes, models } from '@teamkeel/sdk';
+import { CalculateEquipmentBoxes, models, QuoteStatus } from '@teamkeel/sdk';
 
 // To learn more about what you can do with custom functions, visit https://docs.keel.so/functions
 export default CalculateEquipmentBoxes(async (ctx, inputs) => {
@@ -6,6 +6,10 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
 
     if (!quote) {
         throw new Error('Quote not found');
+    }
+
+    if (quote.status !== QuoteStatus.Draft) {
+        throw new Error('Quote is not in draft status');
     }
 
     await models.quote.update({id: quote.id}, {boxType: inputs.boxType});
@@ -175,6 +179,8 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
         
         createdQuoteEquipmentBoxes.push(quoteEquipmentBox);
     }
+
+
 
     // Return summary of the calculation
     return {

@@ -199,11 +199,12 @@ export default {
     },
     
     formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
+      if (!dateString) return '—'
+      const d = new Date(dateString)
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = d.toLocaleString('en-GB', { month: 'short' })
+      const year = d.getFullYear()
+      return `${day} ${month} ${year}`
     },
     
     formatCurrency(amount) {

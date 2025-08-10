@@ -1,4 +1,4 @@
-import { CalculateDelivery, models } from '@teamkeel/sdk';
+import { CalculateDelivery, models, QuoteStatus } from '@teamkeel/sdk';
 
 const COLLECTION_ADDRESS = {
     type: "business",
@@ -16,6 +16,10 @@ export default CalculateDelivery(async (ctx, inputs) => {
 
     if (!quote) {
         throw new Error('Quote not found');
+    }
+
+    if (quote.status !== QuoteStatus.Draft) {
+        throw new Error('Quote is not in draft status');
     }
 
     if (!quote.deliveryAddressId) {
@@ -168,8 +172,6 @@ export default CalculateDelivery(async (ctx, inputs) => {
         }
 
         console.log(`Selected cheapest rate: ${cheapestRate.service_level.name} at ZAR ${cheapestRate.rate}`);
-
-       
 
         // Update the quote with the cheapest delivery option
         const chargedWeightKg = Number(cheapestRate.charged_weight)

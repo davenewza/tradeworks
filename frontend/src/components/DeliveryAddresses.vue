@@ -103,7 +103,7 @@
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
       <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-800 rounded p-3">{{ error }}</div>
-      <div v-else-if="addresses.length === 0" class="text-center text-gray-600 py-10">No addresses yet.</div>
+      <div v-else-if="addresses.length === 0" class="text-center text-gray-600 py-10">No active addresses.</div>
 
       <div v-else class="space-y-3">
         <div v-for="address in addresses" :key="address.id" class="border border-gray-200 rounded-lg p-4">

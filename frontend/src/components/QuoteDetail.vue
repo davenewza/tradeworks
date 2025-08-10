@@ -6,9 +6,19 @@
         <button @click="$emit('back')" class="btn btn-secondary">
           Back to Quotes
         </button>
-        <h2 class="text-2xl font-semibold text-gray-900">Quote #{{ quote.number }}</h2>
+        <div class="flex items-center gap-2">
+          <h2 class="text-2xl font-semibold text-gray-900">{{ quote.name || ('Quote #' + (quote.number || '')) }}</h2>
+          <button 
+            v-if="!isSubmitted"
+            @click="openNameDialog"
+            class="text-gray-500 hover:text-gray-700"
+            title="Edit quote name"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+        </div>
       </div>
-      <div class="flex space-x-2">
+       <div class="flex space-x-2">
         <button 
           v-if="quote.status === 'Draft' || !quote.status" 
           @click="submitQuote" 
@@ -19,7 +29,7 @@
           <span v-if="submittingQuote" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
           {{ submittingQuote ? 'Submitting...' : 'Submit Quote' }}
         </button>
-        <button @click="deleteQuote" class="btn btn-danger">
+         <button v-if="!isSubmitted" @click="deleteQuote" class="btn btn-danger">
           Delete Quote
         </button>
       </div>
@@ -46,13 +56,33 @@
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Created</label>
-          <p class="text-gray-900">{{ formatDate(quote.createdAt) }}</p>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Created By</label>
+          <p class="text-gray-900">{{ quote.createdByName || '—' }}</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Last Updated</label>
           <p class="text-gray-900">{{ formatDate(quote.updatedAt) }}</p>
         </div>
+
+        <!-- Submission/Approval Meta -->
+        <template v-if="isSubmitted || isApproved">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Submitted By</label>
+            <p class="text-gray-900">{{ quote.submittedByName || '—' }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Submitted At</label>
+            <p class="text-gray-900">{{ quote.submittedAt ? formatDate(quote.submittedAt) : '—' }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Approved By</label>
+            <p class="text-gray-900">{{ quote.approvedByName || '—' }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Approved At</label>
+            <p class="text-gray-900">{{ quote.approvedAt ? formatDate(quote.approvedAt) : '—' }}</p>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -268,7 +298,7 @@
       </div>
       
       <!-- Product Action Buttons -->
-      <div class="flex justify-end items-center space-x-3 mt-6 pt-4 border-t border-gray-200">
+      <div v-if="!isSubmitted" class="flex justify-end items-center space-x-3 mt-6 pt-4 border-t border-gray-200">
         <button 
           @click="showAddProductModal = true" 
           class="btn btn-primary"
@@ -290,7 +320,7 @@
 
     <!-- Equipment Boxes Section -->
     <div v-if="productsReadOnly" class="card">
-      <div class="mb-4">
+      <div class="mb-4" v-if="!isSubmitted">
         <div class="flex gap-3">
           <button
             type="button"
@@ -361,7 +391,7 @@
         <div class="flex justify-between items-center px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
           <div class="flex items-center space-x-4">
             <div class="min-h-[2rem] flex flex-col justify-center">
-              <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Description</h4>
+              <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Packaging</h4>
             </div>
           </div>
           <div class="flex items-center space-x-4">
@@ -638,6 +668,27 @@
       </div>
     </div>
 
+    <!-- Edit Quote Name Dialog -->
+    <div v-if="showNameDialog" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black bg-opacity-50" @click="closeNameDialog"></div>
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 class="text-lg font-semibold text-gray-900">Edit quote name</h3>
+          <button @click="closeNameDialog" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="p-4 space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Name</label>
+          <input v-model="editName" type="text" class="input" placeholder="e.g. Term 3, 2025" />
+        </div>
+        <div class="p-4 border-t border-gray-200 flex justify-end gap-2">
+          <button @click="closeNameDialog" class="btn btn-secondary">Cancel</button>
+          <button @click="saveName" class="btn btn-primary" :disabled="savingName || !editName.trim()" :class="{ 'opacity-50 cursor-not-allowed': savingName || !editName.trim() }">{{ savingName ? 'Saving...' : 'Save' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Image Preview Overlay -->
     <div 
       v-if="imagePreview.show"
@@ -720,7 +771,10 @@ export default {
       addressSubmitAttempted: false,
       showAddressDialog: false,
       showDeliveryInfoDialog: false,
-      showRawJson: false
+      showRawJson: false,
+      showNameDialog: false,
+      editName: '',
+      savingName: false
     }
   },
   async mounted() {
@@ -740,8 +794,18 @@ export default {
     if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
       this.productsReadOnly = true
     }
+
+    // Hydrate submitted/approved user names if only IDs present
+    this.hydrateActionUsers()
+    this.hydrateCreatedByUser()
   },
   computed: {
+    isSubmitted() {
+      return this.quote?.status === 'Submitted'
+    },
+    isApproved() {
+      return this.quote?.status === 'Approved'
+    },
     hasDeliveryInfo() {
       return !!this.quote?.deliveryRawJson
     },
@@ -839,6 +903,9 @@ export default {
           if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
             this.productsReadOnly = true
           }
+          // Re-hydrate user display names whenever quote changes
+          this.hydrateActionUsers()
+          this.hydrateCreatedByUser()
         })
       },
       deep: false
@@ -865,6 +932,69 @@ export default {
     }
   },
   methods: {
+    async hydrateActionUsers() {
+      try {
+        const submitId = this.quote?.submittedById || this.quote?.submittedBy
+        const approveId = this.quote?.approvedById || this.quote?.approvedBy
+        const needsSubmitUser = submitId && !this.quote?.submittedByName
+        const needsApproveUser = approveId && !this.quote?.approvedByName
+        if (!needsSubmitUser && !needsApproveUser) return
+        const { userService } = await import('../services/userService.js')
+        const updates = {}
+        if (needsSubmitUser) {
+          try {
+            const u = await userService.getUser(submitId)
+            updates.submittedByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+          } catch {}
+        }
+        if (needsApproveUser) {
+          try {
+            const u = await userService.getUser(approveId)
+            updates.approvedByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+          } catch {}
+        }
+        if (Object.keys(updates).length) {
+          // Merge locally so UI shows names without another server write
+          this.$emit('quote-updated', { ...this.quote, ...updates })
+        }
+      } catch (e) {
+        console.warn('Failed to hydrate action user names', e)
+      }
+    },
+    async hydrateCreatedByUser() {
+      try {
+        const createdId = this.quote?.createdById || this.quote?.createdBy
+        if (!createdId || this.quote?.createdByName) return
+        const { userService } = await import('../services/userService.js')
+        const u = await userService.getUser(createdId)
+        const createdByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+        this.$emit('quote-updated', { ...this.quote, createdByName })
+      } catch (e) {
+        console.warn('Failed to hydrate createdBy user name', e)
+      }
+    },
+    openNameDialog() {
+      this.editName = this.quote.name || ''
+      this.showNameDialog = true
+    },
+    closeNameDialog() {
+      this.showNameDialog = false
+    },
+    async saveName() {
+      try {
+        if (!this.editName || !this.editName.trim()) return
+        this.savingName = true
+        await quoteService.updateQuoteName(this.quote.id, this.editName.trim())
+        const refreshed = await quoteService.getQuote(this.quote.id)
+        this.$emit('quote-updated', refreshed)
+        this.showNameDialog = false
+      } catch (e) {
+        console.error('Failed to update quote name:', e)
+        alert('Failed to update name: ' + (e.message || 'Unknown error'))
+      } finally {
+        this.savingName = false
+      }
+    },
     openDeliveryInfoDialog() {
       this.showDeliveryInfoDialog = true
     },
@@ -890,7 +1020,20 @@ export default {
         this.loadingAddresses = true
         const { deliveryAddressService } = await import('../services/deliveryAddressService.js')
         const result = await deliveryAddressService.listDeliveryAddresses(this.customerId)
-        this.deliveryAddresses = Array.isArray(result) ? result : (result.results || [])
+        const activeList = Array.isArray(result) ? result : (result.results || [])
+        // Ensure selected address appears even if inactive
+        if (this.quote.deliveryAddressId) {
+          try {
+            const selectedAddr = await deliveryAddressService.getDeliveryAddress(this.quote.deliveryAddressId)
+            const exists = activeList.some(a => a.id === selectedAddr.id)
+            if (!exists && selectedAddr) {
+              activeList.push(selectedAddr)
+            }
+          } catch (e) {
+            console.warn('Could not hydrate selected delivery address:', e)
+          }
+        }
+        this.deliveryAddresses = activeList
       } catch (e) {
         console.error('Failed to load delivery addresses', e)
         this.deliveryAddresses = []
@@ -1136,13 +1279,14 @@ export default {
     },
     
     formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      if (!dateString) return '—'
+      const d = new Date(dateString)
+      const day = String(d.getDate()).padStart(2, '0')
+      const month = d.toLocaleString('en-GB', { month: 'short' })
+      const year = d.getFullYear()
+      const hours = String(d.getHours()).padStart(2, '0')
+      const minutes = String(d.getMinutes()).padStart(2, '0')
+      return `${day} ${month} ${year} ${hours}:${minutes}`
     },
     
     formatCurrency(amount) {
@@ -1307,11 +1451,10 @@ export default {
       
       try {
         const date = new Date(dateString)
-        return date.toLocaleDateString('en-ZA', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        })
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = date.toLocaleString('en-GB', { month: 'short' })
+        const year = date.getFullYear()
+        return `${day} ${month} ${year}`
       } catch (error) {
         console.error('Error formatting delivery date:', error)
         return 'Invalid date'
@@ -1380,7 +1523,20 @@ export default {
     },
 
     async submitQuote() {
-      alert('This is not available yet')
+      try {
+        this.submittingQuote = true
+        await quoteService.submitQuote(this.quote.id)
+        const refreshed = await quoteService.getQuote(this.quote.id)
+        // Lock the UI by reflecting submitted status
+        this.$emit('quote-updated', refreshed)
+        this.productsReadOnly = true
+        this.showAddProductModal = false
+      } catch (err) {
+        console.error('Failed to submit quote:', err)
+        alert('Failed to submit quote: ' + (err.message || 'Unknown error'))
+      } finally {
+        this.submittingQuote = false
+      }
     }
   }
 }

@@ -148,7 +148,15 @@ class QuoteService {
 
   // Submit a quote
   async submitQuote(quoteId) {
-    return await this.makeRequest('/submitQuote', { id: quoteId })
+    return await this.makeRequest('/submitQuote', { where: { id: quoteId } })
+  }
+
+  // Update quote name
+  async updateQuoteName(quoteId, name) {
+    return await this.makeRequest('/updateQuoteName', {
+      where: { id: quoteId },
+      values: { name }
+    })
   }
 
   // Delete a quote product

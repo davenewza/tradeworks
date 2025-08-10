@@ -9,11 +9,15 @@ model User {
     actions {
         create createMe() {
             @set(user.identity = ctx.identity)
+            @set(user.email = ctx.identity.email)
+            @set(user.firstName = ctx.identity.givenName)
+            @set(user.lastName = ctx.identity.familyName)
         }
         get getMe() {
             @where(user.identity == ctx.identity)
         }
         get getUser(id) 
+        update updateName(id) with (firstName, lastName) 
         update assignToCustomer(id) with (customer.id) 
         list listUsers(customer.id?) 
     }
