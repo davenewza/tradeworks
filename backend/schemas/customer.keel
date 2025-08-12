@@ -95,6 +95,5 @@ model DeliveryAddress {
             @set(deliveryAddress.isActive = false)
         }
     }
-
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
 }
