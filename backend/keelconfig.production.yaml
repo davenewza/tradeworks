@@ -6,7 +6,7 @@ secrets:
   - name: SHIPLOGIC_API_KEY
 
 auth:
-  redirectUrl: https://tradeworks.vercel.app/callback
+  redirectUrl: https://orders.thecreatespace.co.za/callback
   providers:
     - type: google
       name: google_client
