@@ -1,0 +1,13 @@
+environment:
+  - name: SHIPLOGIC_API_URL
+    value: "https://api.shiplogic.com/v2/rates?provider_id=123"
+
+secrets:
+  - name: SHIPLOGIC_API_KEY
+
+auth:
+  redirectUrl: https://tradeworks.vercel.app/callback
+  providers:
+    - type: google
+      name: google_client
+      clientId: 197248210825-lmlmjjo4hkvaqslk79colj1c15l001mu.apps.googleusercontent.com
