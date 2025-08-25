@@ -1,0 +1,21 @@
+{
+  "id": "list-quote-products",
+  "action_name": "listQuoteProducts",
+  "response": {
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false
+    },
+    "$.results[*].productPriceId": {
+      "visible": false
+    },
+    "$.results[*].quoteId": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

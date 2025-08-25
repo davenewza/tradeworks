@@ -1,0 +1,18 @@
+{
+  "id": "list-quote-equipment-boxes",
+  "action_name": "listQuoteEquipmentBoxes",
+  "response": {
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "visible": false
+    },
+    "$.results[*].quoteId": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

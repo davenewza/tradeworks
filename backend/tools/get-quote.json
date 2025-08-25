@@ -2,6 +2,12 @@
   "id": "get-quote",
   "action_name": "getQuote",
   "response": {
+    "$.customerPriceListId": {
+      "visible": false
+    },
+    "$.deliveryRawJson": {
+      "visible": false
+    },
     "$.equipmentBoxes": {
       "link": {
         "tool_id": "list-quote-equipment-boxes",
@@ -11,32 +17,34 @@
   },
   "entry_activity_actions": [
     {
-      "tool_id": "create-quote-product",
-      "title": "Add Product",
-      "as_dialog": true,
-      "display_order": 0,
-      "data_mapping": [
-        {
-          "key": "$.quote.id",
-          "path": {
-            "path": "$.id"
-          }
-        }
-      ]
-    },
-    {
-      "tool_id": "calculate-delivery",
-      "display_order": 1
-    },
-    {
-      "tool_id": "reset-delivery-info",
-      "display_order": 2
-    },
-    {
       "tool_id": "approve-quote",
       "as_dialog": false,
       "display_order": 3,
       "emphasize": true
+    },
+    {
+      "tool_id": "submit-quote",
+      "deleted": true
+    },
+    {
+      "tool_id": "calculate-delivery",
+      "deleted": true
+    },
+    {
+      "tool_id": "reset-delivery-info",
+      "deleted": true
+    },
+    {
+      "tool_id": "update-quote-delivery",
+      "deleted": true
+    },
+    {
+      "tool_id": "update-quote-delivery-address",
+      "deleted": true
+    },
+    {
+      "tool_id": "delete-quote",
+      "deleted": true
     }
   ],
   "embedded_tools": [
