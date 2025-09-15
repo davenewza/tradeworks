@@ -55,7 +55,7 @@
         {
           "action_link": {
             "tool_id": "list-draft-quotes",
-            "display_order": 2,
+            "display_order": 1,
             "data_mapping": [
               {
                 "key": "$.where.customerPriceList.customer.id.equals",
@@ -69,6 +69,21 @@
         {
           "action_link": {
             "tool_id": "list-submitted-quotes",
+            "display_order": 2,
+            "data_mapping": [
+              {
+                "key": "$.where.customerPriceList.customer.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "action_link": {
+            "tool_id": "list-approved-quotes",
+            "as_dialog": true,
             "display_order": 3,
             "data_mapping": [
               {
