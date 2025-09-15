@@ -1,38 +1,26 @@
 {
-  "id": "list-submitted-quotes",
-  "action_name": "listSubmittedQuotes",
+  "id": "list-approved-quotes",
+  "action_name": "listApprovedQuotes",
   "response": {
     "$.results[*].boxType": {
       "visible": false
     },
     "$.results[*].chargedWeightInGrams": {
-      "display_order": 15,
       "visible": false
     },
     "$.results[*].createdAt": {
-      "display_order": 24,
       "visible": false
-    },
-    "$.results[*].createdById": {
-      "display_order": 17
     },
     "$.results[*].customerPriceListId": {
-      "display_order": 4,
       "visible": false
     },
-    "$.results[*].deliveryAddressId": {
-      "display_order": 16
-    },
     "$.results[*].deliveryRawJson": {
-      "display_order": 11,
       "visible": false
     },
     "$.results[*].deliveryService": {
-      "display_order": 9,
       "visible": false
     },
     "$.results[*].id": {
-      "display_order": 23,
       "visible": false,
       "link": {
         "tool_id": "get-quote",
@@ -47,44 +35,28 @@
         ]
       }
     },
-    "$.results[*].name": {
-      "display_order": 1
-    },
-    "$.results[*].number": {
-      "display_order": 2
-    },
     "$.results[*].status": {
-      "display_order": 3,
       "visible": false
     },
     "$.results[*].total": {
-      "display_order": 12,
       "visible": false
     },
     "$.results[*].totalDeliveryFees": {
-      "display_order": 10,
       "visible": false
     },
     "$.results[*].totalEquipmentBoxPrice": {
-      "display_order": 7,
       "visible": false
     },
-    "$.results[*].totalInclVat": {
-      "display_order": 13
-    },
     "$.results[*].totalProductPrice": {
-      "display_order": 6,
       "visible": false
     },
     "$.results[*].totalWeightInGrams": {
-      "display_order": 8,
       "visible": false
     },
     "$.results[*].updatedAt": {
-      "display_order": 18
+      "visible": false
     },
     "$.results[*].vat": {
-      "display_order": 14,
       "visible": false
     }
   }
