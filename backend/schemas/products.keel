@@ -61,6 +61,8 @@ model EquipmentBox {
 
         volumeUtilisationQuotient Decimal
         effectiveVolumeInLitres Decimal @computed(equipmentBox.holdingVolumeInLitres * equipmentBox.volumeUtilisationQuotient)
+
+        isEnabled Boolean @default(true)
     }
 
     actions {
@@ -69,7 +71,9 @@ model EquipmentBox {
         list listEquipmentBoxes()
         update updateEquipmentBoxImage(id) with (image)
         update updateEquipmentBox(id) with (name, sku, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
-        delete deleteEquipmentBox(id)
+        update disableEquipmentBox(id) {
+            @set(equipmentBox.isEnabled = false)
+        }
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])

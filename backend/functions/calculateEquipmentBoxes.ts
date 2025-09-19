@@ -15,7 +15,7 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
     await models.quote.update({id: quote.id}, {boxType: inputs.boxType});
 
     // Get all available equipment boxes, sorted by effective volume (largest first)
-    const equipmentBoxes = await models.equipmentBox.findMany({ where: { boxType: inputs.boxType } });
+    const equipmentBoxes = await models.equipmentBox.findMany({ where: { boxType: inputs.boxType, isEnabled: true } });
 
     if (equipmentBoxes.length === 0) {
         throw new Error('No equipment boxes available');

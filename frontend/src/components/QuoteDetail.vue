@@ -9,7 +9,7 @@
         <div class="flex items-center gap-2">
           <h2 class="text-2xl font-semibold text-gray-900">{{ quote.name || ('Quote #' + (quote.number || '')) }}</h2>
           <button 
-            v-if="!isSubmitted"
+            v-if="isDraft"
             @click="openNameDialog"
             class="text-gray-500 hover:text-gray-700"
             title="Edit quote name"
@@ -29,7 +29,7 @@
           <span v-if="submittingQuote" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
           {{ submittingQuote ? 'Submitting...' : 'Submit Quote' }}
         </button>
-         <button v-if="!isSubmitted" @click="deleteQuote" class="btn btn-danger">
+         <button v-if="isDraft" @click="deleteQuote" class="btn btn-danger">
           Delete Quote
         </button>
       </div>
@@ -47,9 +47,9 @@
           <div class="flex items-center">
             <span :class="[
               'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-              quote.status === 'Submitted' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
+              quote.status === 'Submitted'
+                ? 'bg-green-100 text-green-800'
+                : (quote.status === 'Approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800')
             ]">
               {{ formatQuoteStatus(quote.status) }}
             </span>
@@ -298,7 +298,7 @@
       </div>
       
       <!-- Product Action Buttons -->
-      <div v-if="!isSubmitted" class="flex justify-end items-center space-x-3 mt-6 pt-4 border-t border-gray-200">
+      <div v-if="isDraft" class="flex justify-end items-center space-x-3 mt-6 pt-4 border-t border-gray-200">
         <button 
           @click="showAddProductModal = true" 
           class="btn btn-primary"
@@ -320,7 +320,7 @@
 
     <!-- Equipment Boxes Section -->
     <div v-if="productsReadOnly" class="card">
-      <div class="mb-4" v-if="!isSubmitted">
+      <div class="mb-4" v-if="isDraft">
         <div class="flex gap-3">
           <button
             type="button"
@@ -795,6 +795,11 @@ export default {
       this.productsReadOnly = true
     }
 
+    // Always lock editing for non-draft quotes
+    if (!(this.quote?.status === 'Draft' || !this.quote?.status)) {
+      this.productsReadOnly = true
+    }
+
     // Hydrate submitted/approved user names if only IDs present
     this.hydrateActionUsers()
     this.hydrateCreatedByUser()
@@ -805,6 +810,10 @@ export default {
     },
     isApproved() {
       return this.quote?.status === 'Approved'
+    },
+    isDraft() {
+      const status = this.quote?.status
+      return !status || status === 'Draft'
     },
     hasDeliveryInfo() {
       return !!this.quote?.deliveryRawJson
@@ -903,6 +912,10 @@ export default {
           if (this.quote.deliveryService && this.quote.totalDeliveryFees && this.quote.totalDeliveryFees > 0) {
             this.productsReadOnly = true
           }
+          // Always lock editing for non-draft quotes
+          if (!(this.quote?.status === 'Draft' || !this.quote?.status)) {
+            this.productsReadOnly = true
+          }
           // Re-hydrate user display names whenever quote changes
           this.hydrateActionUsers()
           this.hydrateCreatedByUser()
@@ -974,6 +987,7 @@ export default {
       }
     },
     openNameDialog() {
+      if (!(this.quote?.status === 'Draft' || !this.quote?.status)) return
       this.editName = this.quote.name || ''
       this.showNameDialog = true
     },
@@ -1062,6 +1076,7 @@ export default {
       }
     },
     async toggleProductsReadOnly() {
+      if (!(this.quote?.status === 'Draft' || !this.quote?.status)) return
       if (!this.productsReadOnly) {
         // going into shipping mode; require address
         this.addressSubmitAttempted = true
@@ -1463,7 +1478,9 @@ export default {
 
     formatQuoteStatus(status) {
       if (!status) return 'Draft'
-      return status === 'Submitted' ? 'Submitted' : 'Draft'
+      if (status === 'Submitted') return 'Submitted'
+      if (status === 'Approved') return 'Approved'
+      return 'Draft'
     },
 
     async refreshQuoteData() {
