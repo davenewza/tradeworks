@@ -1,7 +1,4 @@
 <template>
-  <Analytics />
-  <SpeedInsights />
-  
   <div id="app" class="min-h-screen bg-gray-50">
     <!-- Authentication Check -->
     <div v-if="!isAuthenticated" class="min-h-screen">
@@ -85,8 +82,6 @@ import UserProfileDialog from './components/UserProfileDialog.vue'
 import DeliveryAddresses from './components/DeliveryAddresses.vue'
 import { authService } from './services/authService.js'
 import { customerService } from './services/customerService.js'
-import { Analytics } from '@vercel/analytics/vue';
-import { SpeedInsights } from '@vercel/speed-insights/vue';
 
 export default {
   name: 'App',
