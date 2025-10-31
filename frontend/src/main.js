@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
 import * as Sentry from "@sentry/vue";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const app = createApp(App)
 
