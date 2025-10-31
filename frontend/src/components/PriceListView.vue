@@ -221,6 +221,7 @@
 
 <script>
 import { productService } from '../services/productService.js'
+import { imageCache } from '../utils/imageCache.js'
 
 export default {
   name: 'PriceListView',
@@ -317,7 +318,14 @@ export default {
         for (const productPrice of this.productPrices) {
           if (!this.productDetails[productPrice.productId]) {
             try {
-              this.productDetails[productPrice.productId] = await productService.getProduct(productPrice.productId)
+              const product = await productService.getProduct(productPrice.productId)
+
+              // Cache the image if it exists
+              if (product.image?.url) {
+                product.image.url = await imageCache.get(productPrice.productId, product.image.url)
+              }
+
+              this.productDetails[productPrice.productId] = product
             } catch (err) {
               console.error(`Failed to load product ${productPrice.productId}:`, err)
             }

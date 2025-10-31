@@ -4,6 +4,8 @@ import { authService } from './authService.js'
 class EquipmentBoxService {
   constructor() {
     this.baseUrl = API_BASE
+    // In-memory cache for equipment boxes
+    this.equipmentBoxCache = new Map()
   }
 
   async makeRequest(endpoint, data = null) {
@@ -65,9 +67,29 @@ class EquipmentBoxService {
     })
   }
 
-  // Get equipment box details
-  async getEquipmentBox(equipmentBoxId) {
-    return this.makeRequest('/getEquipmentBox', { id: equipmentBoxId })
+  // Get equipment box details (with caching)
+  async getEquipmentBox(equipmentBoxId, useCache = true) {
+    // Check cache first if caching is enabled
+    if (useCache && this.equipmentBoxCache.has(equipmentBoxId)) {
+      return this.equipmentBoxCache.get(equipmentBoxId)
+    }
+
+    // Fetch from API
+    const equipmentBox = await this.makeRequest('/getEquipmentBox', { id: equipmentBoxId })
+
+    // Store in cache
+    this.equipmentBoxCache.set(equipmentBoxId, equipmentBox)
+
+    return equipmentBox
+  }
+
+  // Clear equipment box cache (useful when equipment boxes are updated)
+  clearEquipmentBoxCache(equipmentBoxId = null) {
+    if (equipmentBoxId) {
+      this.equipmentBoxCache.delete(equipmentBoxId)
+    } else {
+      this.equipmentBoxCache.clear()
+    }
   }
 
   // List all equipment boxes

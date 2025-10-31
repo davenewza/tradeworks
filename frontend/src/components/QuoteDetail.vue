@@ -730,6 +730,7 @@ import AddProductModal from './AddProductModal.vue'
 import { quoteService } from '../services/quoteService.js'
 import { productService } from '../services/productService.js'
 import { deliveryService } from '../services/deliveryService.js'
+import { imageCache } from '../utils/imageCache.js'
 
 export default {
   name: 'QuoteDetail',
@@ -1155,11 +1156,17 @@ export default {
       try {
         const { productService } = await import('../services/productService.js')
         for (const quoteProduct of this.quoteProducts) {
-          //const productPrice = this.productPrices.find(p => p.id === quoteProduct.productPriceId)
 
           if (!this.productDetails[quoteProduct.productId]) {
             try {
-              this.productDetails[quoteProduct.productId] = await productService.getProduct(quoteProduct.productId)
+              const product = await productService.getProduct(quoteProduct.productId)
+
+              // Cache the image if it exists
+              if (product.image?.url) {
+                product.image.url = await imageCache.get(quoteProduct.productId, product.image.url)
+              }
+
+              this.productDetails[quoteProduct.productId] = product
             } catch (err) {
               console.error(`Failed to load product price ${quoteProduct.productId}:`, err)
             }
@@ -1234,12 +1241,19 @@ export default {
         const { equipmentBoxService } = await import('../services/equipmentBoxService.js')
         const response = await equipmentBoxService.listQuoteEquipmentBoxes(this.quote.id)
         this.equipmentBoxes = response.results || []
-        
+
         // Load equipment box details for each equipment box
         for (const equipmentBox of this.equipmentBoxes) {
           if (!this.equipmentBoxDetails[equipmentBox.equipmentBoxId]) {
             try {
-              this.equipmentBoxDetails[equipmentBox.equipmentBoxId] = await equipmentBoxService.getEquipmentBox(equipmentBox.equipmentBoxId)
+              const equipmentBoxDetail = await equipmentBoxService.getEquipmentBox(equipmentBox.equipmentBoxId)
+
+              // Cache the image if it exists
+              if (equipmentBoxDetail.image?.url) {
+                equipmentBoxDetail.image.url = await imageCache.get(equipmentBox.equipmentBoxId, equipmentBoxDetail.image.url)
+              }
+
+              this.equipmentBoxDetails[equipmentBox.equipmentBoxId] = equipmentBoxDetail
             } catch (err) {
               console.error(`Failed to load equipment box details ${equipmentBox.equipmentBoxId}:`, err)
             }

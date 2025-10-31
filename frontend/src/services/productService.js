@@ -2,6 +2,11 @@ import { API_BASE } from '../config/api.js'
 import { authService } from './authService.js'
 
 class ProductService {
+  constructor() {
+    // In-memory cache for products
+    this.productCache = new Map()
+  }
+
   async makeRequest(endpoint, data = null) {
     const headers = {
       'Content-Type': 'application/json',
@@ -40,9 +45,29 @@ class ProductService {
     return response.results || []
   }
 
-  // Get a specific product
-  async getProduct(productId) {
-    return await this.makeRequest('/getProduct', { id: productId })
+  // Get a specific product (with caching)
+  async getProduct(productId, useCache = true) {
+    // Check cache first if caching is enabled
+    if (useCache && this.productCache.has(productId)) {
+      return this.productCache.get(productId)
+    }
+
+    // Fetch from API
+    const product = await this.makeRequest('/getProduct', { id: productId })
+
+    // Store in cache
+    this.productCache.set(productId, product)
+
+    return product
+  }
+
+  // Clear product cache (useful when products are updated)
+  clearProductCache(productId = null) {
+    if (productId) {
+      this.productCache.delete(productId)
+    } else {
+      this.productCache.clear()
+    }
   }
 
 
