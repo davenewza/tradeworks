@@ -2,20 +2,16 @@
   "id": "list-products",
   "action_name": "listProducts",
   "response": {
-    "$.results[*].brandId": {
-      "display_order": 2
-    },
     "$.results[*].createdAt": {
       "display_order": 12,
       "visible": false
     },
     "$.results[*].heightInCm": {
-      "display_order": 8,
+      "display_order": 7,
       "visible": false
     },
     "$.results[*].id": {
       "display_order": 11,
-      "visible": false,
       "link": {
         "tool_id": "get-product",
         "display_order": 0,
@@ -30,29 +26,25 @@
       }
     },
     "$.results[*].image": {
-      "display_order": 5,
+      "display_order": 4,
+      "visible": false
+    },
+    "$.results[*].isEnabled": {
+      "display_order": 10,
       "visible": false
     },
     "$.results[*].lengthInCm": {
-      "display_order": 6,
+      "display_order": 5,
       "visible": false
     },
     "$.results[*].name": {
       "display_order": 3
     },
-    "$.results[*].sku": {
-      "display_order": 1
-    },
-    "$.results[*].supplierId": {
-      "display_order": 4,
-      "visible": false
-    },
     "$.results[*].updatedAt": {
       "display_order": 13,
       "visible": false
     },
-    "$.results[*].volume": {
-      "display_order": 10,
+    "$.results[*].volumeInLitres": {
       "visible": false
     },
     "$.results[*].weightInGrams": {
@@ -60,7 +52,7 @@
       "visible": false
     },
     "$.results[*].widthInCm": {
-      "display_order": 7,
+      "display_order": 6,
       "visible": false
     }
   }

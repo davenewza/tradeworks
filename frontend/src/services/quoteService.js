@@ -6,13 +6,13 @@ class QuoteService {
     const headers = {
       'Content-Type': 'application/json',
     }
-    
+
     // Add authentication header if available
     const token = authService.getToken()
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
-    
+
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers,
@@ -44,7 +44,8 @@ class QuoteService {
             }
           }
         }
-      }
+      },
+      limit: 500
     })
     return response.results || []
   }
@@ -58,7 +59,8 @@ class QuoteService {
             equals: customerPriceListId
           }
         }
-      }
+      },
+      limit: 500
     })
     return response.results || []
   }

@@ -3,31 +3,74 @@
   "action_name": "getProduct",
   "response": {
     "$.brandId": {
-      "display_order": 2
+      "display_order": 2,
+      "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
     "$.heightInCm": {
-      "display_order": 8
+      "display_order": 8,
+      "section_name": "b654f55a-86fa-45b1-9499-fef707a5d042"
+    },
+    "$.image": {
+      "display_order": 5,
+      "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
+    },
+    "$.isEnabled": {
+      "display_order": 4,
+      "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
     "$.lengthInCm": {
-      "display_order": 6
+      "display_order": 7,
+      "section_name": "b654f55a-86fa-45b1-9499-fef707a5d042"
     },
     "$.name": {
-      "display_order": 1
+      "display_order": 1,
+      "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
     "$.sku": {
-      "display_order": 3
+      "display_order": 3,
+      "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
-    "$.supplierId": {
-      "display_order": 5
-    },
-    "$.volume": {
-      "display_order": 10
+    "$.volumeInLitres": {
+      "display_order": 10,
+      "visible": false,
+      "section_name": "b654f55a-86fa-45b1-9499-fef707a5d042"
     },
     "$.weightInGrams": {
-      "display_order": 9
+      "display_order": 9,
+      "section_name": "b654f55a-86fa-45b1-9499-fef707a5d042"
     },
     "$.widthInCm": {
-      "display_order": 7
+      "display_order": 6,
+      "section_name": "b654f55a-86fa-45b1-9499-fef707a5d042"
     }
-  }
+  },
+  "sections": [
+    {
+      "name": "b654f55a-86fa-45b1-9499-fef707a5d042",
+      "title": "Dimensions",
+      "display_order": 6,
+      "visible": true
+    },
+    {
+      "name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539",
+      "title": "Overview",
+      "display_order": 1,
+      "visible": true
+    }
+  ],
+  "entry_activity_actions": [
+    {
+      "tool_id": "update-product",
+      "display_order": 0
+    },
+    {
+      "tool_id": "update-product-dimensions",
+      "title": "Update dimensions",
+      "display_order": 1
+    },
+    {
+      "tool_id": "disable-product",
+      "display_order": 2
+    }
+  ]
 }

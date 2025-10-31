@@ -1,8 +1,8 @@
 {
   "name": ".",
   "dependencies": {
-    "@teamkeel/functions-runtime": "^0.417.0",
-    "@teamkeel/testing-runtime": "^0.417.0",
+    "@teamkeel/functions-runtime": "^0.423.3",
+    "@teamkeel/testing-runtime": "^0.423.3",
     "kysely": "^0.27.4",
     "node-fetch": "^3.3.2"
   },

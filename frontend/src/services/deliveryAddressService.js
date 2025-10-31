@@ -32,7 +32,7 @@ class DeliveryAddressService {
       try {
         const errorData = await response.json()
         if (errorData?.message) message = errorData.message
-      } catch (_) {}
+      } catch (_) { }
       if (typeof message === 'string' && message.toLowerCase().includes('token has expired')) {
         authService.logout()
         window.location.reload()
@@ -49,7 +49,8 @@ class DeliveryAddressService {
         customer: {
           id: { equals: customerId }
         }
-      }
+      },
+      limit: 500
     })
   }
 
@@ -98,5 +99,3 @@ class DeliveryAddressService {
 }
 
 export const deliveryAddressService = new DeliveryAddressService()
-
-

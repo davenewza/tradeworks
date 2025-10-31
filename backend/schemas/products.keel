@@ -2,12 +2,15 @@ model Brand {
     fields {
         name Text
         logo File?
+        products Product[]
+        totalProducts Number @computed(COUNTIF(brand.products, brand.products.isEnabled))
     }
 
     actions {
         get getBrand(id)
         create createBrand() with (name, logo?)
         list listBrands()
+        update updateBrandName(id) with (name)
         update updateBrandLogo(id) with (logo)
     }
 
@@ -27,15 +30,22 @@ model Product {
         weightInGrams Decimal
 
         volumeInLitres Decimal @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
+
+        isEnabled Boolean @default(true)
     }
 
     actions {
         get getProduct(id)
         create createProduct() with (name, sku, image, brand.id, lengthInCm, widthInCm, heightInCm, weightInGrams)//, costPrice, freightIn)
-        list listProducts(name?, sku?,  brand.id?)
+        list listProducts(name?, sku?, brand.id?) {
+            @where(product.isEnabled)
+            @orderBy(name: asc)
+        }
         update updateProductDimensions(id) with (lengthInCm, widthInCm, heightInCm, weightInGrams)
         update updateProduct(id) with (name?,  brand.id?, sku?)//, costPrice?, freightIn?)
-        delete deleteProduct(id)
+        update disableProduct(id) {
+            @set(product.isEnabled = false)
+        }
     }
 
     @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])

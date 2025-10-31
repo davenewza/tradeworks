@@ -6,13 +6,13 @@ class ProductService {
     const headers = {
       'Content-Type': 'application/json',
     }
-    
+
     // Add authentication header if available
     const token = authService.getToken()
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
-    
+
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers,
@@ -34,7 +34,9 @@ class ProductService {
 
   // Get all products
   async getProducts() {
-    const response = await this.makeRequest('/listProducts', {})
+    const response = await this.makeRequest('/listProducts', {
+      limit: 500
+    })
     return response.results || []
   }
 
@@ -53,7 +55,8 @@ class ProductService {
             equals: priceListId
           }
         }
-      }
+      },
+      limit: 500
     })
     return response.results || []
   }

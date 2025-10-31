@@ -1,0 +1,31 @@
+{
+  "id": "get-brand",
+  "action_name": "getBrand",
+  "entry_activity_actions": [
+    {
+      "tool_id": "update-brand-name",
+      "title": "Update name",
+      "as_dialog": false,
+      "display_order": 0
+    },
+    {
+      "tool_id": "update-brand-logo",
+      "title": "Update logo"
+    }
+  ],
+  "embedded_tools": [
+    {
+      "id": "products",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-products"
+          },
+          "response_overrides": {
+            "$.results[*].brandId": false
+          }
+        }
+      ]
+    }
+  ]
+}
