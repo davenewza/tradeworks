@@ -271,16 +271,36 @@ export default {
         const list = this.quotes[cplId] || []
         const missing = list.filter(q => (q.createdById || q.createdBy) && !q.createdByName)
         if (missing.length === 0) return
+
         const { userService } = await import('../services/userService.js')
-        await Promise.all(missing.map(async q => {
+
+        // Collect unique user IDs to avoid redundant fetches
+        const uniqueUserIds = [...new Set(missing.map(q => q.createdById || q.createdBy))]
+
+        // Fetch all unique users in parallel
+        const userMap = new Map()
+        await Promise.all(uniqueUserIds.map(async id => {
           try {
-            const id = q.createdById || q.createdBy
             const u = await userService.getUser(id)
-            q.createdByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
-          } catch {}
+            userMap.set(id, u)
+          } catch (error) {
+            console.warn(`Failed to fetch user ${id}:`, error)
+          }
         }))
-        // Force reactive update
-        this.quotes = { ...this.quotes }
+
+        // Update quotes with fetched user data
+        missing.forEach(q => {
+          const id = q.createdById || q.createdBy
+          const u = userMap.get(id)
+          if (u) {
+            q.createdByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+          }
+        })
+
+        // Force reactive update only if we actually updated something
+        if (userMap.size > 0) {
+          this.quotes = { ...this.quotes }
+        }
       } catch (e) {
         console.warn('Failed to hydrate creator names', e)
       }

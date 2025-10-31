@@ -966,18 +966,30 @@ export default {
         if (!needsSubmitUser && !needsApproveUser) return
         const { userService } = await import('../services/userService.js')
         const updates = {}
+
+        // Fetch both users in parallel if needed
+        const fetchPromises = []
         if (needsSubmitUser) {
-          try {
-            const u = await userService.getUser(submitId)
-            updates.submittedByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
-          } catch {}
+          fetchPromises.push(
+            userService.getUser(submitId)
+              .then(u => {
+                updates.submittedByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+              })
+              .catch(error => console.warn('Failed to fetch submitted by user:', error))
+          )
         }
         if (needsApproveUser) {
-          try {
-            const u = await userService.getUser(approveId)
-            updates.approvedByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
-          } catch {}
+          fetchPromises.push(
+            userService.getUser(approveId)
+              .then(u => {
+                updates.approvedByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+              })
+              .catch(error => console.warn('Failed to fetch approved by user:', error))
+          )
         }
+
+        // Wait for all fetches to complete
+        await Promise.all(fetchPromises)
         if (Object.keys(updates).length) {
           // Merge locally so UI shows names without another server write
           this.$emit('quote-updated', { ...this.quote, ...updates })

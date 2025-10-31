@@ -268,14 +268,32 @@ export default {
         if (missing.length) {
           try {
             const { userService } = await import('../services/userService.js')
-            await Promise.all(missing.map(async e => {
+
+            // Collect unique user IDs to avoid redundant fetches
+            const uniqueUserIds = [...new Set(missing.map(e => e.createdById || e.createdBy))]
+
+            // Fetch all unique users in parallel
+            const userMap = new Map()
+            await Promise.all(uniqueUserIds.map(async id => {
               try {
-                const id = e.createdById || e.createdBy
                 const u = await userService.getUser(id)
-                e.createdByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
-              } catch {}
+                userMap.set(id, u)
+              } catch (error) {
+                console.warn(`Failed to fetch user ${id}:`, error)
+              }
             }))
-          } catch {}
+
+            // Update entries with fetched user data
+            missing.forEach(e => {
+              const id = e.createdById || e.createdBy
+              const u = userMap.get(id)
+              if (u) {
+                e.createdByName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id
+              }
+            })
+          } catch (error) {
+            console.warn('Failed to hydrate creator names', error)
+          }
         }
         this.changeLog = entries
         this.showChangeLog = true

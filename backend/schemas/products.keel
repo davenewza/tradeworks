@@ -14,7 +14,10 @@ model Brand {
         update updateBrandLogo(id) with (logo)
     }
 
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, create, list, update, delete]
+    )
 }
 
 model Product {
@@ -23,70 +26,104 @@ model Product {
         brand Brand
         sku Text @unique
         image File
-
         lengthInCm Decimal
         widthInCm Decimal
         heightInCm Decimal
         weightInGrams Decimal
-
         volumeInLitres Decimal @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
-
         isEnabled Boolean @default(true)
     }
 
     actions {
         get getProduct(id)
-        create createProduct() with (name, sku, image, brand.id, lengthInCm, widthInCm, heightInCm, weightInGrams)//, costPrice, freightIn)
+        create createProduct() with (
+            name,
+            sku,
+            image,
+            brand.id,
+            lengthInCm,
+            widthInCm,
+            heightInCm,
+            weightInGrams,
+        )
         list listProducts(name?, sku?, brand.id?) {
             @where(product.isEnabled)
             @orderBy(name: asc)
         }
-        update updateProductDimensions(id) with (lengthInCm, widthInCm, heightInCm, weightInGrams)
-        update updateProduct(id) with (name?,  brand.id?, sku?)//, costPrice?, freightIn?)
+        update updateProductDimensions(id) with (
+            lengthInCm,
+            widthInCm,
+            heightInCm,
+            weightInGrams,
+        )
+        update updateProduct(id) with (name?, brand.id?, sku?)
         update disableProduct(id) {
             @set(product.isEnabled = false)
         }
     }
 
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, create, list, update, delete]
+    )
 }
 
 model EquipmentBox {
     fields {
         name Text
-        sku Text? 
-        boxType BoxType 
+        sku Text?
+        boxType BoxType
         image File?
-
         price Decimal @computed(equipmentBox.priceInclVat / 115 * 100)
-        priceInclVat Decimal 
-
+        priceInclVat Decimal
         lengthInCm Decimal
         widthInCm Decimal
         heightInCm Decimal
         weightInGrams Decimal
-
         totalVolumeInLitres Decimal @computed(equipmentBox.lengthInCm * equipmentBox.widthInCm * equipmentBox.heightInCm / 1000)
         holdingVolumeInLitres Decimal @default(0.0)
-
         volumeUtilisationQuotient Decimal
         effectiveVolumeInLitres Decimal @computed(equipmentBox.holdingVolumeInLitres * equipmentBox.volumeUtilisationQuotient)
-
         isEnabled Boolean @default(true)
     }
 
     actions {
         get getEquipmentBox(id)
-        create createEquipmentBox() with (name, sku, boxType,image?, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        create createEquipmentBox() with (
+            name,
+            sku,
+            boxType,
+            image?,
+            priceInclVat,
+            lengthInCm,
+            widthInCm,
+            heightInCm,
+            weightInGrams,
+            holdingVolumeInLitres,
+            volumeUtilisationQuotient,
+        )
         list listEquipmentBoxes()
         update updateEquipmentBoxImage(id) with (image)
-        update updateEquipmentBox(id) with (name, sku, priceInclVat, lengthInCm, widthInCm, heightInCm, weightInGrams, holdingVolumeInLitres, volumeUtilisationQuotient)
+        update updateEquipmentBox(id) with (
+            name,
+            sku,
+            priceInclVat,
+            lengthInCm,
+            widthInCm,
+            heightInCm,
+            weightInGrams,
+            holdingVolumeInLitres,
+            volumeUtilisationQuotient,
+        )
         update disableEquipmentBox(id) {
             @set(equipmentBox.isEnabled = false)
         }
     }
 
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, create, list, update, delete]
+    )
 }
 
 enum BoxType {

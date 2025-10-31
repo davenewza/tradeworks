@@ -1,7 +1,7 @@
 model PriceList {
     fields {
         name Text
-        description Text? 
+        description Text?
         numberOfProducts Number @computed(COUNT(priceList.products.id))
         products ProductPrice[]
     }
@@ -14,8 +14,15 @@ model PriceList {
         delete deletePriceList(id)
     }
 
-    @on([create, update], pricelistUpdate)
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+    @on(
+        [create, update],
+        pricelistUpdate
+    )
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, create, list, update, delete]
+    )
 }
 
 model ProductPrice {
@@ -25,20 +32,32 @@ model ProductPrice {
         productSku Text @computed(productPrice.product.sku)
         priceList PriceList
         price Decimal @computed(productPrice.priceInclVat / 115 * 100)
-        priceInclVat Decimal 
+        priceInclVat Decimal
     }
 
     actions {
-        get getProductPrice(id)
+        get getProductPrice(id) {
+            @embed(product)
+        }
         create createProductPrice() with (product.id, priceList.id, priceInclVat)
-        list listProductPrices(priceList.id)
+        list listProductPrices(priceList.id) {
+            @embed(product)
+        }
         update updateProductPrice(id) with (priceInclVat)
         delete deleteProductPrice(id)
     }
 
-    @on([create, update, delete], pricelistUpdate)
+    @on(
+        [create, update, delete],
+        pricelistUpdate
+    )
+
     @unique([product, priceList])
-    @permission(expression: ctx.isAuthenticated, actions:[get, create, list, update, delete])
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, create, list, update, delete]
+    )
 }
 
 model PriceListChangeLog {
