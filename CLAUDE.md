@@ -365,6 +365,24 @@ All API calls should go through service files:
 4. Handle errors appropriately
 5. Return data in expected format
 
+### API Data Embedding Optimization
+
+**Important:** Many list endpoints use `@embed()` directives to include related data in responses, eliminating the need for additional API calls:
+
+**Endpoints with embedded data:**
+- `listProductPrices` - Embeds full `product` object (via `@embed(product)`)
+- `listQuoteProducts` - Embeds full `product` object (via `@embed(product)`)
+- `listQuoteEquipmentBoxes` - Embeds full `equipmentBox` object (via `@embed(equipmentBox)`)
+- `listCustomerPriceLists` - Embeds full `priceList` object (via `@embed(priceList)`)
+
+**Best practices:**
+- Always check if related data is already embedded before making individual GET requests
+- Use embedded data directly from list responses: `productPrice.product`, `quoteProduct.product`, etc.
+- Only call `getProduct()`, `getEquipmentBox()`, etc. when you need standalone entity data
+- See `productService.js` and component implementations for examples
+
+This pattern prevents N+1 query problems and significantly reduces API calls.
+
 ### Testing
 
 Backend tests use Vitest. Test files should be colocated with the code being tested or in a `__tests__` directory.

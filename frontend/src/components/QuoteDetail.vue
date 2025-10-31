@@ -717,7 +717,7 @@
     <AddProductModal 
       v-if="showAddProductModal"
       :quote-id="quote.id"
-        :price-list-id="customerPriceList?.priceListId"
+        :price-list-id="priceListId"
         :existing-quote-products="quoteProducts"
       @close="showAddProductModal = false"
       @product-added="handleProductAdded"
@@ -817,6 +817,10 @@ export default {
     this.hydrateCreatedByUser()
   },
   computed: {
+    // Extract priceListId from embedded priceList or fallback to priceListId field
+    priceListId() {
+      return this.customerPriceList?.priceList?.id || this.customerPriceList?.priceListId
+    },
     isSubmitted() {
       return this.quote?.status === 'Submitted'
     },
@@ -1158,7 +1162,10 @@ export default {
       }
 
       try {
-        this.productPrices = await productService.getProductPricesByPriceList(this.customerPriceList.priceListId)
+        // Use computed priceListId that handles embedded priceList
+        if (this.priceListId) {
+          this.productPrices = await productService.getProductPricesByPriceList(this.priceListId)
+        }
       } catch (err) {
         console.error('Failed to load product prices:', err)
       }
@@ -1166,22 +1173,18 @@ export default {
     
     async loadProductDetails() {
       try {
-        const { productService } = await import('../services/productService.js')
+        // Product data is now embedded in quoteProduct responses via the computed field
+        // No need to fetch separately
         for (const quoteProduct of this.quoteProducts) {
+          if (quoteProduct.product && !this.productDetails[quoteProduct.productId]) {
+            const product = quoteProduct.product
 
-          if (!this.productDetails[quoteProduct.productId]) {
-            try {
-              const product = await productService.getProduct(quoteProduct.productId)
-
-              // Cache the image if it exists
-              if (product.image?.url) {
-                product.image.url = await imageCache.get(quoteProduct.productId, product.image.url)
-              }
-
-              this.productDetails[quoteProduct.productId] = product
-            } catch (err) {
-              console.error(`Failed to load product price ${quoteProduct.productId}:`, err)
+            // Cache the image if it exists
+            if (product.image?.url) {
+              product.image.url = await imageCache.get(quoteProduct.productId, product.image.url)
             }
+
+            this.productDetails[quoteProduct.productId] = product
           }
         }
       } catch (err) {
@@ -1254,21 +1257,18 @@ export default {
         const response = await equipmentBoxService.listQuoteEquipmentBoxes(this.quote.id)
         this.equipmentBoxes = response.results || []
 
-        // Load equipment box details for each equipment box
-        for (const equipmentBox of this.equipmentBoxes) {
-          if (!this.equipmentBoxDetails[equipmentBox.equipmentBoxId]) {
-            try {
-              const equipmentBoxDetail = await equipmentBoxService.getEquipmentBox(equipmentBox.equipmentBoxId)
+        // Equipment box data is now embedded in the response
+        // No need to fetch separately
+        for (const quoteEquipmentBox of this.equipmentBoxes) {
+          if (quoteEquipmentBox.equipmentBox && !this.equipmentBoxDetails[quoteEquipmentBox.equipmentBoxId]) {
+            const equipmentBoxDetail = quoteEquipmentBox.equipmentBox
 
-              // Cache the image if it exists
-              if (equipmentBoxDetail.image?.url) {
-                equipmentBoxDetail.image.url = await imageCache.get(equipmentBox.equipmentBoxId, equipmentBoxDetail.image.url)
-              }
-
-              this.equipmentBoxDetails[equipmentBox.equipmentBoxId] = equipmentBoxDetail
-            } catch (err) {
-              console.error(`Failed to load equipment box details ${equipmentBox.equipmentBoxId}:`, err)
+            // Cache the image if it exists
+            if (equipmentBoxDetail.image?.url) {
+              equipmentBoxDetail.image.url = await imageCache.get(quoteEquipmentBox.equipmentBoxId, equipmentBoxDetail.image.url)
             }
+
+            this.equipmentBoxDetails[quoteEquipmentBox.equipmentBoxId] = equipmentBoxDetail
           }
         }
       } catch (err) {

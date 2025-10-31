@@ -46,6 +46,10 @@ class ProductService {
   }
 
   // Get a specific product (with caching)
+  // NOTE: In most cases, product data is already embedded in API responses:
+  // - listProductPrices has @embed(product) directive
+  // - QuoteProduct has computed field that includes product data
+  // Only use this method when you need standalone product data
   async getProduct(productId, useCache = true) {
     // Check cache first if caching is enabled
     if (useCache && this.productCache.has(productId)) {

@@ -48,7 +48,9 @@ model CustomerPriceList {
 
     actions {
         create createCustomerPriceList() with (customer.id, priceList.id)
-        list listCustomerPriceLists(customer.id)
+        list listCustomerPriceLists(customer.id) {
+            @embed(priceList)
+        }
         delete deleteCustomerPriceList(id)
     }
 

@@ -125,7 +125,8 @@ export default {
           // Load CPL to get its priceListId
           const cpls = await priceListService.getCustomerPriceLists(quote.customerPriceList?.customer?.id || '')
           const match = cpls.find(cpl => cpl.id === quote.customerPriceListId)
-          priceListId = match?.priceListId || ''
+          // Price list is now embedded in customerPriceList
+          priceListId = match?.priceList?.id || ''
         }
         this.productPrices = priceListId ? await productService.getProductPricesByPriceList(priceListId) : []
         this.filteredProductPrices = this.filterAvailableProducts(this.productPrices)

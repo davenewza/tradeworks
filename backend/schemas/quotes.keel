@@ -13,7 +13,9 @@ model QuoteProduct {
 
     actions {
         create createQuoteProduct() with (quote.id, productPrice.id, quantity)
-        list listQuoteProducts(quote.id)
+        list listQuoteProducts(quote.id) {
+            @embed(product)
+        }
         update updateQuoteProduct(id) with (quantity)
         delete deleteQuoteProduct(id)
     }
@@ -145,7 +147,9 @@ model QuoteEquipmentBox {
     }
 
     actions {
-        list listQuoteEquipmentBoxes(quote.id?)
+        list listQuoteEquipmentBoxes(quote.id?) {
+            @embed(equipmentBox)
+        }
     }
 
     @unique([quote, equipmentBox])

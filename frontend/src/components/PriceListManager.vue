@@ -373,16 +373,18 @@ export default {
           return
         }
         
-        // Get the actual price list details for each customer price list
-        this.priceLists = await Promise.all(
-          customerPriceLists.map(async (customerPriceList) => {
-            const priceList = await priceListService.getPriceList(customerPriceList.priceListId)
-            return {
-              ...priceList,
-              customerPriceListId: customerPriceList.id
-            }
-          })
-        )
+        // Price list data is now embedded in customerPriceList via @embed(priceList)
+        // No need to fetch separately
+        this.priceLists = customerPriceLists.map((customerPriceList) => {
+          // Use embedded priceList data
+          const priceList = customerPriceList.priceList || {}
+          return {
+            ...priceList,
+            customerPriceListId: customerPriceList.id,
+            // Keep the priceListId for backward compatibility
+            priceListId: priceList.id
+          }
+        })
         console.log('Price lists loaded:', this.priceLists)
         
         // Load quotes for each customer price list

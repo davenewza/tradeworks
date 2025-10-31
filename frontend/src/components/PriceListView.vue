@@ -333,20 +333,18 @@ export default {
     
     async loadProductDetails() {
       try {
+        // Product data is now embedded in productPrice responses via @embed(product)
+        // No need to fetch separately
         for (const productPrice of this.productPrices) {
-          if (!this.productDetails[productPrice.productId]) {
-            try {
-              const product = await productService.getProduct(productPrice.productId)
+          if (productPrice.product && !this.productDetails[productPrice.productId]) {
+            const product = productPrice.product
 
-              // Cache the image if it exists
-              if (product.image?.url) {
-                product.image.url = await imageCache.get(productPrice.productId, product.image.url)
-              }
-
-              this.productDetails[productPrice.productId] = product
-            } catch (err) {
-              console.error(`Failed to load product ${productPrice.productId}:`, err)
+            // Cache the image if it exists
+            if (product.image?.url) {
+              product.image.url = await imageCache.get(productPrice.productId, product.image.url)
             }
+
+            this.productDetails[productPrice.productId] = product
           }
         }
       } catch (err) {
