@@ -20,6 +20,8 @@ This is a full-stack quote management application built with Keel (backend frame
 - Vite for build tooling
 - Tailwind CSS for styling
 - Sentry for error tracking
+- Vercel Analytics for user analytics
+- Vercel Speed Insights for performance monitoring
 
 ## Commands
 
@@ -426,3 +428,9 @@ Many fields use `@computed()` in schemas for calculated values:
 
 ### Box Packing Algorithm
 `calculateEquipmentBoxes.ts` implements a bin-packing algorithm to determine optimal box quantities based on product volumes and dimensions.
+
+### Error Tracking with Sentry
+
+- Sentry is initialized in `frontend/src/main.js`
+- Captures frontend errors and exceptions
+- Sends user context with errors (`sendDefaultPii: true`)
