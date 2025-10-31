@@ -46,22 +46,30 @@
         </div>
       </header>
       
+      <!-- Loading State -->
+      <div v-if="isLoadingUser" class="flex justify-center items-center py-20">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p class="text-gray-600">Loading...</p>
+        </div>
+      </div>
+
       <!-- Customer Assignment Check -->
-      <div v-if="!hasCustomerId" class="card text-center py-12">
+      <div v-else-if="!hasCustomerId" class="card text-center py-12">
         <div class="text-yellow-600 text-lg font-medium mb-2">No Customer Assigned</div>
         <p class="text-gray-600 mb-4">No customer has been assigned to you yet. Please contact your administrator.</p>
       </div>
-      
+
       <!-- Main Application Content -->
-      <PriceListManager 
-        v-else-if="hasCustomerId && !showAddresses" 
-        :customer-id="customerId" 
+      <PriceListManager
+        v-else-if="hasCustomerId && !showAddresses"
+        :customer-id="customerId"
         :key="`price-list-manager-${customerId}`"
       />
-      <DeliveryAddresses 
-        v-else-if="hasCustomerId && showAddresses" 
+      <DeliveryAddresses
+        v-else-if="hasCustomerId && showAddresses"
         :customer-id="customerId"
-        @close="showAddresses = false" 
+        @close="showAddresses = false"
       />
     </div>
   </div>
@@ -93,7 +101,8 @@ export default {
       showAddresses: false,
       logoOk: true,
       logoSrc: `${import.meta.env.BASE_URL}createspace-logo.png`,
-      customerName: ''
+      customerName: '',
+      isLoadingUser: false
     }
   },
   computed: {
@@ -123,8 +132,11 @@ export default {
 
     // Check authentication status
     this.isAuthenticated = authService.isAuthenticated()
-    
+
     if (this.isAuthenticated) {
+      // Set loading state while fetching user data
+      this.isLoadingUser = true
+
       // Always refetch user data on page refresh to ensure we have the latest information
       try {
         this.currentUser = await authService.getCurrentUser()
@@ -138,6 +150,8 @@ export default {
         this.currentUser = await authService.getCurrentUserCached()
         this.customerId = authService.getCustomerId(this.currentUser)
         await this.loadCustomerName()
+      } finally {
+        this.isLoadingUser = false
       }
     }
   },
@@ -146,7 +160,7 @@ export default {
       console.log('Login successful:', loginData)
       this.isAuthenticated = true
       this.loginData = loginData
-      
+
       // Check if this is a new user (identity_created: true)
       if (loginData.identity_created) {
         console.log('New user detected, showing profile dialog')
@@ -154,10 +168,16 @@ export default {
         this.showProfileDialog = true
       } else {
         console.log('Existing user, retrieving profile')
-        // Existing user, get their profile
-        this.currentUser = await authService.getCurrentUser()
-        this.customerId = authService.getCustomerId(this.currentUser)
-        await this.loadCustomerName()
+        // Set loading state while fetching user data
+        this.isLoadingUser = true
+        try {
+          // Existing user, get their profile
+          this.currentUser = await authService.getCurrentUser()
+          this.customerId = authService.getCustomerId(this.currentUser)
+          await this.loadCustomerName()
+        } finally {
+          this.isLoadingUser = false
+        }
       }
     },
     
