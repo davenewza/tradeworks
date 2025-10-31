@@ -104,12 +104,12 @@
           <div class="flex justify-between items-center">
             <div class="flex items-center space-x-4">
               <div class="relative w-12 h-12">
-                <img 
-                  v-if="productDetails[productPrice.productId]?.image?.url" 
-                  :src="productDetails[productPrice.productId].image.url" 
-                  :alt="productDetails[productPrice.productId]?.name"
+                <img
+                  v-if="productDetails[productPrice.product?.id]?.image?.url"
+                  :src="productDetails[productPrice.product.id].image.url"
+                  :alt="productDetails[productPrice.product.id]?.name"
                   class="w-12 h-12 object-cover rounded-lg cursor-pointer"
-                  @mouseenter="showImagePreview(productPrice.productId, $event)"
+                  @mouseenter="showImagePreview(productPrice.product.id, $event)"
                   @mousemove="updateImagePreviewPosition($event)"
                   @mouseleave="hideImagePreview"
                 />
@@ -123,8 +123,8 @@
                 </div>
               </div>
               <div class="min-h-[2rem] flex flex-col justify-center">
-                <h4 class="font-medium text-gray-900">{{ productDetails[productPrice.productId]?.name || productPrice.productName }}</h4>
-                <p class="text-sm text-gray-600">SKU: {{ productDetails[productPrice.productId]?.sku || productPrice.productSku }}</p>
+                <h4 class="font-medium text-gray-900">{{ productDetails[productPrice.product?.id]?.name || productPrice.productName }}</h4>
+                <p class="text-sm text-gray-600">SKU: {{ productDetails[productPrice.product?.id]?.sku || productPrice.productSku }}</p>
               </div>
             </div>
             <div class="flex items-center space-x-8">
@@ -336,15 +336,18 @@ export default {
         // Product data is now embedded in productPrice responses via @embed(product)
         // No need to fetch separately
         for (const productPrice of this.productPrices) {
-          if (productPrice.product && !this.productDetails[productPrice.productId]) {
+          if (productPrice.product) {
             const product = productPrice.product
+            const productId = product.id
 
-            // Cache the image if it exists
-            if (product.image?.url) {
-              product.image.url = await imageCache.get(productPrice.productId, product.image.url)
+            if (!this.productDetails[productId]) {
+              // Cache the image if it exists
+              if (product.image?.url) {
+                product.image.url = await imageCache.get(productId, product.image.url)
+              }
+
+              this.productDetails[productId] = product
             }
-
-            this.productDetails[productPrice.productId] = product
           }
         }
       } catch (err) {
@@ -444,7 +447,8 @@ export default {
     filteredProductPrices() {
       if (this.selectedBrandId === 'ALL') return this.productPrices
       return this.productPrices.filter(pp => {
-        const prod = this.productDetails[pp.productId]
+        const productId = pp.product?.id
+        const prod = this.productDetails[productId]
         const brandId = prod?.brandId || pp.brandId || pp.productBrandId
         return brandId === this.selectedBrandId
       })

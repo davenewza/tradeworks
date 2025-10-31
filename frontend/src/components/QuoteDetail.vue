@@ -241,12 +241,12 @@
           <div class="flex justify-between items-center">
               <div class="flex items-center space-x-4">
               <div class="relative w-12 h-12">
-                <img 
-                  v-if="productDetails[product.productId]?.image?.url" 
-                  :src="productDetails[product.productId].image.url" 
-                  :alt="productDetails[product.productId]?.name"
+                <img
+                  v-if="productDetails[product.product?.id]?.image?.url"
+                  :src="productDetails[product.product.id].image.url"
+                  :alt="productDetails[product.product.id]?.name"
                   class="w-12 h-12 object-contain rounded-lg cursor-pointer bg-white"
-                  @mouseenter="showImagePreview(product.productId, $event)"
+                  @mouseenter="showImagePreview(product.product.id, $event)"
                   @mousemove="updateImagePreviewPosition($event)"
                   @mouseleave="hideImagePreview"
                 />
@@ -260,8 +260,8 @@
                 </div>
               </div>
               <div class="min-h-[2rem] flex flex-col justify-center">
-                <h4 class="font-medium text-gray-900">{{ productDetails[product.productId]?.name || 'Product' }}</h4>
-                <p class="text-sm text-gray-600">SKU: {{ productDetails[product.productId]?.sku || 'N/A' }}</p>
+                <h4 class="font-medium text-gray-900">{{ productDetails[product.product?.id]?.name || 'Product' }}</h4>
+                <p class="text-sm text-gray-600">SKU: {{ productDetails[product.product?.id]?.sku || 'N/A' }}</p>
               </div>
             </div>
             <div class="flex items-center space-x-4">
@@ -890,7 +890,8 @@ export default {
     },
     productsWeight() {
       return this.quoteProducts.reduce((totalWeight, quoteProduct) => {
-        const product = this.productDetails[quoteProduct.productId]
+        const productId = quoteProduct.product?.id
+        const product = this.productDetails[productId]
         if (product && product.weightInGrams) {
           return totalWeight + (Number(product.weightInGrams) * quoteProduct.quantity)
         }
@@ -1176,15 +1177,18 @@ export default {
         // Product data is now embedded in quoteProduct responses via the computed field
         // No need to fetch separately
         for (const quoteProduct of this.quoteProducts) {
-          if (quoteProduct.product && !this.productDetails[quoteProduct.productId]) {
+          if (quoteProduct.product) {
             const product = quoteProduct.product
+            const productId = product.id
 
-            // Cache the image if it exists
-            if (product.image?.url) {
-              product.image.url = await imageCache.get(quoteProduct.productId, product.image.url)
+            if (!this.productDetails[productId]) {
+              // Cache the image if it exists
+              if (product.image?.url) {
+                product.image.url = await imageCache.get(productId, product.image.url)
+              }
+
+              this.productDetails[productId] = product
             }
-
-            this.productDetails[quoteProduct.productId] = product
           }
         }
       } catch (err) {
