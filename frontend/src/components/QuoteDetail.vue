@@ -189,8 +189,13 @@
     <!-- Products Section -->
     <div class="card">
 
+      <!-- Products Loading State -->
+      <div v-if="loadingProducts" class="flex justify-center items-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+
       <!-- Products List -->
-      <div v-if="quoteProducts.length === 0" class="text-center py-8">
+      <div v-else-if="quoteProducts.length === 0" class="text-center py-8">
         <div class="text-gray-500 mb-4">
           <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18"/>
@@ -362,7 +367,11 @@
       </div>
 
       <!-- Equipment Boxes List -->
-      <div v-if="!selectedBoxType" class="text-center py-8">
+      <div v-if="loadingEquipmentBoxes" class="flex justify-center items-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+
+      <div v-else-if="!selectedBoxType" class="text-center py-8">
         <div class="text-gray-500 mb-4">
           <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
@@ -370,10 +379,6 @@
         </div>
         <h4 class="text-lg font-medium text-gray-900 mb-2">No equipment boxes selected</h4>
         <p class="text-gray-600">Select a box type to automatically calculate packaging requirements.</p>
-      </div>
-
-      <div v-else-if="loadingEquipmentBoxes" class="flex justify-center items-center py-8">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
 
       <div v-else-if="equipmentBoxes.length === 0" class="text-center py-8">
@@ -753,6 +758,7 @@ export default {
       equipmentBoxDetails: {}, // Store equipment box details by equipmentBoxId
       selectedBoxType: '',
       loadingEquipmentBoxes: false,
+      loadingProducts: false,
       imagePreview: {
         show: false,
         src: '',
@@ -778,12 +784,17 @@ export default {
     }
   },
   async mounted() {
+    // Initialize loading states
+    this.loadingProducts = true
+    this.loadingEquipmentBoxes = true
+    this.loadingAddresses = true
+
     await this.refreshQuoteData()
     await this.loadCustomerPriceList()
     await this.loadQuoteProducts()
     await this.loadProductDetails()
-    await this.loadEquipmentBoxes()
     this.initializeBoxType()
+    await this.loadEquipmentBoxes()
     await this.loadDeliveryAddresses()
     // hydrate selected from quote if present
     if (this.quote.deliveryAddressId) {
@@ -1125,9 +1136,12 @@ export default {
     
     async loadQuoteProducts() {
       try {
+        this.loadingProducts = true
         this.quoteProducts = await quoteService.getQuoteProducts(this.quote.id)
       } catch (err) {
         console.error('Failed to load quote products:', err)
+      } finally {
+        this.loadingProducts = false
       }
 
       try {
