@@ -11,10 +11,14 @@
   ],
   "entry_activity_actions": [
     {
+      "tool_id": "update-price-list",
+      "display_order": 0
+    },
+    {
       "tool_id": "create-product-price",
       "title": "Add product",
       "as_dialog": true,
-      "display_order": 0,
+      "display_order": 1,
       "data_mapping": [
         {
           "key": "$.priceList.id",
@@ -23,6 +27,21 @@
           }
         }
       ]
+    },
+    {
+      "tool_id": "create-discount-tier",
+      "title": "Add discount tier",
+      "as_dialog": true,
+      "display_order": 2,
+      "data_mapping": [
+        {
+          "key": "$.priceList.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ],
+      "skip_confirmation": true
     }
   ],
   "embedded_tools": [
@@ -32,6 +51,20 @@
         {
           "action_link": {
             "tool_id": "list-product-prices"
+          },
+          "response_overrides": {
+            "$.results[*].priceListId": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "discounts",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-discount-tiers",
+            "as_dialog": true
           },
           "response_overrides": {
             "$.results[*].priceListId": false

@@ -1,0 +1,39 @@
+{
+  "id": "list-discount-tiers",
+  "action_name": "listDiscountTiers",
+  "response": {
+    "$.results[*].createdAt": {
+      "display_order": 6,
+      "visible": false
+    },
+    "$.results[*].discountPercentage": {
+      "display_order": 4
+    },
+    "$.results[*].id": {
+      "display_order": 5
+    },
+    "$.results[*].priceListId": {
+      "display_order": 1,
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 7,
+      "visible": false
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "delete-discount-tier",
+      "as_dialog": true,
+      "display_order": 2,
+      "data_mapping": [
+        {
+          "key": "$.id",
+          "path": {
+            "path": "$.results[*].id"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,7 @@ model PriceList {
         description Text?
         numberOfProducts Number @computed(COUNT(priceList.products.id))
         products ProductPrice[]
+        discounts DiscountTier[]
     }
 
     actions {
@@ -11,7 +12,6 @@ model PriceList {
         create createPriceList() with (name, description?)
         list listPriceLists()
         update updatePriceList(id) with (name, description?)
-        delete deletePriceList(id)
     }
 
     @on(
@@ -53,6 +53,42 @@ model ProductPrice {
     )
 
     @unique([product, priceList])
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, create, list, update, delete]
+    )
+}
+
+model DiscountTier {
+    fields {
+        priceList PriceList
+        discountPercentage Decimal
+        minQuantity Number?
+        maxQuantity Number?
+    }
+
+    actions {
+        get getDiscountTier(id)
+        create createDiscountTier() with (
+            priceList.id,
+            discountPercentage,
+            minQuantity?,
+            maxQuantity?,
+        )
+        list listDiscountTiers(priceList.id) {
+            @orderBy(
+                minQuantity: asc,
+                maxQuantity: asc
+            )
+        }
+        update updateDiscountTier(id) with (
+            discountPercentage,
+            minQuantity?,
+            maxQuantity?,
+        )
+        delete deleteDiscountTier(id)
+    }
 
     @permission(
         expression: ctx.isAuthenticated,

@@ -4,7 +4,8 @@ model QuoteProduct {
         productPrice ProductPrice
         product Product @computed(quoteProduct.productPrice.product)
         quantity Number
-        price Decimal @computed(quoteProduct.productPrice.price)
+        discount Decimal @default(0.0)
+        price Decimal @computed(quoteProduct.productPrice.price * (1 - (quoteProduct.discount/100)))
         priceInclVat Decimal @computed(quoteProduct.price * 1.15)
         total Decimal @computed(quoteProduct.price * quoteProduct.quantity)
         totalInclVat Decimal @computed(quoteProduct.total * 1.15)

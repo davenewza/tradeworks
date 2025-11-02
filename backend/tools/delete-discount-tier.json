@@ -1,0 +1,39 @@
+{
+  "id": "delete-discount-tier",
+  "action_name": "deleteDiscountTier",
+  "inputs": {
+    "$.id": {
+      "lookup_action": {
+        "tool_id": "list-discount-tiers",
+        "as_dialog": true,
+        "data_mapping": [
+          {
+            "key": "$.where.priceList.id.equals",
+            "path": {
+              "path": "$.priceListId"
+            }
+          }
+        ]
+      }
+    },
+    "$.priceListId": {
+      "visible": false,
+      "lookup_action": {
+        "tool_id": "list-price-lists",
+        "display_order": 0
+      },
+      "get_entry_action": {
+        "tool_id": "get-price-list",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.priceListId"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -118,6 +118,16 @@ class PriceListService {
       return { ...e, createdByName }
     })
   }
+
+  // List discount tiers for a price list
+  async listDiscountTiers(priceListId) {
+    const response = await this.makeRequest('/listDiscountTiers', {
+      where: {
+        priceList: { id: { equals: priceListId } }
+      }
+    })
+    return response.results || []
+  }
 }
 
 export const priceListService = new PriceListService()

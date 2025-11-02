@@ -60,6 +60,28 @@
 
     <!-- Products List -->
     <div v-else>
+      <!-- Discount Tiers Section -->
+      <div v-if="discountTiers.length > 0" class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 class="text-lg font-semibold text-gray-900 mb-3">Discount Tiers</h4>
+        <p class="text-sm text-gray-600 mb-3">Volume discounts apply automatically based on the quantity ordered for each product.</p>
+        <div class="bg-white rounded border border-blue-200 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr class="border-b border-gray-200">
+                <th class="text-left py-2 px-4 text-gray-700 font-semibold">Quantity Range</th>
+                <th class="text-right py-2 px-4 text-gray-700 font-semibold">Discount Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="tier in discountTiers" :key="tier.id" class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="py-2 px-4 text-gray-900">{{ formatQuantityRange(tier) }} units</td>
+                <td class="text-right py-2 px-4 text-gray-900 font-medium">{{ tier.discountPercentage }}% off</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Brand Filters -->
       <div class="mb-4 flex flex-wrap items-center gap-2">
         <button
@@ -90,6 +112,9 @@
           </div>
           <div class="w-24 text-right whitespace-nowrap">
             <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Price (incl. VAT)</h4>
+          </div>
+          <div v-if="discountTiers.length > 0" class="w-24 text-right">
+            <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Discounts</h4>
           </div>
         </div>
       </div>
@@ -134,6 +159,20 @@
               <div class="w-24 text-right whitespace-nowrap">
                 <p class="text-sm font-bold text-gray-900">ZAR {{ formatCurrency(productPrice.priceInclVat) }}</p>
               </div>
+              <div v-if="discountTiers.length > 0" class="w-24 text-right">
+                <a
+                  href="#"
+                  @click.prevent
+                  @mouseenter="showDiscountPopup(productPrice.product?.id, productPrice, $event)"
+                  @mouseleave="hideDiscountPopup"
+                  class="text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                  </svg>
+                  Discounts
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -141,7 +180,7 @@
     </div>
 
     <!-- Image Preview Overlay -->
-    <div 
+    <div
       v-if="imagePreview.show"
       :style="{
         position: 'fixed',
@@ -152,11 +191,46 @@
       }"
       class="bg-white border border-gray-300 rounded-lg shadow-lg p-2"
     >
-      <img 
-        :src="imagePreview.src" 
+      <img
+        :src="imagePreview.src"
         :alt="imagePreview.alt"
         class="w-60 h-60 object-contain rounded bg-white"
       />
+    </div>
+
+    <!-- Discount Tiers Popup -->
+    <div
+      v-if="discountPopup.show"
+      :style="{
+        position: 'fixed',
+        top: discountPopup.y + 'px',
+        left: discountPopup.x + 'px',
+        zIndex: 1001
+      }"
+      class="bg-white border border-gray-300 rounded-lg shadow-xl p-4 min-w-[300px]"
+      @mouseenter="discountPopup.show = true"
+      @mouseleave="hideDiscountPopup"
+    >
+      <h4 class="text-sm font-semibold text-gray-900 mb-3">Volume Discounts</h4>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left py-1 text-gray-700 font-medium">Quantity</th>
+            <th class="text-right py-1 text-gray-700 font-medium">Discount</th>
+            <th class="text-right py-1 text-gray-700 font-medium">Unit Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="tier in discountTiers" :key="tier.id" class="border-b border-gray-100">
+            <td class="py-2 text-gray-900">{{ formatQuantityRange(tier) }}</td>
+            <td class="text-right text-gray-900">{{ tier.discountPercentage }}%</td>
+            <td class="text-right font-medium text-gray-900">
+              ZAR {{ formatCurrency(calculateDiscountedPrice(discountPopup.productPrice?.priceInclVat || 0, tier.discountPercentage)) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="text-xs text-gray-500 mt-2">Prices include VAT</p>
     </div>
 
   <!-- Change Log Modal -->
@@ -247,13 +321,22 @@ export default {
         alt: '',
         x: 0,
         y: 0
+      },
+      discountTiers: [],
+      discountPopup: {
+        show: false,
+        productId: null,
+        productPrice: null,
+        x: 0,
+        y: 0
       }
     }
   },
   async mounted() {
     await Promise.all([
       this.loadProductPrices(),
-      this.loadBrands()
+      this.loadBrands(),
+      this.loadDiscountTiers()
     ])
     await this.loadProductDetails()
   },
@@ -311,6 +394,17 @@ export default {
       } catch (e) {
         console.error('Failed to load brands', e)
         this.brands = []
+      }
+    },
+    async loadDiscountTiers() {
+      try {
+        const priceListId = this.priceList.priceListId || this.priceList.id
+        const { priceListService } = await import('../services/priceListService.js')
+        this.discountTiers = await priceListService.listDiscountTiers(priceListId)
+        console.log('Discount tiers loaded:', this.discountTiers)
+      } catch (e) {
+        console.error('Failed to load discount tiers', e)
+        this.discountTiers = []
       }
     },
     async loadProductPrices() {
@@ -441,6 +535,54 @@ export default {
     
     hideImagePreview() {
       this.imagePreview.show = false
+    },
+
+    showDiscountPopup(productId, productPrice, event) {
+      if (!this.discountTiers || this.discountTiers.length === 0) return
+
+      const offsetX = 10
+      const offsetY = 10
+      const popupWidth = 300
+      const popupHeight = 200
+
+      let x = event.clientX + offsetX
+      let y = event.clientY + offsetY
+
+      if (x + popupWidth > window.innerWidth) {
+        x = event.clientX - popupWidth - offsetX
+      }
+
+      if (y + popupHeight > window.innerHeight) {
+        y = event.clientY - popupHeight - offsetY
+      }
+
+      this.discountPopup = {
+        show: true,
+        productId: productId,
+        productPrice: productPrice,
+        x: x,
+        y: y
+      }
+    },
+
+    hideDiscountPopup() {
+      this.discountPopup.show = false
+    },
+
+    calculateDiscountedPrice(basePrice, discountPercentage) {
+      const discount = parseFloat(discountPercentage) / 100
+      return parseFloat(basePrice) * (1 - discount)
+    },
+
+    formatQuantityRange(tier) {
+      if (tier.minQuantity && tier.maxQuantity) {
+        return `${tier.minQuantity} - ${tier.maxQuantity}`
+      } else if (tier.minQuantity) {
+        return `${tier.minQuantity}+`
+      } else if (tier.maxQuantity) {
+        return `Up to ${tier.maxQuantity}`
+      }
+      return 'All'
     }
   },
   computed: {
