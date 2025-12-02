@@ -66,23 +66,23 @@ model Quote {
             @set(quote.name = "")
             @set(quote.createdBy = ctx.identity.user)
         }
-        get getQuote(id)
-        list listQuotes(customerPriceList.customer.id?, status?)
-        list listDraftQuotes(customerPriceList.customer.id) {
+        get getQuote(id) 
+        list listQuotes(customerPriceList.id, status?)
+        list listDraftQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Draft)
             @sortable(
                 name,
                 createdAt
             )
         }
-        list listSubmittedQuotes(customerPriceList.customer.id) {
+        list listSubmittedQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Submitted)
             @sortable(
                 name,
                 createdAt
             )
         }
-        list listApprovedQuotes(customerPriceList.customer.id) {
+        list listApprovedQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Approved)
             @sortable(
                 name,
@@ -125,8 +125,8 @@ model Quote {
     }
 
     @permission(
-        expression: ctx.isAuthenticated,
-        actions: [get, create, list]
+        expression: ctx.isAuthenticated && quote.customerPriceList.customer == ctx.identity.user.customer,
+        actions: [get, list, create]
     )
 }
 

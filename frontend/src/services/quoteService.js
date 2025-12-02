@@ -33,22 +33,6 @@ class QuoteService {
     return response.json()
   }
 
-  // Get quotes for a specific customer
-  async getQuotesByCustomer(customerId) {
-    const response = await this.makeRequest('/listQuotes', {
-      where: {
-        customerPriceList: {
-          customer: {
-            id: {
-              equals: customerId
-            }
-          }
-        }
-      },
-      limit: 500
-    })
-    return response.results || []
-  }
 
   // Get quotes for a specific customer price list
   async getQuotesByCustomerPriceList(customerPriceListId) {

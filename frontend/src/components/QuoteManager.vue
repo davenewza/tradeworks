@@ -132,9 +132,19 @@ export default {
     async loadQuotes() {
       this.loading = true
       this.error = null
-      
+
       try {
-        this.quotes = await quoteService.getQuotesByCustomer(this.customerId)
+        // Get customer's price lists first
+        const { priceListService } = await import('../services/priceListService.js')
+        const customerPriceLists = await priceListService.getCustomerPriceLists(this.customerId)
+
+        // Fetch quotes for each customer price list and combine
+        const allQuotes = []
+        for (const cpl of customerPriceLists) {
+          const quotes = await quoteService.getQuotesByCustomerPriceList(cpl.id)
+          allQuotes.push(...quotes)
+        }
+        this.quotes = allQuotes
       } catch (err) {
         this.error = err.message || 'Failed to load quotes'
       } finally {
