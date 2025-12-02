@@ -42,32 +42,56 @@
         </div>
 
         <div v-else class="space-y-4">
-          <div 
-            v-for="productPrice in filteredProductPrices" 
-            :key="productPrice.id" 
-            class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
-            @click="selectProduct(productPrice)"
+          <div
+            v-for="productPrice in filteredProductPrices"
+            :key="productPrice.id"
+            class="border border-gray-200 rounded-lg hover:bg-gray-50"
           >
-            <div class="flex items-center space-x-4">
-              <div class="flex-1">
-                <h4 class="font-medium text-gray-900">{{ productPrice.productName }}</h4>
-                <p class="text-sm text-gray-600">SKU: {{ productPrice.productSku }}</p>
-                <div class="flex items-center space-x-4 mt-2">
-                  <div>
-                    <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(productPrice.price) }}</span>
-                  </div>
-                  <div>
-                    <span class="text-xs text-gray-500">
-                      incl. VAT: ZAR {{ formatCurrency(productPrice.priceInclVat) }}
-                    </span>
+            <div class="p-4 cursor-pointer" @click="selectProduct(productPrice)">
+              <div class="flex items-center space-x-4">
+                <div class="flex-1">
+                  <h4 class="font-medium text-gray-900">{{ productPrice.productName }}</h4>
+                  <p class="text-sm text-gray-600">SKU: {{ productPrice.productSku }}</p>
+                  <div class="flex items-center space-x-4 mt-2">
+                    <div>
+                      <span class="text-sm font-medium text-gray-900">ZAR {{ formatCurrency(productPrice.price) }}</span>
+                    </div>
+                    <div>
+                      <span class="text-xs text-gray-500">
+                        incl. VAT: ZAR {{ formatCurrency(productPrice.priceInclVat) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <div class="text-right">
+                  <button class="btn btn-primary text-sm">
+                    Add to Quote
+                  </button>
+                </div>
               </div>
-              <div class="text-right">
-                <button class="btn btn-primary text-sm">
-                  Add to Quote
-                </button>
-              </div>
+            </div>
+
+            <!-- Discount Tiers Table -->
+            <div v-if="discountTiers.length > 0" class="border-t border-gray-200 bg-blue-50 p-3">
+              <div class="text-xs font-semibold text-gray-700 mb-2">Volume Discounts Available</div>
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-blue-200">
+                    <th class="text-left py-1 text-gray-700 font-medium">Quantity</th>
+                    <th class="text-right py-1 text-gray-700 font-medium">Discount</th>
+                    <th class="text-right py-1 text-gray-700 font-medium">Unit Price (incl. VAT)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="tier in discountTiers" :key="tier.id" class="border-b border-blue-100">
+                    <td class="py-1.5 text-gray-900">{{ formatQuantityRange(tier) }}</td>
+                    <td class="text-right text-gray-900">{{ tier.discountPercentage }}%</td>
+                    <td class="text-right font-medium text-gray-900">
+                      ZAR {{ formatCurrency(calculateDiscountedPrice(productPrice.priceInclVat, tier.discountPercentage)) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -107,7 +131,9 @@ export default {
       productPrices: [],
       filteredProductPrices: [],
       searchQuery: '',
-      loading: false
+      loading: false,
+      discountTiers: [],
+      resolvedPriceListId: null
     }
   },
   async mounted() {
@@ -128,12 +154,28 @@ export default {
           // Price list is now embedded in customerPriceList
           priceListId = match?.priceList?.id || ''
         }
+        this.resolvedPriceListId = priceListId
         this.productPrices = priceListId ? await productService.getProductPricesByPriceList(priceListId) : []
         this.filteredProductPrices = this.filterAvailableProducts(this.productPrices)
+
+        // Load discount tiers
+        if (priceListId) {
+          await this.loadDiscountTiers(priceListId)
+        }
       } catch (err) {
         console.error('Failed to load product prices:', err)
       } finally {
         this.loading = false
+      }
+    },
+
+    async loadDiscountTiers(priceListId) {
+      try {
+        const { priceListService } = await import('../services/priceListService.js')
+        this.discountTiers = await priceListService.listDiscountTiers(priceListId)
+      } catch (err) {
+        console.error('Failed to load discount tiers:', err)
+        this.discountTiers = []
       }
     },
     
@@ -176,13 +218,29 @@ export default {
     },
     
 
-    
+
     formatCurrency(amount) {
       if (!amount) return '0.00'
       return parseFloat(amount).toLocaleString('en-ZA', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })
+    },
+
+    formatQuantityRange(tier) {
+      if (tier.minQuantity && tier.maxQuantity) {
+        return `${tier.minQuantity} - ${tier.maxQuantity}`
+      } else if (tier.minQuantity) {
+        return `${tier.minQuantity}+`
+      } else if (tier.maxQuantity) {
+        return `Up to ${tier.maxQuantity}`
+      }
+      return 'All'
+    },
+
+    calculateDiscountedPrice(basePrice, discountPercentage) {
+      const discount = parseFloat(discountPercentage) / 100
+      return parseFloat(basePrice) * (1 - discount)
     }
   }
 }

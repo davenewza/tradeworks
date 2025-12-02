@@ -13,7 +13,7 @@ model QuoteProduct {
     }
 
     actions {
-        create createQuoteProduct() with (quote.id, productPrice.id, quantity)
+        create createQuoteProduct() with (quote.id, productPrice.id, quantity) @function
         list listQuoteProducts(quote.id) {
             @embed(product)
         }

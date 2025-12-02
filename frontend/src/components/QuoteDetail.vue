@@ -224,6 +224,9 @@
             <div class="w-20 text-right">
               <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Quantity</h4>
             </div>
+            <div v-if="hasDiscounts" class="w-20 text-right">
+              <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Discount</h4>
+            </div>
             <div class="w-20 text-right">
               <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Price</h4>
             </div>
@@ -266,9 +269,9 @@
             </div>
             <div class="flex items-center space-x-4">
               <div class="w-12 text-center">
-            <button 
+            <button
                   v-if="!productsReadOnly"
-              @click="removeProduct(product.id)" 
+              @click="removeProduct(product.id)"
                   class="text-red-600 hover:text-red-800 p-2 rounded"
               title="Remove product"
             >
@@ -278,10 +281,10 @@
             </button>
               </div>
               <div class="w-20 text-right">
-                <input 
+                <input
                   v-if="!productsReadOnly"
-                  type="number" 
-                  :value="product.quantity" 
+                  type="number"
+                  :value="product.quantity"
                   @change="updateProductQuantity(product.id, $event.target.value)"
                   class="input w-16 text-sm text-center"
                   min="0"
@@ -290,6 +293,12 @@
                 <p v-else class="text-sm font-medium text-gray-900 text-center">
                   {{ product.quantity }}
                 </p>
+              </div>
+              <div v-if="hasDiscounts" class="w-20 text-right">
+                <p v-if="product.discount && product.discount > 0" class="text-sm font-medium text-green-700">
+                  {{ product.discount }}%
+                </p>
+                <p v-else class="text-sm text-gray-400">—</p>
               </div>
               <div class="w-20 text-right">
                 <p class="text-sm font-medium text-gray-900">{{ formatCurrency(product.price) }}</p>
@@ -909,6 +918,9 @@ export default {
     },
     totalShipmentWeight() {
       return this.productsWeight + this.equipmentBoxesWeight
+    },
+    hasDiscounts() {
+      return this.quoteProducts.some(qp => qp.discount && qp.discount > 0)
     }
   },
   watch: {
