@@ -87,6 +87,7 @@ model DeliveryAddress {
             contactPerson?, contactPhone?, contactEmail?)
         list listDeliveryAddresses(customer.id) {
             @where(deliveryAddress.isActive == true)
+            @searchable(name)
         }
         // city, province, postalCode, country cannot be edited
         update updateDeliveryAddress(id) with (

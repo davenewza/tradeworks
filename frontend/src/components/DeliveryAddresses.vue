@@ -99,6 +99,18 @@
         <span class="text-sm text-gray-600">{{ addresses.length }} total</span>
       </div>
 
+      <!-- Search Input -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Search by name</label>
+        <input
+          v-model="searchQuery"
+          @input="debouncedSearch"
+          type="text"
+          class="input w-full md:w-96"
+          placeholder="e.g., Warehouse, Office, etc."
+        />
+      </div>
+
       <div v-if="loading" class="flex justify-center items-center py-8">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
@@ -165,6 +177,8 @@ export default {
       editingAddress: null,
       deactivatingId: null,
       isFormOpen: false,
+      searchQuery: '',
+      searchTimeout: null,
       form: {
         name: '',
         organisation: '',
@@ -197,18 +211,34 @@ export default {
   async mounted() {
     await this.loadAddresses()
   },
+  beforeUnmount() {
+    // Clean up timeout to prevent memory leaks
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout)
+    }
+  },
   methods: {
-    async loadAddresses() {
+    async loadAddresses(searchName = null) {
       try {
         this.loading = true
         this.error = null
-        const result = await deliveryAddressService.listDeliveryAddresses(this.customerId)
+        const result = await deliveryAddressService.listDeliveryAddresses(this.customerId, searchName)
         this.addresses = Array.isArray(result) ? result : (result.results || [])
       } catch (err) {
         this.error = err.message || 'Failed to load delivery addresses'
       } finally {
         this.loading = false
       }
+    },
+    debouncedSearch() {
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+      // Set new timeout to search after 300ms of no typing
+      this.searchTimeout = setTimeout(() => {
+        this.loadAddresses(this.searchQuery)
+      }, 300)
     },
     resetForm() {
       this.editingAddress = null

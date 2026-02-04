@@ -42,16 +42,23 @@ class DeliveryAddressService {
     return response.json()
   }
 
-  async listDeliveryAddresses(customerId) {
-    // Requires where.customer.id.equals
-    return this.makeRequest('/listDeliveryAddresses', {
+  async listDeliveryAddresses(customerId, searchName = null) {
+    // Build request payload with @searchable support
+    const payload = {
       where: {
         customer: {
           id: { equals: customerId }
         }
       },
       limit: 500
-    })
+    }
+
+    // Add search parameter at the same level as where (uses @searchable)
+    if (searchName && searchName.trim()) {
+      payload.search = searchName.trim()
+    }
+
+    return this.makeRequest('/listDeliveryAddresses', payload)
   }
 
   async getDeliveryAddress(addressId) {

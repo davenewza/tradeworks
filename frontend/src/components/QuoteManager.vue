@@ -49,16 +49,27 @@
           >
             <div class="flex justify-between items-start">
               <div>
-                <div class="flex items-center gap-2 mb-1">
-                  <h3 class="text-lg font-medium text-gray-900">Quote #{{ quote.number }}</h3>
-                  <span :class="[
-                    'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                    quote.status === 'Submitted' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  ]">
-                    {{ formatQuoteStatus(quote.status) }}
-                  </span>
+                <div class="mb-1">
+                  <h3 class="text-lg font-medium text-gray-900">
+                    <template v-if="quote.deliveryAddressName || quote.name">
+                      <span v-if="quote.deliveryAddressName">{{ quote.deliveryAddressName }}</span>
+                      <span v-if="quote.name"> ({{ quote.name }})</span>
+                    </template>
+                    <template v-else>
+                      Quote #{{ quote.number }}
+                    </template>
+                  </h3>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span v-if="quote.deliveryAddressName || quote.name" class="text-sm text-gray-600">#{{ quote.number }}</span>
+                    <span :class="[
+                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                      quote.status === 'Submitted'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    ]">
+                      {{ formatQuoteStatus(quote.status) }}
+                    </span>
+                  </div>
                 </div>
                 <p class="text-sm text-gray-600 mb-2">
                   Created: {{ formatDate(quote.createdAt) }}
@@ -144,6 +155,7 @@ export default {
           const quotes = await quoteService.getQuotesByCustomerPriceList(cpl.id)
           allQuotes.push(...quotes)
         }
+        console.log('Loaded quotes:', allQuotes)
         this.quotes = allQuotes
       } catch (err) {
         this.error = err.message || 'Failed to load quotes'

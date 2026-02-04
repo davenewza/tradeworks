@@ -35,8 +35,8 @@ class QuoteService {
 
 
   // Get quotes for a specific customer price list
-  async getQuotesByCustomerPriceList(customerPriceListId) {
-    const response = await this.makeRequest('/listQuotes', {
+  async getQuotesByCustomerPriceList(customerPriceListId, searchTerm = null) {
+    const payload = {
       where: {
         customerPriceList: {
           id: {
@@ -45,7 +45,14 @@ class QuoteService {
         }
       },
       limit: 500
-    })
+    }
+
+    // Add search parameter if provided (uses @searchable)
+    if (searchTerm && searchTerm.trim()) {
+      payload.search = searchTerm.trim()
+    }
+
+    const response = await this.makeRequest('/listQuotes', payload)
     return response.results || []
   }
 

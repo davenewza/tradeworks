@@ -146,18 +146,29 @@
               >
                 <div class="flex justify-between items-start">
                   <div>
-                    <div class="flex items-center gap-2 mb-1">
-                      <h5 class="font-medium text-gray-900">{{ quote.name || ('Quote #' + (quote.number || '')) }} <span class="text-sm text-gray-600" v-if="quote.number">• #{{ quote.number }}</span></h5>
-                      <span :class="[
-                        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                        quote.status === 'Approved' 
-                          ? 'bg-green-100 text-green-800' 
-                          : (quote.status === 'Submitted' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-yellow-100 text-yellow-800')
-                      ]">
-                        {{ formatQuoteStatus(quote.status) }}
-                      </span>
+                    <div class="mb-1">
+                      <h5 class="font-medium text-gray-900">
+                        <template v-if="quote.deliveryAddressName || quote.name">
+                          <span v-if="quote.deliveryAddressName">{{ quote.deliveryAddressName }}</span>
+                          <span v-if="quote.name"> ({{ quote.name }})</span>
+                        </template>
+                        <template v-else>
+                          Quote #{{ quote.number }}
+                        </template>
+                      </h5>
+                      <div class="flex items-center gap-2 mt-1">
+                        <span v-if="quote.deliveryAddressName || quote.name" class="text-sm text-gray-600">#{{ quote.number }}</span>
+                        <span :class="[
+                          'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                          quote.status === 'Approved'
+                            ? 'bg-green-100 text-green-800'
+                            : (quote.status === 'Submitted'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-yellow-100 text-yellow-800')
+                        ]">
+                          {{ formatQuoteStatus(quote.status) }}
+                        </span>
+                      </div>
                     </div>
                     <p class="text-sm text-gray-600">
                       Created By: {{ quote.createdByName || '—' }}
@@ -211,8 +222,15 @@ export default {
       selectedPriceList: null,
       lastHiddenTime: null,
       statusFilters: {},
-      searchTerms: {}
+      searchTerms: {},
+      searchTimeouts: {}
     }
+  },
+  beforeUnmount() {
+    // Clean up search timeouts
+    Object.values(this.searchTimeouts).forEach(timeout => {
+      if (timeout) clearTimeout(timeout)
+    })
   },
   watch: {
     customerId: {
@@ -320,19 +338,22 @@ export default {
     getFilteredQuotes(cplId) {
       const list = this.quotes[cplId] || []
       const filter = this.statusFilters[cplId] || 'All'
-      const term = (this.searchTerms[cplId] || '').trim().toLowerCase()
-      let filtered = filter === 'All' ? list : list.filter(q => (q.status || 'Draft') === filter)
-      if (term) {
-        filtered = filtered.filter(q => {
-          const name = (q.name || '').toLowerCase()
-          const number = (q.number || '').toString().toLowerCase()
-          return name.includes(term) || number.includes(term)
-        })
-      }
-      return filtered
+      // Backend search handles text filtering, only apply status filter here
+      return filter === 'All' ? list : list.filter(q => (q.status || 'Draft') === filter)
     },
     setSearchTerm(cplId, value) {
+      // Update search term
       this.$set ? this.$set(this.searchTerms, cplId, value) : (this.searchTerms = { ...this.searchTerms, [cplId]: value })
+
+      // Clear existing timeout for this price list
+      if (this.searchTimeouts[cplId]) {
+        clearTimeout(this.searchTimeouts[cplId])
+      }
+
+      // Debounce the search - wait 300ms after user stops typing
+      this.searchTimeouts[cplId] = setTimeout(() => {
+        this.loadQuotesForSinglePriceList(cplId)
+      }, 300)
     },
     handleVisibilityChange() {
       // Refresh data when user returns to the tab (after being away for more than 30 seconds)
@@ -404,10 +425,11 @@ export default {
       try {
         console.log('Loading quotes for price lists...')
         const { quoteService } = await import('../services/quoteService.js')
-        
+
         for (const priceList of this.priceLists) {
           console.log('Loading quotes for price list:', priceList.customerPriceListId)
-          const quotes = await quoteService.getQuotesByCustomerPriceList(priceList.customerPriceListId)
+          const searchTerm = this.searchTerms[priceList.customerPriceListId] || null
+          const quotes = await quoteService.getQuotesByCustomerPriceList(priceList.customerPriceListId, searchTerm)
           this.quotes[priceList.customerPriceListId] = quotes
           console.log('Quotes loaded for price list:', priceList.customerPriceListId, quotes)
           // Hydrate creator names for this list
@@ -418,6 +440,18 @@ export default {
         console.error('Failed to load quotes:', err)
         // Don't let quote loading errors prevent the page from loading
         this.error = 'Failed to load some quotes, but price lists are available'
+      }
+    },
+    async loadQuotesForSinglePriceList(cplId) {
+      try {
+        const { quoteService } = await import('../services/quoteService.js')
+        const searchTerm = this.searchTerms[cplId] || null
+        const quotes = await quoteService.getQuotesByCustomerPriceList(cplId, searchTerm)
+        this.quotes[cplId] = quotes
+        // Hydrate creator names for this list
+        this.hydrateCreatorsForList(cplId)
+      } catch (err) {
+        console.error('Failed to load quotes for price list:', cplId, err)
       }
     },
     

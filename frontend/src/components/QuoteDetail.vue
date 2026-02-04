@@ -149,7 +149,22 @@
             </button>
           </div>
           <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
-            <div v-if="deliveryAddresses.length === 0" class="text-center text-sm text-gray-600 py-8">No delivery addresses found.</div>
+            <!-- Search Input -->
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Search by name</label>
+              <input
+                v-model="addressSearchQuery"
+                @input="debouncedAddressSearch"
+                type="text"
+                class="input w-full"
+                placeholder="e.g., Warehouse, Office, etc."
+              />
+            </div>
+
+            <div v-if="loadingAddressList" class="text-center text-sm text-gray-600 py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+            <div v-else-if="deliveryAddresses.length === 0" class="text-center text-sm text-gray-600 py-8">No delivery addresses found.</div>
             <div v-else class="space-y-4">
               <div 
                 v-for="addr in deliveryAddresses" 
@@ -783,14 +798,19 @@ export default {
       productsReadOnly: false,
       deliveryAddresses: [],
       loadingAddresses: false,
+      loadingAddressList: false,
+      addressesInitiallyLoaded: false,
       selectedAddressId: '',
+      selectedAddressData: null,
       addressSubmitAttempted: false,
       showAddressDialog: false,
       showDeliveryInfoDialog: false,
       showRawJson: false,
       showNameDialog: false,
       editName: '',
-      savingName: false
+      savingName: false,
+      addressSearchQuery: '',
+      addressSearchTimeout: null
     }
   },
   async mounted() {
@@ -824,6 +844,12 @@ export default {
     // Hydrate submitted/approved user names if only IDs present
     this.hydrateActionUsers()
     this.hydrateCreatedByUser()
+  },
+  beforeUnmount() {
+    // Clean up timeout to prevent memory leaks
+    if (this.addressSearchTimeout) {
+      clearTimeout(this.addressSearchTimeout)
+    }
   },
   computed: {
     // Extract priceListId from embedded priceList or fallback to priceListId field
@@ -872,8 +898,7 @@ export default {
       return cw != null ? Number(cw).toFixed(0) : '0'
     },
     selectedAddress() {
-      const list = this.deliveryAddresses || []
-      return list.find(a => a.id === this.selectedAddressId) || {}
+      return this.selectedAddressData || {}
     },
     // Note: Totals are now pulled from the quote response from getQuote
     // and should include equipment boxes and delivery fees from the backend
@@ -1065,36 +1090,83 @@ export default {
     },
     selectAddress(id) {
       if (this.productsReadOnly) return
-      this.selectedAddressId = id
-      this.onAddressChange()
-      this.closeAddressDialog()
+      // Find the selected address in the current list and store its data
+      const address = this.deliveryAddresses.find(a => a.id === id)
+      if (address) {
+        this.selectedAddressId = id
+        this.selectedAddressData = address
+        this.onAddressChange()
+        this.closeAddressDialog()
+      }
     },
-    async loadDeliveryAddresses() {
+    async loadDeliveryAddresses(searchName = null) {
       try {
         if (!this.customerId) return
-        this.loadingAddresses = true
+
+        // Use different loading states:
+        // - loadingAddresses: initial load only (affects selected address display)
+        // - loadingAddressList: all subsequent loads/filtering (only affects modal list)
+        const isInitialLoad = !this.addressesInitiallyLoaded
+
+        if (isInitialLoad) {
+          this.loadingAddresses = true
+        } else {
+          this.loadingAddressList = true
+        }
+
         const { deliveryAddressService } = await import('../services/deliveryAddressService.js')
-        const result = await deliveryAddressService.listDeliveryAddresses(this.customerId)
+        const result = await deliveryAddressService.listDeliveryAddresses(this.customerId, searchName)
         const activeList = Array.isArray(result) ? result : (result.results || [])
-        // Ensure selected address appears even if inactive
-        if (this.quote.deliveryAddressId) {
+
+        // Only append the selected address if there's NO search active
+        // When searching, show only matching results
+        if (this.quote.deliveryAddressId && !searchName) {
           try {
             const selectedAddr = await deliveryAddressService.getDeliveryAddress(this.quote.deliveryAddressId)
             const exists = activeList.some(a => a.id === selectedAddr.id)
             if (!exists && selectedAddr) {
               activeList.push(selectedAddr)
             }
+            // Store the selected address data separately so it's not affected by filtering
+            if (!this.selectedAddressData) {
+              this.selectedAddressData = selectedAddr
+            }
           } catch (e) {
             console.warn('Could not hydrate selected delivery address:', e)
           }
         }
         this.deliveryAddresses = activeList
+
+        // If we have a selectedAddressId but no selectedAddressData yet, populate it
+        if (this.selectedAddressId && !this.selectedAddressData) {
+          const addr = activeList.find(a => a.id === this.selectedAddressId)
+          if (addr) {
+            this.selectedAddressData = addr
+          }
+        }
+
+        // Mark as initially loaded
+        if (isInitialLoad) {
+          this.addressesInitiallyLoaded = true
+        }
       } catch (e) {
         console.error('Failed to load delivery addresses', e)
         this.deliveryAddresses = []
       } finally {
         this.loadingAddresses = false
+        this.loadingAddressList = false
       }
+    },
+    debouncedAddressSearch() {
+      // Clear existing timeout
+      if (this.addressSearchTimeout) {
+        clearTimeout(this.addressSearchTimeout)
+      }
+      // Set new timeout to search after 300ms of no typing
+      this.addressSearchTimeout = setTimeout(() => {
+        const searchTerm = this.addressSearchQuery.trim()
+        this.loadDeliveryAddresses(searchTerm || null)
+      }, 300)
     },
 
     async onAddressChange() {

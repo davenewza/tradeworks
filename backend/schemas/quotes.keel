@@ -49,6 +49,7 @@ model Quote {
         deliveryService Text?
         totalDeliveryFees Decimal @default(0.0)
         deliveryAddress DeliveryAddress?
+        deliveryAddressName Text? @computed(quote.deliveryAddress.name)
         chargedWeightInGrams Decimal?
         deliveryRawJson Text?
         total Decimal @computed(quote.totalProductPrice + quote.totalEquipmentBoxPrice + quote.totalDeliveryFees)
@@ -66,14 +67,17 @@ model Quote {
             @set(quote.name = "")
             @set(quote.createdBy = ctx.identity.user)
         }
-        get getQuote(id) 
-        list listQuotes(customerPriceList.id, status?)
+        get getQuote(id)
+        list listQuotes(customerPriceList.id, status?) {
+            @searchable(deliveryAddressName, number, name)
+        }
         list listDraftQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Draft)
             @sortable(
                 name,
                 createdAt
             )
+            @searchable(deliveryAddressName, number, name)
         }
         list listSubmittedQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Submitted)
@@ -81,6 +85,7 @@ model Quote {
                 name,
                 createdAt
             )
+            @searchable(deliveryAddressName, number, name)
         }
         list listApprovedQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Approved)
@@ -88,6 +93,7 @@ model Quote {
                 name,
                 createdAt
             )
+            @searchable(deliveryAddressName, number, name)
         }
         update updateQuoteName(id) with (name) {
             @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
