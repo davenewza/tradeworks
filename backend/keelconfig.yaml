@@ -1,9 +1,18 @@
 environment:
   - name: SHIPLOGIC_API_URL
     value: "https://api.shiplogic.com/v2/rates?provider_id=123"
+  - name: ZOHO_BOOKS_BASE_URL
+    value: "https://www.zohoapis.com/books/v3"
+  - name: ZOHO_BOOKS_ORG_ID
+    value: "756529239" 
+  - name: ZOHO_ACCOUNTS_BASE_URL
+    value: "https://accounts.zoho.com"
+  - name: ZOHO_CLIENT_ID
+    value: "1000.9X0VMF7WCARWJSGFJMASJE8YOI2DRB"
 
 secrets:
   - name: SHIPLOGIC_API_KEY
+  - name: ZOHO_CLIENT_SECRET
 
 auth:
   redirectUrl: http://localhost:3000/callback

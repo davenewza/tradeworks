@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@teamkeel/functions-runtime": "^0.435.0",
-    "@teamkeel/testing-runtime": "^0.435.0",
+    "@teamkeel/functions-runtime": "^0.436.1",
+    "@teamkeel/testing-runtime": "^0.436.1",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
     "kysely": "^0.27.6",
