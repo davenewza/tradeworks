@@ -1,0 +1,49 @@
+model Sale {
+    fields {
+        invoiceNumber Text @unique
+        channel Channel
+        date Date
+        product Product
+        quantity Number
+        price Decimal
+        total Decimal @computed(sale.price * sale.quantity)
+        vat Decimal @computed(sale.total * 0.15)
+        totalExclVat Decimal @computed(sale.total - sale.vat)
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        create createSale() with (
+            invoiceNumber,
+            channel.id,
+            date,
+            product.id,
+            quantity,
+            price,
+        )
+        list listOrders(date?, product.id?)
+        write syncSales(start: Date, end: Date) returns (SaleSyncResult) {
+            @permission(expression: ctx.isAuthenticated)
+        }
+    }
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [create, list]
+    )
+}
+
+message SaleSyncResult {
+    totalInvoicesProcessed Number
+    salesCreated Number
+    salesUpdated Number
+    salesSkipped Number
+    skippedProducts SkippedProduct[]
+}
+
+message SkippedProduct {
+    invoiceNumber Text
+    sku Text
+    productName Text
+    reason Text
+}

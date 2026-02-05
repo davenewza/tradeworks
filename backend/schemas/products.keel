@@ -25,13 +25,14 @@ model Product {
         name Text
         brand Brand
         sku Text @unique
-        image File
-        lengthInCm Decimal
-        widthInCm Decimal
-        heightInCm Decimal
-        weightInGrams Decimal
-        volumeInLitres Decimal @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
+        image File?
+        lengthInCm Decimal?
+        widthInCm Decimal?
+        heightInCm Decimal?
+        weightInGrams Decimal?
+        volumeInLitres Decimal? @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
         isEnabled Boolean @default(true)
+        synchronisedAt Timestamp?
     }
 
     actions {
@@ -60,12 +61,29 @@ model Product {
         update disableProduct(id) {
             @set(product.isEnabled = false)
         }
+        write syncProducts() returns (ProductSyncResult) {
+            @permission(expression: ctx.isAuthenticated)
+        }
     }
 
     @permission(
         expression: ctx.isAuthenticated,
         actions: [get, create, list, update, delete]
     )
+}
+
+message ProductSyncResult {
+    totalItemsProcessed Number
+    productsCreated Number
+    productsUpdated Number
+    productsSkipped Number
+    skippedItems SkippedItem[]
+}
+
+message SkippedItem {
+    sku Text
+    name Text
+    reason Text
 }
 
 model EquipmentBox {

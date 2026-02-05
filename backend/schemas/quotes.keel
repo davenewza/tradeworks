@@ -9,7 +9,7 @@ model QuoteProduct {
         priceInclVat Decimal @computed(quoteProduct.price * 1.15)
         total Decimal @computed(quoteProduct.price * quoteProduct.quantity)
         totalInclVat Decimal @computed(quoteProduct.total * 1.15)
-        totalWeightInGrams Decimal @computed(quoteProduct.product.weightInGrams * quoteProduct.quantity)
+        totalWeightInGrams Decimal? @computed(quoteProduct.product.weightInGrams * quoteProduct.quantity)
     }
 
     actions {
@@ -69,7 +69,11 @@ model Quote {
         }
         get getQuote(id)
         list listQuotes(customerPriceList.id, status?) {
-            @searchable(deliveryAddressName, number, name)
+            @searchable(
+                deliveryAddressName,
+                number,
+                name
+            )
         }
         list listDraftQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Draft)
@@ -77,7 +81,11 @@ model Quote {
                 name,
                 createdAt
             )
-            @searchable(deliveryAddressName, number, name)
+            @searchable(
+                deliveryAddressName,
+                number,
+                name
+            )
         }
         list listSubmittedQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Submitted)
@@ -85,7 +93,11 @@ model Quote {
                 name,
                 createdAt
             )
-            @searchable(deliveryAddressName, number, name)
+            @searchable(
+                deliveryAddressName,
+                number,
+                name
+            )
         }
         list listApprovedQuotes(customerPriceList.id) {
             @where(quote.status == QuoteStatus.Approved)
@@ -93,7 +105,11 @@ model Quote {
                 name,
                 createdAt
             )
-            @searchable(deliveryAddressName, number, name)
+            @searchable(
+                deliveryAddressName,
+                number,
+                name
+            )
         }
         update updateQuoteName(id) with (name) {
             @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)

@@ -1,0 +1,16 @@
+model Channel {
+    fields {
+        name Text @unique
+    }
+
+    actions {
+        get getChannel(id)
+        list listChannels()
+        create createChannel() with (name)
+    }
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, list, create]
+    )
+}

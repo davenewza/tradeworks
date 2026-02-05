@@ -1,0 +1,463 @@
+openapi: 3.0.0
+info:
+  title: Tasks
+  description: A project comprises of a single or multiple tasks that need to be completed. You need a task to the project before you log time.
+  contact: {}
+  version: 1.0.0
+servers:
+  - url: https://www.zohoapis.com/books/v3
+    description: API Endpoint
+tags:
+  - name: tasks
+    description: Tasks Module
+paths:
+  /projects/{project_id}/tasks:
+    post:
+      tags:
+        - tasks
+      operationId: add_task
+      summary: Add a task
+      description: The task has been added.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/add-a-task-request'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/add-a-task-response'
+      deprecated: false
+      security:
+        - Zoho_Auth:
+            - ZohoBooks.projects.CREATE
+    get:
+      tags:
+        - tasks
+      operationId: list_tasks
+      summary: List tasks
+      description: Get list of tasks added to a project.
+      parameters:
+        - name: page
+          in: query
+          description: Page number to be fetched. Default value is 1.
+          required: false
+          schema:
+            type: integer
+            default: 1
+          example: 1
+        - name: per_page
+          in: query
+          description: Number of records to be fetched per page. Default value is 200.
+          required: false
+          schema:
+            type: integer
+            default: 200
+          example: 200
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/list-tasks-response'
+      deprecated: false
+      security:
+        - Zoho_Auth:
+            - ZohoBooks.projects.READ
+    parameters:
+      - name: project_id
+        in: path
+        schema:
+          type: string
+        required: true
+        description: Unique identifier of the project.
+        example: '90300000072369'
+      - $ref: '#/components/parameters/organization_id'
+  /projects/{project_id}/tasks/{task_id}:
+    put:
+      tags:
+        - tasks
+      operationId: update_task
+      summary: Update a task
+      description: Update the details of a task.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/update-a-task-request'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/update-a-task-response'
+      deprecated: false
+      security:
+        - Zoho_Auth:
+            - ZohoBooks.projects.UPDATE
+    get:
+      tags:
+        - tasks
+      operationId: get_task
+      summary: Get a task
+      description: Get the details of a task.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/get-a-task-response'
+      deprecated: false
+      security:
+        - Zoho_Auth:
+            - ZohoBooks.projects.READ
+    delete:
+      tags:
+        - tasks
+      operationId: delete_task
+      summary: Delete Task
+      description: Delete a task added to a project.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/delete-task-response'
+      deprecated: false
+      security:
+        - Zoho_Auth:
+            - ZohoBooks.projects.DELETE
+    parameters:
+      - name: project_id
+        in: path
+        schema:
+          type: string
+        required: true
+        description: Unique identifier of the project.
+        example: '90300000072369'
+      - name: task_id
+        in: path
+        schema:
+          type: string
+        required: true
+        description: Unique identifier of the task.
+        example: '90300000072369'
+      - $ref: '#/components/parameters/organization_id'
+components:
+  parameters:
+    organization_id:
+      name: organization_id
+      description: ID of the organization
+      in: query
+      required: true
+      schema:
+        type: string
+      example: '10234695'
+  schemas:
+    gendoc-attributes-schema:
+      $ref: '#/components/schemas/task-response'
+    task-response:
+      type: object
+      properties:
+        project_id:
+          $ref: '#/components/schemas/project_id'
+        task_id:
+          $ref: '#/components/schemas/task_id'
+        currency_id:
+          $ref: '#/components/schemas/currency_id'
+        customer_id:
+          $ref: '#/components/schemas/customer_id'
+        task_name:
+          $ref: '#/components/schemas/task_name'
+        project_name:
+          $ref: '#/components/schemas/project_name'
+        customer_name:
+          $ref: '#/components/schemas/customer_name'
+        billed_hours:
+          $ref: '#/components/schemas/billed_hours'
+        log_time:
+          $ref: '#/components/schemas/log_time'
+        un_billed_hours:
+          $ref: '#/components/schemas/un_billed_hours'
+    project_id:
+      description: Unique ID of the project generated by the server.
+      type: string
+      example: '90300000072369'
+    task_id:
+      description: Unique ID of the task generated by the server.
+      type: string
+      example: '90300000072369'
+    customer_id:
+      description: Customer ID of the customer for whom the task is created.
+      type: string
+      example: '903000000000099'
+    currency_id:
+      description: The currenct id of the currency
+      type: string
+      example: 982000000000190
+    task_name:
+      description: The name of the task. <code>Max-length [100]</code>
+      type: string
+      example: Painting
+    project_name:
+      description: The name of the project
+      type: string
+      example: Furniture Manufacturing
+    customer_name:
+      description: Name of the customer to whom the task is created.
+      type: string
+      example: Sujin Kumar
+    billed_hours:
+      description: The total hours that are billed.
+      type: number
+      format: double
+      example: '12:06'
+    log_time:
+      description: Total hours logged in the project.
+      type: number
+      format: double
+      example: '13:06'
+    un_billed_hours:
+      description: Total hours that are unbilled.
+      type: number
+      format: double
+      example: '01:00'
+    description:
+      description: The description of the project.
+      type: string
+      example: ''
+    rate:
+      description: Hourly rate for a task.
+      type: integer
+      example: 3
+    budget_hours:
+      description: Task budget hours.
+      type: integer
+      example: ''
+    page:
+      type: integer
+      example: 1
+    per_page:
+      type: integer
+      example: 200
+    report_name:
+      type: string
+      example: Tasks
+    has_more_page:
+      type: boolean
+      example: false
+    sort_order:
+      type: string
+      example: D
+    sort_column:
+      description: 'Sort tasks: Allowed Values: <code>task_name</code>, <code>billes_hours</code>, <code>log_time</code> and <code>un_billes_hours</code>.'
+      type: string
+      example: created_time
+    status:
+      type: string
+      example: active
+    is_billable:
+      type: boolean
+      example: true
+    add-a-task-request:
+      required:
+        - task_name
+      type: object
+      properties:
+        task_name:
+          $ref: '#/components/schemas/task_name'
+        description:
+          $ref: '#/components/schemas/description'
+        rate:
+          $ref: '#/components/schemas/rate'
+        budget_hours:
+          $ref: '#/components/schemas/budget_hours'
+    add-a-task-response:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+          readOnly: true
+        message:
+          type: string
+          example: The project information has been updated.
+          readOnly: true
+        task:
+          $ref: '#/components/schemas/task-response'
+    list-tasks-request:
+      type: object
+      properties:
+        sort_column:
+          $ref: '#/components/schemas/sort_column'
+    list-tasks-response:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+          readOnly: true
+        message:
+          type: string
+          example: success
+          readOnly: true
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              project_id:
+                $ref: '#/components/schemas/project_id'
+              task_id:
+                $ref: '#/components/schemas/task_id'
+              currency_id:
+                $ref: '#/components/schemas/currency_id'
+              customer_id:
+                $ref: '#/components/schemas/customer_id'
+              task_name:
+                $ref: '#/components/schemas/task_name'
+              project_name:
+                $ref: '#/components/schemas/project_name'
+              customer_name:
+                $ref: '#/components/schemas/customer_name'
+              billed_hours:
+                $ref: '#/components/schemas/billed_hours'
+              log_time:
+                $ref: '#/components/schemas/log_time'
+              un_billed_hours:
+                $ref: '#/components/schemas/un_billed_hours'
+        page_context:
+          type: object
+          properties:
+            page:
+              $ref: '#/components/schemas/page'
+            per_page:
+              $ref: '#/components/schemas/per_page'
+            has_more_page:
+              $ref: '#/components/schemas/has_more_page'
+            report_name:
+              $ref: '#/components/schemas/report_name'
+            sort_column:
+              $ref: '#/components/schemas/sort_column'
+            sort_order:
+              $ref: '#/components/schemas/sort_order'
+    update-a-task-request:
+      required:
+        - task_name
+      type: object
+      properties:
+        task_name:
+          $ref: '#/components/schemas/task_name'
+        description:
+          $ref: '#/components/schemas/description'
+        rate:
+          $ref: '#/components/schemas/rate'
+        budget_hours:
+          $ref: '#/components/schemas/budget_hours'
+    update-a-task-response:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+          readOnly: true
+        message:
+          type: string
+          example: The task information has been updated.
+          readOnly: true
+        task:
+          type: object
+          properties:
+            project_id:
+              $ref: '#/components/schemas/project_id'
+            task_id:
+              $ref: '#/components/schemas/task_id'
+            currency_id:
+              $ref: '#/components/schemas/currency_id'
+            customer_id:
+              $ref: '#/components/schemas/customer_id'
+            task_name:
+              $ref: '#/components/schemas/task_name'
+            project_name:
+              $ref: '#/components/schemas/project_name'
+            customer_name:
+              $ref: '#/components/schemas/customer_name'
+            billed_hours:
+              $ref: '#/components/schemas/billed_hours'
+            log_time:
+              $ref: '#/components/schemas/log_time'
+            un_billed_hours:
+              $ref: '#/components/schemas/un_billed_hours'
+    get-a-task-request:
+      type: object
+      properties:
+        task_id:
+          description: Unique ID of the task generated by the server.
+          type: string
+          example: '90300000072369'
+    get-a-task-response:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+          readOnly: true
+        message:
+          type: string
+          example: success
+          readOnly: true
+        task:
+          type: object
+          properties:
+            project_id:
+              $ref: '#/components/schemas/project_id'
+            project_name:
+              $ref: '#/components/schemas/project_name'
+            task_id:
+              $ref: '#/components/schemas/task_id'
+            task_name:
+              $ref: '#/components/schemas/task_name'
+            description:
+              $ref: '#/components/schemas/description'
+            rate:
+              $ref: '#/components/schemas/rate'
+            status:
+              $ref: '#/components/schemas/status'
+            is_billable:
+              $ref: '#/components/schemas/is_billable'
+    delete-task-request:
+      type: object
+      properties:
+        task_id:
+          description: Unique ID of the task generated by the server.
+          type: string
+          example: '90300000072369'
+    delete-task-response:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+          readOnly: true
+        message:
+          type: string
+          example: The task has been deleted successfully.
+          readOnly: true
+  securitySchemes:
+    Zoho_Auth:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: https://accounts.zoho.com/oauth/v2/auth
+          scopes:
+            ZohoBooks.projects.CREATE: Create Projects
+            ZohoBooks.projects.UPDATE: Update Projects
+            ZohoBooks.projects.READ: Read Projects
+            ZohoBooks.projects.DELETE: Delete Projects
