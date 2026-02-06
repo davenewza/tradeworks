@@ -36,7 +36,9 @@ interface ZohoInvoiceDetailResponse {
 }
 
 // Concurrency limit for parallel API requests to avoid rate limiting
-const INVOICE_FETCH_BATCH_SIZE = 10;
+const INVOICE_FETCH_BATCH_SIZE = 5;
+const INVOICE_FETCH_MAX_RETRIES = 3;
+const INVOICE_FETCH_RETRY_BASE_MS = 250;
 
 async function getZohoAccessToken(ctx: {
     env: { ZOHO_ACCOUNTS_BASE_URL: string; ZOHO_CLIENT_ID: string };
@@ -65,7 +67,6 @@ async function getZohoAccessToken(ctx: {
     }
 
     const tokenData = await response.json();
-    console.log('Zoho token response:', JSON.stringify(tokenData));
     if (!tokenData.access_token) {
         throw new Error(`Zoho OAuth token response missing access_token: ${JSON.stringify(tokenData)}`);
     }
@@ -92,13 +93,18 @@ function getChannelFromInvoice(invoice: ZohoInvoice): string {
 }
 
 // Fetch invoice details in parallel batches
+async function delay(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchInvoiceDetailsBatch(
     invoiceSummaries: Array<{ invoice_id: string; invoice_number: string }>,
     baseUrl: string,
     orgId: string,
     accessToken: string
-): Promise<ZohoInvoice[]> {
+): Promise<{ invoices: ZohoInvoice[]; failures: number }> {
     const results: ZohoInvoice[] = [];
+    let failures = 0;
 
     for (let i = 0; i < invoiceSummaries.length; i += INVOICE_FETCH_BATCH_SIZE) {
         const batch = invoiceSummaries.slice(i, i + INVOICE_FETCH_BATCH_SIZE);
@@ -106,33 +112,47 @@ async function fetchInvoiceDetailsBatch(
         const batchResults = await Promise.all(
             batch.map(async (summary) => {
                 const url = `${baseUrl}/invoices/${summary.invoice_id}?organization_id=${orgId}`;
-                try {
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Zoho-oauthtoken ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    });
+                for (let attempt = 1; attempt <= INVOICE_FETCH_MAX_RETRIES; attempt++) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Zoho-oauthtoken ${accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                        });
 
-                    if (!response.ok) {
-                        console.warn(`Failed to fetch invoice ${summary.invoice_number}, skipping`);
-                        return null;
+                        if (response.ok) {
+                            const data: ZohoInvoiceDetailResponse = await response.json();
+                            return data.invoice;
+                        }
+
+                        const errorText = await response.text();
+                        console.error(
+                            `Failed to fetch invoice ${summary.invoice_number} (attempt ${attempt}/${INVOICE_FETCH_MAX_RETRIES}): ${response.status} - ${errorText}`
+                        );
+                    } catch (error) {
+                        console.error(
+                            `Error fetching invoice ${summary.invoice_number} (attempt ${attempt}/${INVOICE_FETCH_MAX_RETRIES}):`,
+                            error
+                        );
                     }
 
-                    const data: ZohoInvoiceDetailResponse = await response.json();
-                    return data.invoice;
-                } catch (error) {
-                    console.warn(`Error fetching invoice ${summary.invoice_number}:`, error);
-                    return null;
+                    if (attempt < INVOICE_FETCH_MAX_RETRIES) {
+                        await delay(INVOICE_FETCH_RETRY_BASE_MS * Math.pow(2, attempt - 1));
+                    }
                 }
+
+                return null;
             })
         );
 
-        results.push(...batchResults.filter((inv): inv is ZohoInvoice => inv !== null));
+        const successful = batchResults.filter((inv): inv is ZohoInvoice => inv !== null);
+        results.push(...successful);
+        failures += batchResults.length - successful.length;
     }
 
-    return results;
+    return { invoices: results, failures };
 }
 
 export default SyncSales(async (ctx, inputs) => {
@@ -155,26 +175,49 @@ export default SyncSales(async (ctx, inputs) => {
 
     // Cache for channel lookups by name
     const channelCache = new Map<string, { id: string }>();
+    const channelLocks = new Map<string, Promise<{ id: string }>>();
 
     // Helper to get or create a channel
     async function getOrCreateChannel(channelName: string): Promise<{ id: string }> {
         const cached = channelCache.get(channelName);
         if (cached) return cached;
 
-        const existing = await models.channel.findOne({ name: channelName });
-        if (existing) {
-            channelCache.set(channelName, { id: existing.id });
-            return { id: existing.id };
+        const existingLock = channelLocks.get(channelName);
+        if (existingLock) {
+            return await existingLock;
         }
 
-        const created = await models.channel.create({ name: channelName });
-        channelCache.set(channelName, { id: created.id });
-        return { id: created.id };
+        const lock = (async () => {
+            const existing = await models.channel.findMany({ where: { name: channelName } });
+            if (existing.length > 0) {
+                if (existing.length > 1) {
+                    console.error(`Duplicate channels detected for "${channelName}". Using the first record.`);
+                }
+                const selected = { id: existing[0].id };
+                channelCache.set(channelName, selected);
+                return selected;
+            }
+
+            const created = await models.channel.create({ name: channelName });
+            const selected = { id: created.id };
+            channelCache.set(channelName, selected);
+            return selected;
+        })();
+
+        channelLocks.set(channelName, lock);
+        try {
+            return await lock;
+        } finally {
+            channelLocks.delete(channelName);
+        }
     }
 
     // Fetch all invoices from Zoho within the date range
     let page = 1;
     let hasMorePages = true;
+
+    let invoiceDetailFailures = 0;
+    let salePersistFailures = 0;
 
     while (hasMorePages) {
         const invoicesUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/invoices?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&date_start=${startDate}&date_end=${endDate}&page=${page}&per_page=200`;
@@ -195,20 +238,14 @@ export default SyncSales(async (ctx, inputs) => {
         const invoicesData: ZohoInvoicesResponse = await invoicesResponse.json();
 
         // Fetch all invoice details in parallel batches
-        const invoices = await fetchInvoiceDetailsBatch(
+        const invoiceDetailResult = await fetchInvoiceDetailsBatch(
             invoicesData.invoices,
             ctx.env.ZOHO_BOOKS_BASE_URL,
             ctx.env.ZOHO_BOOKS_ORG_ID,
             accessToken
         );
-
-        // Log the first invoice to see custom_fields structure
-        if (invoices.length > 0 && totalInvoicesProcessed === 0) {
-            console.log('Sample invoice custom_fields:', JSON.stringify({
-                invoice_number: invoices[0].invoice_number,
-                custom_fields: invoices[0].custom_fields,
-            }, null, 2));
-        }
+        const invoices = invoiceDetailResult.invoices;
+        invoiceDetailFailures += invoiceDetailResult.failures;
 
         totalInvoicesProcessed += invoices.length;
 
@@ -307,51 +344,67 @@ export default SyncSales(async (ctx, inputs) => {
                 const price = lineItem.rate;
                 const now = new Date();
 
-                if (existingSale) {
-                    // Update existing sale if values differ
-                    const needsUpdate =
-                        existingSale.quantity !== quantity ||
-                        Number(existingSale.price) !== price ||
-                        existingSale.productId !== product.id;
+                try {
+                    if (existingSale) {
+                        // Update existing sale if values differ
+                        const needsUpdate =
+                            existingSale.quantity !== quantity ||
+                            Number(existingSale.price) !== price ||
+                            existingSale.productId !== product.id;
 
-                    if (needsUpdate) {
-                        await models.sale.update(
-                            { id: existingSale.id },
-                            {
-                                quantity: quantity,
-                                price: price,
-                                productId: product.id,
-                                date: saleDate,
-                                synchronisedAt: now,
-                            }
-                        );
-                        salesUpdated++;
+                        if (needsUpdate) {
+                            await models.sale.update(
+                                { id: existingSale.id },
+                                {
+                                    quantity: quantity,
+                                    price: price,
+                                    productId: product.id,
+                                    date: saleDate,
+                                    synchronisedAt: now,
+                                }
+                            );
+                            salesUpdated++;
+                        } else {
+                            // Update synchronisedAt even if no other changes
+                            await models.sale.update(
+                                { id: existingSale.id },
+                                { synchronisedAt: now }
+                            );
+                        }
                     } else {
-                        // Update synchronisedAt even if no other changes
-                        await models.sale.update(
-                            { id: existingSale.id },
-                            { synchronisedAt: now }
-                        );
+                        // Create new sale
+                        await models.sale.create({
+                            invoiceNumber: saleIdentifier,
+                            channel: { id: channel.id },
+                            date: saleDate,
+                            product: { id: product.id },
+                            quantity: quantity,
+                            price: price,
+                            synchronisedAt: now,
+                        });
+                        salesCreated++;
                     }
-                } else {
-                    // Create new sale
-                    console.log(`Creating sale: invoiceNumber=${saleIdentifier}, channelId=${channel.id}, productId=${product.id}`);
-                    await models.sale.create({
-                        invoiceNumber: saleIdentifier,
-                        channel: { id: channel.id },
-                        date: saleDate,
-                        product: { id: product.id },
-                        quantity: quantity,
-                        price: price,
-                        synchronisedAt: now,
-                    });
-                    salesCreated++;
+                } catch (error) {
+                    salePersistFailures++;
+                    console.error(
+                        `Failed to persist sale for invoice ${invoice.invoice_number} line ${lineItem.line_item_id}:`,
+                        error
+                    );
                 }
             }
         }
 
         hasMorePages = invoicesData.page_context.has_more_page;
         page++;
+    }
+
+    if (invoiceDetailFailures > 0 || salePersistFailures > 0) {
+        console.error(
+            `SyncSales completed with errors. Invoice detail failures: ${invoiceDetailFailures}. Sale persist failures: ${salePersistFailures}.`
+        );
+        throw new Error(
+            `SyncSales completed with errors. Invoice detail failures: ${invoiceDetailFailures}. Sale persist failures: ${salePersistFailures}.`
+        );
     }
 
     return {
