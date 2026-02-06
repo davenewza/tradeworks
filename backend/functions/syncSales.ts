@@ -35,11 +35,8 @@ interface ZohoInvoiceDetailResponse {
     invoice: ZohoInvoice;
 }
 
-interface ZohoTokenResponse {
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-}
+// Concurrency limit for parallel API requests to avoid rate limiting
+const INVOICE_FETCH_BATCH_SIZE = 10;
 
 async function getZohoAccessToken(ctx: {
     env: { ZOHO_ACCOUNTS_BASE_URL: string; ZOHO_CLIENT_ID: string };
@@ -75,6 +72,69 @@ async function getZohoAccessToken(ctx: {
     return tokenData.access_token;
 }
 
+// Helper to extract channel from invoice custom fields
+function getChannelFromInvoice(invoice: ZohoInvoice): string {
+    if (!invoice.custom_fields || invoice.custom_fields.length === 0) {
+        return 'Other';
+    }
+    // Look for channel field - check label case-insensitively
+    const channelField = invoice.custom_fields.find(
+        (cf) => cf.label?.toLowerCase() === 'sales channel' ||
+                cf.label?.toLowerCase() === 'cf_sales_channel' ||
+                cf.label?.toLowerCase().includes('sales channel')
+    );
+    // Ensure value is a string before trimming
+    const value = channelField?.value;
+    if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+    }
+    return 'Other';
+}
+
+// Fetch invoice details in parallel batches
+async function fetchInvoiceDetailsBatch(
+    invoiceSummaries: Array<{ invoice_id: string; invoice_number: string }>,
+    baseUrl: string,
+    orgId: string,
+    accessToken: string
+): Promise<ZohoInvoice[]> {
+    const results: ZohoInvoice[] = [];
+
+    for (let i = 0; i < invoiceSummaries.length; i += INVOICE_FETCH_BATCH_SIZE) {
+        const batch = invoiceSummaries.slice(i, i + INVOICE_FETCH_BATCH_SIZE);
+
+        const batchResults = await Promise.all(
+            batch.map(async (summary) => {
+                const url = `${baseUrl}/invoices/${summary.invoice_id}?organization_id=${orgId}`;
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        console.warn(`Failed to fetch invoice ${summary.invoice_number}, skipping`);
+                        return null;
+                    }
+
+                    const data: ZohoInvoiceDetailResponse = await response.json();
+                    return data.invoice;
+                } catch (error) {
+                    console.warn(`Error fetching invoice ${summary.invoice_number}:`, error);
+                    return null;
+                }
+            })
+        );
+
+        results.push(...batchResults.filter((inv): inv is ZohoInvoice => inv !== null));
+    }
+
+    return results;
+}
+
 export default SyncSales(async (ctx, inputs) => {
     const startDate = formatDate(inputs.start);
     const endDate = formatDate(inputs.end);
@@ -93,9 +153,6 @@ export default SyncSales(async (ctx, inputs) => {
         reason: string;
     }> = [];
 
-    // Cache for product lookups by SKU
-    const productCache = new Map<string, { id: string } | null>();
-
     // Cache for channel lookups by name
     const channelCache = new Map<string, { id: string }>();
 
@@ -113,25 +170,6 @@ export default SyncSales(async (ctx, inputs) => {
         const created = await models.channel.create({ name: channelName });
         channelCache.set(channelName, { id: created.id });
         return { id: created.id };
-    }
-
-    // Helper to extract channel from invoice custom fields
-    function getChannelFromInvoice(invoice: ZohoInvoice): string {
-        if (!invoice.custom_fields || invoice.custom_fields.length === 0) {
-            return 'Other';
-        }
-        // Look for channel field - check label case-insensitively
-        const channelField = invoice.custom_fields.find(
-            (cf) => cf.label?.toLowerCase() === 'sales channel' ||
-                    cf.label?.toLowerCase() === 'cf_sales_channel' ||
-                    cf.label?.toLowerCase().includes('sales channel')
-        );
-        // Ensure value is a string before trimming
-        const value = channelField?.value;
-        if (typeof value === 'string' && value.trim()) {
-            return value.trim();
-        }
-        return 'Other';
     }
 
     // Fetch all invoices from Zoho within the date range
@@ -156,47 +194,84 @@ export default SyncSales(async (ctx, inputs) => {
 
         const invoicesData: ZohoInvoicesResponse = await invoicesResponse.json();
 
-        for (const invoiceSummary of invoicesData.invoices) {
-            // Fetch full invoice details to get line items
-            const invoiceDetailUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/invoices/${invoiceSummary.invoice_id}?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}`;
+        // Fetch all invoice details in parallel batches
+        const invoices = await fetchInvoiceDetailsBatch(
+            invoicesData.invoices,
+            ctx.env.ZOHO_BOOKS_BASE_URL,
+            ctx.env.ZOHO_BOOKS_ORG_ID,
+            accessToken
+        );
 
-            const invoiceDetailResponse = await fetch(invoiceDetailUrl, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Zoho-oauthtoken ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
+        // Log the first invoice to see custom_fields structure
+        if (invoices.length > 0 && totalInvoicesProcessed === 0) {
+            console.log('Sample invoice custom_fields:', JSON.stringify({
+                invoice_number: invoices[0].invoice_number,
+                custom_fields: invoices[0].custom_fields,
+            }, null, 2));
+        }
+
+        totalInvoicesProcessed += invoices.length;
+
+        // Collect all unique SKUs from this batch for batch product lookup
+        const allSkus = new Set<string>();
+        for (const invoice of invoices) {
+            for (const lineItem of invoice.line_items) {
+                const sku = lineItem.sku?.trim();
+                if (sku) {
+                    allSkus.add(sku);
+                }
+            }
+        }
+
+        // Batch fetch all products by SKU
+        const productMap = new Map<string, { id: string }>();
+        if (allSkus.size > 0) {
+            const products = await models.product.findMany({
+                where: { sku: { oneOf: Array.from(allSkus) } },
             });
-
-            if (!invoiceDetailResponse.ok) {
-                console.warn(`Failed to fetch invoice ${invoiceSummary.invoice_number}, skipping`);
-                continue;
+            for (const product of products) {
+                productMap.set(product.sku, { id: product.id });
             }
+        }
 
-            const invoiceDetail: ZohoInvoiceDetailResponse = await invoiceDetailResponse.json();
-            const invoice = invoiceDetail.invoice;
-
-            totalInvoicesProcessed++;
-
-            // Log the first invoice to see custom_fields structure
-            if (totalInvoicesProcessed === 1) {
-                console.log('Sample invoice custom_fields:', JSON.stringify({
-                    invoice_number: invoice.invoice_number,
-                    custom_fields: invoice.custom_fields,
-                }, null, 2));
+        // Collect all sale identifiers for batch existence check
+        const allSaleIdentifiers: string[] = [];
+        for (const invoice of invoices) {
+            for (const lineItem of invoice.line_items) {
+                allSaleIdentifiers.push(`${invoice.invoice_number}-${lineItem.line_item_id}`);
             }
+        }
 
-            // Get the channel from the invoice custom field
+        // Batch fetch all existing sales
+        const existingSalesMap = new Map<string, { id: string; quantity: number; price: any; productId: string }>();
+        if (allSaleIdentifiers.length > 0) {
+            const existingSales = await models.sale.findMany({
+                where: { invoiceNumber: { oneOf: allSaleIdentifiers } },
+            });
+            for (const sale of existingSales) {
+                existingSalesMap.set(sale.invoiceNumber, {
+                    id: sale.id,
+                    quantity: sale.quantity,
+                    price: sale.price,
+                    productId: sale.productId,
+                });
+            }
+        }
+
+        // Pre-fetch/create channels for all invoices
+        const channelNames = new Set<string>();
+        for (const invoice of invoices) {
+            channelNames.add(getChannelFromInvoice(invoice));
+        }
+        for (const channelName of channelNames) {
+            await getOrCreateChannel(channelName);
+        }
+
+        // Process all invoices and their line items
+        for (const invoice of invoices) {
             const channelName = getChannelFromInvoice(invoice);
-            const channel = await getOrCreateChannel(channelName);
+            const channel = channelCache.get(channelName)!;
 
-            // Debug: log channel info
-            if (!channel || !channel.id) {
-                console.error(`Channel is invalid for invoice ${invoice.invoice_number}:`, { channelName, channel });
-                throw new Error(`Failed to get/create channel '${channelName}' for invoice ${invoice.invoice_number}`);
-            }
-
-            // Process each line item as a separate sale
             for (const lineItem of invoice.line_items) {
                 const sku = lineItem.sku?.trim();
 
@@ -211,15 +286,7 @@ export default SyncSales(async (ctx, inputs) => {
                     continue;
                 }
 
-                // Look up product by SKU (with caching)
-                let product = productCache.get(sku);
-                if (product === undefined) {
-                    const foundProduct = await models.product.findOne({
-                        sku: sku,
-                    });
-                    product = foundProduct ? { id: foundProduct.id } : null;
-                    productCache.set(sku, product);
-                }
+                const product = productMap.get(sku);
 
                 if (!product) {
                     salesSkipped++;
@@ -232,13 +299,8 @@ export default SyncSales(async (ctx, inputs) => {
                     continue;
                 }
 
-                // Check if sale already exists by invoice number and line item
                 const saleIdentifier = `${invoice.invoice_number}-${lineItem.line_item_id}`;
-                const existingSales = await models.sale.findMany({
-                    where: { invoiceNumber: { equals: saleIdentifier } },
-                    limit: 1,
-                });
-                const existingSale = existingSales.length > 0 ? existingSales[0] : null;
+                const existingSale = existingSalesMap.get(saleIdentifier);
 
                 const saleDate = new Date(invoice.date);
                 const quantity = Math.round(lineItem.quantity);
