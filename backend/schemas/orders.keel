@@ -1,9 +1,10 @@
 model Sale {
     fields {
-        invoiceNumber Text @unique
+        invoiceNumber Text
+        lineItemId Text
         channel Channel
         date Date
-        product Product
+        product Product?
         quantity Number
         price Decimal
         total Decimal @computed(sale.price * sale.quantity)
@@ -15,6 +16,7 @@ model Sale {
     actions {
         create createSale() with (
             invoiceNumber,
+            lineItemId,
             channel.id,
             date,
             product.id,
@@ -22,10 +24,9 @@ model Sale {
             price,
         )
         list listOrders(date?, product.id?)
-        write syncSales(start: Date, end: Date) returns (SaleSyncResult) {
-            @permission(expression: ctx.isAuthenticated)
-        }
     }
+
+    @unique([invoiceNumber, lineItemId])
 
     @permission(
         expression: ctx.isAuthenticated,
@@ -33,17 +34,10 @@ model Sale {
     )
 }
 
-message SaleSyncResult {
-    totalInvoicesProcessed Number
-    salesCreated Number
-    salesUpdated Number
-    salesSkipped Number
-    skippedProducts SkippedProduct[]
-}
-
-message SkippedProduct {
-    invoiceNumber Text
-    sku Text
-    productName Text
-    reason Text
+flow SyncSales {
+    inputs {
+        start Date
+        end Date
+    }
+    @permission(expression: ctx.isAuthenticated)
 }
