@@ -1,9 +1,13 @@
 import { PricelistUpdate, models } from '@teamkeel/sdk';
 
-// To learn more about events and subscribers, visit https://docs.keel.so/events
 export default PricelistUpdate(async (ctx, event) => {
+    const identity = await models.identity.findOne({ id: event.identityId! });
+    if (!identity) {
+        throw new Error("identity not found");
+    }
+
     const user = await models.user.findOne({
-        identityId: event.identityId!
+        id: identity.userId!
     });
 
     switch (event.eventName) {
