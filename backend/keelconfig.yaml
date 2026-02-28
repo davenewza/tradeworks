@@ -1,6 +1,3 @@
-auth:
-  - userCreation: required
-
 environment:
   - name: SHIPLOGIC_API_URL
     value: "https://api.shiplogic.com/v2/rates?provider_id=123"
@@ -18,6 +15,7 @@ secrets:
   - name: ZOHO_CLIENT_SECRET
 
 auth:
+  userCreation: required
   redirectUrl: http://localhost:3000/callback
   providers:
     - type: google

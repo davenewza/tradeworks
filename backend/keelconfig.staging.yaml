@@ -15,6 +15,7 @@ secrets:
   - name: ZOHO_CLIENT_SECRET
 
 auth:
+  userCreation: required
   redirectUrl: http://localhost:3000/callback
   providers:
     - type: google
