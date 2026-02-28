@@ -111,8 +111,8 @@ export default SyncProducts(async (ctx, inputs) => {
         // Look for brand field - check label case-insensitively for "brand" or "cf_brand"
         const brandField = item.custom_fields.find(
             (cf) => cf.label?.toLowerCase() === 'brand' ||
-                    cf.label?.toLowerCase() === 'cf_brand' ||
-                    cf.label?.toLowerCase().includes('brand')
+                cf.label?.toLowerCase() === 'cf_brand' ||
+                cf.label?.toLowerCase().includes('brand')
         );
         return brandField?.value?.trim() || 'Other';
     }
@@ -203,18 +203,6 @@ export default SyncProducts(async (ctx, inputs) => {
 
             // Get the detailed item with custom_fields, fall back to list item
             const item = itemDetailsMap.get(listItem.item_id) || listItem;
-
-            // Log the first item to see its structure (especially custom_fields)
-            if (!loggedFirstItem) {
-                console.log('Sample item with details:', JSON.stringify({
-                    item_id: item.item_id,
-                    name: item.name,
-                    sku: item.sku,
-                    status: item.status,
-                    custom_fields: item.custom_fields,
-                }, null, 2));
-                loggedFirstItem = true;
-            }
 
             // Get brand from custom field
             const brandName = getBrandFromItem(item);

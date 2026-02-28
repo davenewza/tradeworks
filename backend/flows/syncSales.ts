@@ -296,8 +296,22 @@ export default SyncSales({}, async (ctx, inputs) => {
 
                 for (const lineItem of invoice.line_items) {
                     const sku = lineItem.sku?.trim();
-                    const product = sku ? productMap.get(sku) : undefined;
-                    const productId = product?.id ?? null;
+                    if (!sku) {
+                        pagePersistFailures++;
+                        console.error(
+                            `Skipping line item ${lineItem.line_item_id} on invoice ${invoice.invoice_number}: no SKU provided`
+                        );
+                        continue;
+                    }
+                    const product = productMap.get(sku);
+                    if (!product) {
+                        pagePersistFailures++;
+                        console.error(
+                            `Skipping line item ${lineItem.line_item_id} on invoice ${invoice.invoice_number}: no product found for SKU "${sku}"`
+                        );
+                        continue;
+                    }
+                    const productId = product.id;
 
                     const existingSale = existingSalesMap.get(`${invoice.invoice_number}-${lineItem.line_item_id}`);
 
@@ -337,7 +351,7 @@ export default SyncSales({}, async (ctx, inputs) => {
                                 lineItemId: lineItem.line_item_id,
                                 channel: { id: channel.id },
                                 date: saleDate,
-                                product: productId ? { id: productId } : undefined,
+                                product: { id: productId },
                                 quantity: quantity,
                                 price: price,
                                 synchronisedAt: now,

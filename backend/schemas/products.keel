@@ -33,6 +33,8 @@ model Product {
         volumeInLitres Decimal? @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
         isEnabled Boolean @default(true)
         synchronisedAt Timestamp?
+        views ProductViews[]
+        sales Sale[]
     }
 
     actions {
