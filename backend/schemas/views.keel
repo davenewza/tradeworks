@@ -1,0 +1,57 @@
+enum ViewsImportType {
+    TakealotProductSalesExport
+    AmazonDetailPageSalesTraffic
+    CreatespaceShopifyExport
+}
+
+enum PeriodType {
+    Weekly
+    Monthly
+}
+
+model ProductViews {
+    fields {
+        product Product
+        channel Channel
+        periodType PeriodType
+        periodStart Date
+        views Number
+    }
+
+    actions {
+        list listProductViews(product.id?, channel.id?, periodType?, periodStart?)
+    }
+
+    @on(
+        [create],
+        productViewsCreated
+    )
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [list]
+    )
+}
+
+flow ImportProductViews {
+    inputs {
+        periodType PeriodType
+        periodStart Date
+        type ViewsImportType
+        fileContent File
+    }
+    @permission(expression: ctx.isAuthenticated)
+}
+
+model ProductPerformance {
+    fields {
+        product Product
+        channel Channel
+        periodType PeriodType
+        periodStart Date
+        periodEnd Date @computed(IF(productPerformance.periodType == PeriodType.Weekly, ADDDAYS(productPerformance.periodStart, 7), ADDMONTHS(productPerformance.periodStart, 1)))
+        views Number? @computed(SUMIF(productPerformance.product.views.views, productPerformance.product.views.channel == productPerformance.channel && productPerformance.product.views.periodType == productPerformance.periodType && productPerformance.product.views.periodStart == productPerformance.periodStart))
+        unitsSold Number? @computed(SUMIF(productPerformance.product.sales.quantity, productPerformance.product.sales.channel == productPerformance.channel && productPerformance.product.sales.date >= productPerformance.periodStart && productPerformance.product.sales.date < productPerformance.periodEnd))
+        conversionRate Decimal? @computed(IF(productPerformance.views > 0, productPerformance.unitsSold / productPerformance.views * 100, null))
+    }
+}

@@ -1,3 +1,6 @@
+auth:
+  - userCreation: required
+
 environment:
   - name: SHIPLOGIC_API_URL
     value: "https://api.shiplogic.com/v2/rates?provider_id=123"

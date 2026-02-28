@@ -4,7 +4,7 @@ model Sale {
         lineItemId Text
         channel Channel
         date Date
-        product Product?
+        product Product
         quantity Number
         price Decimal
         total Decimal @computed(sale.price * sale.quantity)
