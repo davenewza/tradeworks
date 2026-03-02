@@ -24,6 +24,9 @@ model Sale {
             price,
         )
         list listOrders(date?, product.id?)
+        write handleInvoiceWebhook(Any) returns (Any) {
+            @permission(expression: true)
+        }
     }
 
     @unique([invoiceNumber, lineItemId])
@@ -40,4 +43,9 @@ flow SyncSales {
         end Date
     }
     @permission(expression: ctx.isAuthenticated)
+}
+
+flow ScheduledSyncSales {
+    @schedule("every 6 hours")
+    @permission(expression: true)
 }
