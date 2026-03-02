@@ -1,4 +1,4 @@
-import { SyncSales, models } from '@teamkeel/sdk';
+import { ScheduledSyncSales, models } from '@teamkeel/sdk';
 import {
     ZohoInvoicesResponse,
     getZohoAccessToken,
@@ -8,13 +8,19 @@ import {
     processInvoiceLineItems,
 } from '../lib/zohoSalesHelpers';
 
-export default SyncSales({}, async (ctx, inputs) => {
+const LOOKBACK_HOURS = 48;
+
+export default ScheduledSyncSales({}, async (ctx) => {
+    const now = new Date();
+    const start = new Date(now.getTime() - LOOKBACK_HOURS * 60 * 60 * 1000);
+    const startDate = formatDate(start);
+    const endDate = formatDate(now);
+
+    console.log(`Scheduled sync: ${startDate} to ${endDate}`);
+
     const accessToken = await ctx.step("authenticate", async () => {
         return await getZohoAccessToken(ctx);
     });
-
-    const startDate = formatDate(inputs.start);
-    const endDate = formatDate(inputs.end);
 
     let totalInvoicesProcessed = 0;
     let salesCreated = 0;
@@ -153,18 +159,19 @@ export default SyncSales({}, async (ctx, inputs) => {
 
     if (invoiceDetailFailures > 0 || salePersistFailures > 0) {
         console.error(
-            `SyncSales completed with errors. Invoice detail failures: ${invoiceDetailFailures}. Sale persist failures: ${salePersistFailures}.`
+            `ScheduledSyncSales completed with errors. Invoice detail failures: ${invoiceDetailFailures}. Sale persist failures: ${salePersistFailures}.`
         );
         throw new Error(
-            `SyncSales completed with errors. Invoice detail failures: ${invoiceDetailFailures}. Sale persist failures: ${salePersistFailures}.`
+            `ScheduledSyncSales completed with errors. Invoice detail failures: ${invoiceDetailFailures}. Sale persist failures: ${salePersistFailures}.`
         );
     }
 
     return ctx.complete({
-        title: "Sales sync complete",
+        title: "Scheduled sales sync complete",
         content: [
             ctx.ui.display.keyValue({
                 data: [
+                    { key: "Date range", value: `${startDate} to ${endDate}` },
                     { key: "Invoices processed", value: totalInvoicesProcessed },
                     { key: "Sales created", value: salesCreated },
                     { key: "Sales updated", value: salesUpdated },
