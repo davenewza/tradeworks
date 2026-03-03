@@ -15,7 +15,7 @@ secrets:
   - name: ZOHO_CLIENT_SECRET
 
 auth:
-  userCreation: off
+  userCreation: auto
   redirectUrl: https://orders.thecreatespace.co.za/callback
   providers:
     - type: google
