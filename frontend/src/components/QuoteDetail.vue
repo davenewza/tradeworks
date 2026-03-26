@@ -1345,10 +1345,11 @@ export default {
         const response = await equipmentBoxService.listQuoteEquipmentBoxes(this.quote.id)
         this.equipmentBoxes = response.results || []
 
-        // Equipment box data is now embedded in the response
-        // No need to fetch separately
+        // Clear cached details and repopulate from embedded response data
+        // to ensure names and details always reflect the current equipment boxes
+        this.equipmentBoxDetails = {}
         for (const quoteEquipmentBox of this.equipmentBoxes) {
-          if (quoteEquipmentBox.equipmentBox && !this.equipmentBoxDetails[quoteEquipmentBox.equipmentBoxId]) {
+          if (quoteEquipmentBox.equipmentBox) {
             const equipmentBoxDetail = quoteEquipmentBox.equipmentBox
 
             // Cache the image if it exists
