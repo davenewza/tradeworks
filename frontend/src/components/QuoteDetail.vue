@@ -445,9 +445,9 @@
             <div class="flex items-center space-x-4">
               <div class="relative w-12 h-12">
                 <img
-                  v-if="equipmentBoxDetails[equipmentBox.equipmentBox?.id]?.image?.url"
-                  :src="equipmentBoxDetails[equipmentBox.equipmentBox?.id].image.url"
-                  :alt="equipmentBoxDetails[equipmentBox.equipmentBox?.id]?.name || 'Equipment Box'"
+                  v-if="equipmentBox.equipmentBox?.image?.url"
+                  :src="equipmentBox.equipmentBox.image.url"
+                  :alt="equipmentBox.equipmentBox?.name || 'Equipment Box'"
                   class="w-12 h-12 object-contain rounded-lg cursor-pointer bg-white"
                   @mouseenter="showBoxImagePreview(equipmentBox.equipmentBox?.id, $event)"
                   @mousemove="updateImagePreviewPosition($event)"
@@ -461,10 +461,10 @@
               </div>
               <div class="min-h-[2rem] flex flex-col justify-center">
                 <h4 class="font-medium text-gray-900">
-                  {{ equipmentBoxDetails[equipmentBox.equipmentBox?.id]?.name || 'Equipment Box' }}
+                  {{ equipmentBox.equipmentBox?.name || 'Equipment Box' }}
                 </h4>
                 <p class="text-xs text-gray-500">
-                  Dimensions: {{ formatDimensions(equipmentBoxDetails[equipmentBox.equipmentBox?.id]) }}
+                  Dimensions: {{ formatDimensions(equipmentBox.equipmentBox) }}
                 </p>
               </div>
             </div>
@@ -780,7 +780,7 @@ export default {
       loading: false,
       customerPriceList: null,
       equipmentBoxes: [],
-      equipmentBoxDetails: {}, // Store equipment box details by equipmentBox.id
+
       selectedBoxType: '',
       loadingEquipmentBoxes: false,
       loadingProducts: false,
@@ -934,7 +934,7 @@ export default {
     },
     equipmentBoxesWeight() {
       return this.equipmentBoxes.reduce((totalWeight, equipmentBox) => {
-        const equipmentBoxDetail = this.equipmentBoxDetails[equipmentBox.equipmentBox?.id]
+        const equipmentBoxDetail = equipmentBox.equipmentBox
         if (equipmentBoxDetail && equipmentBoxDetail.weightInGrams) {
           return totalWeight + (Number(equipmentBoxDetail.weightInGrams) * equipmentBox.quantity)
         }
@@ -1345,21 +1345,13 @@ export default {
         const response = await equipmentBoxService.listQuoteEquipmentBoxes(this.quote.id)
         this.equipmentBoxes = response.results || []
 
-        // Clear cached details and repopulate from embedded response data
-        // to ensure names and details always reflect the current equipment boxes
-        this.equipmentBoxDetails = {}
+        // Cache images from embedded response data using stable blob URLs
         for (const quoteEquipmentBox of this.equipmentBoxes) {
-          if (quoteEquipmentBox.equipmentBox) {
-            const equipmentBoxDetail = quoteEquipmentBox.equipmentBox
-
-            const equipmentBoxId = quoteEquipmentBox.equipmentBox.id
-
-            // Cache the image if it exists
-            if (equipmentBoxDetail.image?.url) {
-              equipmentBoxDetail.image.url = await imageCache.get(equipmentBoxId, equipmentBoxDetail.image.url)
-            }
-
-            this.equipmentBoxDetails[equipmentBoxId] = equipmentBoxDetail
+          if (quoteEquipmentBox.equipmentBox?.image?.url) {
+            quoteEquipmentBox.equipmentBox.image.url = await imageCache.get(
+              quoteEquipmentBox.equipmentBox.id,
+              quoteEquipmentBox.equipmentBox.image.url
+            )
           }
         }
       } catch (err) {
@@ -1528,7 +1520,8 @@ export default {
     },
 
     showBoxImagePreview(equipmentBoxId, event) {
-      const box = this.equipmentBoxDetails[equipmentBoxId]
+      const entry = this.equipmentBoxes.find(e => e.equipmentBox?.id === equipmentBoxId)
+      const box = entry?.equipmentBox
       if (box?.image?.url) {
         const offsetX = 10
         const offsetY = 10
@@ -1654,7 +1647,7 @@ export default {
           totalParcels: this.equipmentBoxes.length > 0 ? this.equipmentBoxes.reduce((sum, box) => sum + box.quantity, 0) : 0,
           totalWeightKg: this.totalShipmentWeight / 1000, // Convert from grams to kg
           totalVolumeCm3: this.equipmentBoxes.length > 0 ? this.equipmentBoxes.reduce((sum, box) => {
-            const equipmentBoxDetail = this.equipmentBoxDetails[box.equipmentBox?.id]
+            const equipmentBoxDetail = box.equipmentBox
             if (equipmentBoxDetail) {
               const volume = (equipmentBoxDetail.lengthInCm * equipmentBoxDetail.widthInCm * equipmentBoxDetail.heightInCm) * box.quantity
               return sum + volume
