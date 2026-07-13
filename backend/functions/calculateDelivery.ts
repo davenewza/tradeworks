@@ -228,6 +228,7 @@ export default CalculateDelivery(async (ctx, inputs) => {
 
     } catch (error) {
         console.error('Error calling Shiplogic API:', error);
-        throw new Error(`Failed to calculate delivery rates: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to calculate delivery rates: ${message}`);
     }
 });

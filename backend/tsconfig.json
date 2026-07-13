@@ -2,18 +2,36 @@
   "compilerOptions": {
     "allowJs": true,
     "esModuleInterop": true,
-    "lib": ["ES2016", "DOM"],
-    "moduleResolution": "node",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "noImplicitAny": false,
     "paths": {
-      "@teamkeel/sdk": ["./.build/sdk"],
-      "@teamkeel/testing": ["./.build/testing"]
+      "@teamkeel/sdk": [
+        "./.build/sdk"
+      ],
+      "@teamkeel/testing": [
+        "./.build/testing"
+      ]
     },
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
-    "target": "ES2016",
-    "types": ["node"]
+    "target": "ES2022",
+    "types": [
+      "node"
+    ]
   },
-  "exclude": ["node_modules", "functions-old", "subscribers-old"],
-  "include": ["**/*.ts"]
+  "exclude": [
+    "node_modules",
+    "functions-old",
+    "subscribers-old"
+  ],
+  "include": [
+    "**/*.ts",
+    ".build/vitest-matchers.d.ts"
+  ]
 }
