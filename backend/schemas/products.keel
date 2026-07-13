@@ -63,9 +63,6 @@ model Product {
         update disableProduct(id) {
             @set(product.isEnabled = false)
         }
-        write syncProducts() returns (ProductSyncResult) {
-            @permission(expression: ctx.isAuthenticated)
-        }
     }
 
     @permission(
@@ -74,18 +71,8 @@ model Product {
     )
 }
 
-message ProductSyncResult {
-    totalItemsProcessed Number
-    productsCreated Number
-    productsUpdated Number
-    productsSkipped Number
-    skippedItems SkippedItem[]
-}
-
-message SkippedItem {
-    sku Text
-    name Text
-    reason Text
+flow SyncProducts {
+    @permission(expression: ctx.isAuthenticated)
 }
 
 model EquipmentBox {
