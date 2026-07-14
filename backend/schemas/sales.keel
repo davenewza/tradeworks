@@ -33,7 +33,7 @@ model Sale {
 
     @permission(
         expression: ctx.isAuthenticated,
-        actions: [create, list]
+        actions: [get, create, list]
     )
 }
 
