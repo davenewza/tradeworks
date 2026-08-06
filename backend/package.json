@@ -1,5 +1,8 @@
 {
   "name": ".",
+  "scripts": {
+    "test": "keel test"
+  },
   "dependencies": {
     "@teamkeel/functions-runtime": "^0.470.0",
     "@teamkeel/testing-runtime": "^0.470.0",
