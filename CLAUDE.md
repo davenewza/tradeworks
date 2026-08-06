@@ -29,6 +29,8 @@ This is a full-stack quote management application built with Keel (backend frame
 
 ## Commands
 
+This schema requires an up-to-date Keel CLI (0.465+). Older CLIs fail validation with misleading errors such as `'User' is not a model and cannot be extended` (they predate `extend model` support) or `Additional property userProvisioning is not allowed`. Upgrade with `npm install -g keel@latest`. (The keel npm package only works as a global install - its installer cannot run as a project dependency.)
+
 ### Backend Development
 ```bash
 cd backend
