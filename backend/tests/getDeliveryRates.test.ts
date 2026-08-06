@@ -7,8 +7,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 // than an identity, so these tests call the JSON API directly instead of
 // going through the generated actions client (which cannot set headers).
 //
-// Requirements to run:
-//   keel secrets set --env test DELIVERY_API_KEY test-delivery-api-key
+// Run with `npm test`, which first stores the dummy API key below in the
+// keel CLI's test-environment secrets (keel test can only read secrets from
+// ~/.keel/config.yaml, so this is per machine). Running `keel test` directly
+// works too once that one-time setup has happened.
 //
 // ShipLogic is mocked: keelconfig.test.yaml points SHIPLOGIC_API_URL at the
 // local server started below, so no real network calls are made.
@@ -110,7 +112,8 @@ beforeAll(async () => {
     if (probe.status !== 403) {
         throw new Error(
             'getDeliveryRates did not reject an unauthenticated request - is the test secret set? ' +
-                'Run: keel secrets set --env test DELIVERY_API_KEY test-delivery-api-key'
+                'Run tests with `npm test`, or run once: ' +
+                'keel secrets set --env test DELIVERY_API_KEY test-delivery-api-key'
         );
     }
 });

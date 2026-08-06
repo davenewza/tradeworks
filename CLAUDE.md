@@ -33,11 +33,12 @@ This is a full-stack quote management application built with Keel (backend frame
 ```bash
 cd backend
 
-# Run tests
-npx vitest
+# Run tests (sets the dummy test API key, then runs `keel test`;
+# requires Docker for the test database)
+npm test
 
-# Run a single test file
-npx vitest path/to/test-file.test.ts
+# Filter tests by name pattern
+keel test -p "pattern matching test names"
 
 # Type checking
 npx tsc --noEmit
