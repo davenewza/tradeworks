@@ -12,6 +12,7 @@ environment:
 
 secrets:
   - name: SHIPLOGIC_API_KEY
+  - name: DELIVERY_API_KEY
   - name: ZOHO_CLIENT_SECRET
 
 auth:

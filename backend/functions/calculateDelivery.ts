@@ -1,15 +1,13 @@
 import { CalculateDelivery, models, QuoteStatus } from '@teamkeel/sdk';
-
-const COLLECTION_ADDRESS = {
-    type: "business",
-    company: "Tradeworks",
-    street_address: "65 Oak Street",
-    local_area: "Somerset West",
-    city: "Somerset West",
-    zone: "Western Cape",
-    country: "ZA",
-    code: "7130"
-};
+import {
+    COLLECTION_ADDRESS,
+    DELIVERY_MARKUP,
+    ParcelBoxGroup,
+    ShipLogicAddress,
+    buildParcels,
+    fetchShipLogicRates,
+    mapRates
+} from '../lib/deliveryHelpers';
 
 export default CalculateDelivery(async (ctx, inputs) => {
     const quote = await models.quote.findOne({ id: inputs.id });
@@ -25,13 +23,13 @@ export default CalculateDelivery(async (ctx, inputs) => {
     if (!quote.deliveryAddressId) {
         throw new Error('No delivery address assigned to this quote.');
     }
-    
+
     const deliveryAddress = await models.deliveryAddress.findOne({ id: quote.deliveryAddressId });
-    
+
     if (!deliveryAddress) {
         throw new Error('Delivery address not found for this quote.');
     }
-    
+
 
     // Get all equipment boxes for this quote
     const quoteEquipmentBoxes = await models.quoteEquipmentBox.findMany({
@@ -77,21 +75,13 @@ export default CalculateDelivery(async (ctx, inputs) => {
     console.log(`Total product weight: ${totalProductWeightKg}kg`);
     console.log('Product details:', productDetails);
 
-    // Calculate total number of equipment boxes
-    const totalEquipmentBoxes = quoteEquipmentBoxes.reduce((sum, qeb) => sum + qeb.quantity, 0);
-    console.log(`Total equipment boxes: ${totalEquipmentBoxes}`);
-
-    // Calculate product weight per equipment box
-    const productWeightPerBox = totalProductWeightKg / totalEquipmentBoxes;
-    console.log(`Product weight per equipment box: ${productWeightPerBox}kg`);
-
-    // Convert equipment boxes to parcels for the API
-    const parcels: any[] = [];
+    // Convert the quote's equipment boxes into parcel groups for the API
+    const boxGroups: ParcelBoxGroup[] = [];
 
     for (const quoteEquipmentBox of quoteEquipmentBoxes) {
         // Get the equipment box details
-        const equipmentBox = await models.equipmentBox.findOne({ 
-            id: quoteEquipmentBox.equipmentBoxId 
+        const equipmentBox = await models.equipmentBox.findOne({
+            id: quoteEquipmentBox.equipmentBoxId
         });
 
         if (!equipmentBox) {
@@ -99,21 +89,18 @@ export default CalculateDelivery(async (ctx, inputs) => {
             continue;
         }
 
-        // Create a parcel for each equipment box (quantity times)
-        for (let i = 0; i < quoteEquipmentBox.quantity; i++) {
-            const equipmentBoxWeightKg = Number(equipmentBox.weightInGrams) / 1000;
-            const totalParcelWeightKg = equipmentBoxWeightKg + productWeightPerBox;
-            
-            parcels.push({
-                submitted_length_cm: Number(equipmentBox.lengthInCm),
-                submitted_width_cm: Number(equipmentBox.widthInCm),
-                submitted_height_cm: Number(equipmentBox.heightInCm),
-                submitted_weight_kg: totalParcelWeightKg // Equipment box weight + distributed product weight
-            });
-        }
+        boxGroups.push({
+            lengthInCm: Number(equipmentBox.lengthInCm),
+            widthInCm: Number(equipmentBox.widthInCm),
+            heightInCm: Number(equipmentBox.heightInCm),
+            weightInGrams: Number(equipmentBox.weightInGrams),
+            quantity: quoteEquipmentBox.quantity
+        });
 
-        console.log(`Added ${quoteEquipmentBox.quantity} parcels for equipment box: ${equipmentBox.name} (${equipmentBox.lengthInCm}x${equipmentBox.widthInCm}x${equipmentBox.heightInCm}cm, equipment box: ${equipmentBox.weightInGrams}g, total weight per parcel: ${(Number(equipmentBox.weightInGrams) / 1000 + productWeightPerBox).toFixed(2)}kg)`);
+        console.log(`Added ${quoteEquipmentBox.quantity} parcels for equipment box: ${equipmentBox.name} (${equipmentBox.lengthInCm}x${equipmentBox.widthInCm}x${equipmentBox.heightInCm}cm, equipment box: ${equipmentBox.weightInGrams}g)`);
     }
+
+    const parcels = buildParcels(boxGroups, totalProductWeightKg);
 
     if (parcels.length === 0) {
         throw new Error('No valid parcels could be created from equipment boxes');
@@ -121,7 +108,7 @@ export default CalculateDelivery(async (ctx, inputs) => {
 
     console.log(`Total parcels to ship: ${parcels.length}`);
 
-    const deliveryAddressObject = {
+    const deliveryAddressObject: ShipLogicAddress = {
         type: "business",
         company: deliveryAddress.organisation || "",
         street_address: deliveryAddress.addressLine1 + ", " + deliveryAddress.addressLine2,
@@ -141,27 +128,16 @@ export default CalculateDelivery(async (ctx, inputs) => {
     console.log('Calling Shiplogic API with request:', JSON.stringify(requestBody, null, 2));
 
     try {
-        const response = await fetch(ctx.env.SHIPLOGIC_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${ctx.secrets.SHIPLOGIC_API_KEY}`
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Shiplogic API error:', response.status, errorText);
-            throw new Error(`Shiplogic API error: ${response.status} - ${errorText}`);
-        }
-
-        const apiResponse = await response.json();
+        const apiResponse = await fetchShipLogicRates(
+            ctx.env.SHIPLOGIC_API_URL,
+            ctx.secrets.SHIPLOGIC_API_KEY,
+            requestBody
+        );
         console.log('Shiplogic API response:', JSON.stringify(apiResponse, null, 2));
 
         // Process and return the rates
         const rates = apiResponse.rates || [];
-        
+
         // Sort rates by price (lowest first)
         rates.sort((a: any, b: any) => a.rate - b.rate);
 
@@ -178,14 +154,14 @@ export default CalculateDelivery(async (ctx, inputs) => {
         const chargedWeightInGrams = Number.isFinite(chargedWeightKg) ? Math.round(chargedWeightKg * 1000) : null
         await models.quote.update({ id: quote.id }, {
             deliveryService: cheapestRate.service_level.name,
-            totalDeliveryFees: cheapestRate.rate_excluding_vat * 1.1,
+            totalDeliveryFees: cheapestRate.rate_excluding_vat * DELIVERY_MARKUP,
             chargedWeightInGrams: chargedWeightInGrams ?? undefined,
             deliveryRawJson: apiResponse
         });
 
         // Calculate total weight and volume for summary
         const totalWeightKg = parcels.reduce((sum, parcel) => sum + parcel.submitted_weight_kg, 0);
-        const totalVolumeCm3 = parcels.reduce((sum, parcel) => 
+        const totalVolumeCm3 = parcels.reduce((sum, parcel) =>
             sum + (parcel.submitted_length_cm * parcel.submitted_width_cm * parcel.submitted_height_cm), 0);
 
         return {
@@ -201,28 +177,7 @@ export default CalculateDelivery(async (ctx, inputs) => {
             deliveryAddress: deliveryAddressObject,
             selectedDeliveryService: cheapestRate.service_level.name,
             selectedDeliveryFees: cheapestRate.rate,
-            availableRates: rates.map((rate: any) => ({
-                serviceLevel: {
-                    code: rate.service_level.code,
-                    name: rate.service_level.name,
-                    description: rate.service_level.description,
-                    deliveryDateFrom: rate.service_level.delivery_date_from,
-                    deliveryDateTo: rate.service_level.delivery_date_to,
-                    collectionDate: rate.service_level.collection_date,
-                    collectionCutOffTime: rate.service_level.collection_cut_off_time
-                },
-                pricing: {
-                    rate: rate.rate * 1.1,
-                    rateExcludingVat: rate.rate_excluding_vat * 1.1,
-                    vat: rate.base_rate.vat * 1.1,
-                    vatPercentage: rate.base_rate.vat_percentage * 1.1
-                },
-                weights: {
-                    chargedWeight: rate.charged_weight,
-                    actualWeight: rate.actual_weight,
-                    volumetricWeight: rate.volumetric_weight
-                }
-            })),
+            availableRates: mapRates(rates),
             rawApiResponse: apiResponse
         };
 
