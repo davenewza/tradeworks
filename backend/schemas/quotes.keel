@@ -141,6 +141,9 @@ model Quote {
         write calculateDelivery(id) returns (Any) {
             @permission(expression: ctx.isAuthenticated)
         }
+        read getDeliveryRates(GetDeliveryRatesInput) returns (GetDeliveryRatesResponse) {
+            @permission(expression: ctx.headers.X_API_KEY == ctx.secrets.DELIVERY_API_KEY)
+        }
         delete deleteQuote(id) {
             @permission(expression: ctx.isAuthenticated && quote.status == QuoteStatus.Draft)
         }
@@ -156,6 +159,87 @@ enum QuoteStatus {
     Draft
     Submitted
     Approved
+}
+
+// Messages for the external delivery-rates API (getDeliveryRates), consumed
+// by external services authenticating with the X-API-KEY header.
+
+message DeliveryRateLineInput {
+    sku Text
+    quantity Number
+}
+
+message DeliveryRateAddressInput {
+    addressLine1 Text
+    addressLine2 Text?
+    suburb Text
+    city Text
+    province Text
+    postalCode Text
+    // Defaults to "ZA" when omitted
+    country Text?
+    organisation Text?
+}
+
+message GetDeliveryRatesInput {
+    lines DeliveryRateLineInput[]
+    deliveryAddress DeliveryRateAddressInput
+    // When true, plastic equipment boxes are used; otherwise cardboard
+    includeEquipmentBox Boolean?
+}
+
+message DeliveryRateServiceLevelInfo {
+    code Text
+    name Text
+    description Text?
+    deliveryDateFrom Text?
+    deliveryDateTo Text?
+    collectionDate Text?
+    collectionCutOffTime Text?
+}
+
+message DeliveryRatePricing {
+    rate Decimal
+    rateExcludingVat Decimal
+    vat Decimal
+    vatPercentage Decimal
+}
+
+message DeliveryRateWeights {
+    chargedWeight Decimal?
+    actualWeight Decimal?
+    volumetricWeight Decimal?
+}
+
+message DeliveryRateOption {
+    serviceLevel DeliveryRateServiceLevelInfo
+    pricing DeliveryRatePricing
+    weights DeliveryRateWeights
+}
+
+message DeliveryRateBox {
+    name Text
+    sku Text?
+    quantity Number
+    priceExclVat Decimal
+    priceInclVat Decimal
+    lengthInCm Decimal
+    widthInCm Decimal
+    heightInCm Decimal
+    weightInGrams Decimal
+}
+
+message GetDeliveryRatesResponse {
+    // Cheapest available service, which the fee fields below refer to
+    deliveryService Text
+    // Excluding VAT - the same basis as a quote's totalDeliveryFees
+    deliveryFee Decimal
+    deliveryFeeInclVat Decimal
+    boxType BoxType
+    boxes DeliveryRateBox[]
+    totalParcels Number
+    totalWeightKg Decimal
+    rates DeliveryRateOption[]
 }
 
 model QuoteEquipmentBox {

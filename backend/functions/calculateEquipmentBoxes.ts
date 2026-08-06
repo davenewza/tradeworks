@@ -1,4 +1,5 @@
 import { CalculateEquipmentBoxes, models, QuoteStatus } from '@teamkeel/sdk';
+import { PackableBox, packEquipmentBoxes } from '../lib/deliveryHelpers';
 
 // To learn more about what you can do with custom functions, visit https://docs.keel.so/functions
 export default CalculateEquipmentBoxes(async (ctx, inputs) => {
@@ -14,15 +15,12 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
 
     await models.quote.update({id: quote.id}, {boxType: inputs.boxType});
 
-    // Get all available equipment boxes, sorted by effective volume (largest first)
+    // Get all available equipment boxes for the selected box type
     const equipmentBoxes = await models.equipmentBox.findMany({ where: { boxType: inputs.boxType, isEnabled: true } });
 
     if (equipmentBoxes.length === 0) {
         throw new Error('No equipment boxes available');
     }
-
-    // Sort equipment boxes by effective volume (largest first)
-    equipmentBoxes.sort((a, b) => Number(b.effectiveVolumeInLitres) - Number(a.effectiveVolumeInLitres));
 
     // Get all quote products
     const quoteProducts = await models.quoteProduct.findMany({
@@ -34,7 +32,7 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
         const existingQuoteEquipmentBoxes = await models.quoteEquipmentBox.findMany({
             where: { quoteId: quote.id }
         });
-        
+
         for (const existingBox of existingQuoteEquipmentBoxes) {
             await models.quoteEquipmentBox.delete({ id: existingBox.id });
         }
@@ -52,19 +50,19 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
 
     // Calculate total volume needed for all products
     let totalVolumeNeeded = 0;
-    
+
     for (const quoteProduct of quoteProducts) {
         // Get the product details
         const product = await models.product.findOne({ id: quoteProduct.productId });
-        
+
         if (!product) {
             throw new Error(`Product not found for quote product ${quoteProduct.id}`);
         }
-        
+
         if (!product.volumeInLitres) {
             throw new Error(`Product ${product.name} (${product.sku}) does not have volume information`);
         }
-        
+
         // Calculate volume for this product line item (product volume * quantity)
         const productLineVolume = Number(product.volumeInLitres) * quoteProduct.quantity;
         totalVolumeNeeded += productLineVolume;
@@ -76,123 +74,55 @@ export default CalculateEquipmentBoxes(async (ctx, inputs) => {
     const existingQuoteEquipmentBoxes = await models.quoteEquipmentBox.findMany({
         where: { quoteId: quote.id }
     });
-    
+
     for (const existingBox of existingQuoteEquipmentBoxes) {
         await models.quoteEquipmentBox.delete({ id: existingBox.id });
     }
 
-    // Calculate equipment boxes needed
-    interface EquipmentBoxNeeded {
-        equipmentBoxId: string;
-        price: number;
-        quantity: number;
-        effectiveVolume: number;
-        volumeUsed: number;
+    const packableBoxes: PackableBox[] = equipmentBoxes.map(box => ({
+        id: box.id,
+        name: box.name,
+        sku: box.sku,
+        price: Number(box.price),
+        priceInclVat: Number(box.priceInclVat),
+        lengthInCm: Number(box.lengthInCm),
+        widthInCm: Number(box.widthInCm),
+        heightInCm: Number(box.heightInCm),
+        weightInGrams: Number(box.weightInGrams),
+        effectiveVolumeInLitres: Number(box.effectiveVolumeInLitres)
+    }));
+
+    const packed = packEquipmentBoxes(totalVolumeNeeded, packableBoxes);
+
+    for (const { box, quantity, volumeUsed } of packed) {
+        console.log(`Selected ${quantity}x ${box.name} (${box.effectiveVolumeInLitres}L each, ${volumeUsed.toFixed(2)}L used)`);
     }
-    
-    // Use a Map to track equipment box needs and avoid duplicates
-    const equipmentBoxesMap = new Map<string, EquipmentBoxNeeded>();
-    let remainingVolume = totalVolumeNeeded;
-
-    // Use largest boxes first for most of the volume
-    for (let i = 0; i < equipmentBoxes.length - 1; i++) {
-        const equipmentBox = equipmentBoxes[i];
-        const effectiveVolume = Number(equipmentBox.effectiveVolumeInLitres);
-        
-        if (remainingVolume <= 0) {
-            break;
-        }
-
-        // Calculate how many of this equipment box type we need
-        const boxesNeeded = Math.floor(remainingVolume / effectiveVolume);
-        
-        if (boxesNeeded > 0) {
-            equipmentBoxesMap.set(equipmentBox.id, {
-                equipmentBoxId: equipmentBox.id,
-                price: equipmentBox.price,
-                quantity: boxesNeeded,
-                effectiveVolume: effectiveVolume,
-                volumeUsed: effectiveVolume * boxesNeeded
-            });
-            
-            remainingVolume -= effectiveVolume * boxesNeeded;
-            console.log(`Selected ${boxesNeeded}x ${equipmentBox.name} (${effectiveVolume}L each). Remaining volume: ${remainingVolume.toFixed(2)}L`);
-        }
-    }
-
-    // For the final remaining volume, find the smallest box that can fit it
-    if (remainingVolume > 0) {
-        // Sort equipment boxes by effective volume (smallest first) to find the smallest that fits
-        const sortedBySmallest = [...equipmentBoxes].sort((a, b) => Number(a.effectiveVolumeInLitres) - Number(b.effectiveVolumeInLitres));
-        
-        // Find the smallest box that can fit the remaining volume
-        const smallestBoxThatFits = sortedBySmallest.find(box => Number(box.effectiveVolumeInLitres) >= remainingVolume);
-        
-        if (smallestBoxThatFits) {
-            const existingBox = equipmentBoxesMap.get(smallestBoxThatFits.id);
-            if (existingBox) {
-                existingBox.quantity += 1;
-                existingBox.volumeUsed += remainingVolume;
-            } else {
-                equipmentBoxesMap.set(smallestBoxThatFits.id, {
-                    equipmentBoxId: smallestBoxThatFits.id,
-                    price: smallestBoxThatFits.price,
-                    quantity: 1,
-                    effectiveVolume: Number(smallestBoxThatFits.effectiveVolumeInLitres),
-                    volumeUsed: remainingVolume
-                });
-            }
-            console.log(`Selected 1x ${smallestBoxThatFits.name} (${smallestBoxThatFits.effectiveVolumeInLitres}L) for remaining volume: ${remainingVolume.toFixed(2)}L`);
-        } else {
-            // If no box is small enough, use the smallest available box
-            const smallestBox = sortedBySmallest[0];
-            const existingBox = equipmentBoxesMap.get(smallestBox.id);
-            if (existingBox) {
-                existingBox.quantity += 1;
-                existingBox.volumeUsed += remainingVolume;
-            } else {
-                equipmentBoxesMap.set(smallestBox.id, {
-                    equipmentBoxId: smallestBox.id,
-                    price: smallestBox.price,
-                    quantity: 1,
-                    effectiveVolume: Number(smallestBox.effectiveVolumeInLitres),
-                    volumeUsed: remainingVolume
-                });
-            }
-            console.log(`Selected 1x ${smallestBox.name} (${smallestBox.effectiveVolumeInLitres}L) for remaining volume: ${remainingVolume.toFixed(2)}L`);
-        }
-    }
-
-    // Convert map to array
-    const equipmentBoxesNeeded = Array.from(equipmentBoxesMap.values());
 
     // Create quote equipment boxes
     const createdQuoteEquipmentBoxes: any[] = [];
-    
-    for (const boxNeeded of equipmentBoxesNeeded) {
+
+    for (const boxNeeded of packed) {
         const quoteEquipmentBox = await models.quoteEquipmentBox.create({
             quoteId: quote.id,
-            equipmentBoxId: boxNeeded.equipmentBoxId,
+            equipmentBoxId: boxNeeded.box.id,
             quantity: boxNeeded.quantity,
-            price: boxNeeded.price
+            price: boxNeeded.box.price
         });
-        
+
         createdQuoteEquipmentBoxes.push(quoteEquipmentBox);
     }
-
-
 
     // Return summary of the calculation
     return {
         quoteId: quote.id,
         totalVolumeNeeded: totalVolumeNeeded,
-        equipmentBoxesUsed: equipmentBoxesNeeded.map(box => ({
-            equipmentBoxId: box.equipmentBoxId,
-            quantity: box.quantity,
-            effectiveVolume: box.effectiveVolume,
-            volumeUsed: box.volumeUsed
+        equipmentBoxesUsed: packed.map(boxNeeded => ({
+            equipmentBoxId: boxNeeded.box.id,
+            quantity: boxNeeded.quantity,
+            effectiveVolume: boxNeeded.box.effectiveVolumeInLitres,
+            volumeUsed: boxNeeded.volumeUsed
         })),
-        totalEquipmentBoxes: equipmentBoxesNeeded.reduce((sum, box) => sum + box.quantity, 0),
+        totalEquipmentBoxes: packed.reduce((sum, boxNeeded) => sum + boxNeeded.quantity, 0),
         createdQuoteEquipmentBoxes: createdQuoteEquipmentBoxes
     };
 });

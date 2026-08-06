@@ -1,10 +1,13 @@
 environment:
+  # Tests run against a local mock ShipLogic server started by the test
+  # suite (see tests/getDeliveryRates.test.ts) so no real network calls
+  # are made.
   - name: SHIPLOGIC_API_URL
-    value: "https://api.shiplogic.com/v2/rates"
+    value: "http://127.0.0.1:59991/rates"
   - name: ZOHO_BOOKS_BASE_URL
     value: "https://www.zohoapis.com/books/v3"
   - name: ZOHO_BOOKS_ORG_ID
-    value: "756529239" 
+    value: "756529239"
   - name: ZOHO_ACCOUNTS_BASE_URL
     value: "https://accounts.zoho.com"
   - name: ZOHO_CLIENT_ID
