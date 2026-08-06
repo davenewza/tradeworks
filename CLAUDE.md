@@ -33,8 +33,7 @@ This is a full-stack quote management application built with Keel (backend frame
 ```bash
 cd backend
 
-# Run tests (sets the dummy test API key, then runs `keel test`;
-# requires Docker for the test database)
+# Run tests (runs `keel test`; requires Docker for the test database)
 npm test
 
 # Filter tests by name pattern
