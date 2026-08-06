@@ -191,7 +191,9 @@ export interface MappedRate {
 
 /**
  * Maps raw ShipLogic rates to the shape we expose, cheapest first, with
- * DELIVERY_MARKUP applied to all monetary amounts. vatPercentage is a
+ * DELIVERY_MARKUP applied to all monetary amounts. vat is the total VAT
+ * on the fee (incl minus excl) rather than ShipLogic's base_rate.vat,
+ * which excludes VAT charged on surcharges. vatPercentage is a
  * percentage, not a price, so the markup does not apply to it.
  */
 export function mapRates(rates: any[]): MappedRate[] {
@@ -210,7 +212,7 @@ export function mapRates(rates: any[]): MappedRate[] {
             pricing: {
                 rate: rate.rate * DELIVERY_MARKUP,
                 rateExcludingVat: rate.rate_excluding_vat * DELIVERY_MARKUP,
-                vat: rate.base_rate.vat * DELIVERY_MARKUP,
+                vat: (rate.rate - rate.rate_excluding_vat) * DELIVERY_MARKUP,
                 vatPercentage: rate.base_rate.vat_percentage
             },
             weights: {

@@ -155,7 +155,7 @@ The endpoint is **read-only and idempotent**: it does not create quotes, orders,
       "pricing": {
         "rate": 245.03,
         "rateExcludingVat": 213.07,
-        "vat": 28.41,
+        "vat": 31.96,
         "vatPercentage": 15
       },
       "weights": {
@@ -206,7 +206,7 @@ The endpoint is **read-only and idempotent**: it does not create quotes, orders,
 | `serviceLevel.collectionCutOffTime` | string or absent | Cut-off time for same-day collection. |
 | `pricing.rate` | number | Fee in ZAR including VAT. |
 | `pricing.rateExcludingVat` | number | Fee in ZAR excluding VAT. |
-| `pricing.vat` | number | VAT amount the courier reports on its base charge only. Surcharges carry their own VAT, so this can be less than `rate - rateExcludingVat`; use that difference if you need the total VAT amount. |
+| `pricing.vat` | number | Total VAT amount in ZAR (always equals `rate - rateExcludingVat`). |
 | `pricing.vatPercentage` | number | VAT percentage (currently `15`). |
 | `weights.chargedWeight` | number or absent | Billable weight in kg (the greater of actual and volumetric weight). |
 | `weights.actualWeight` | number or absent | Actual weight in kg. |

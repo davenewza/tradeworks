@@ -113,7 +113,9 @@ describe('mapRates', () => {
         return {
             rate,
             rate_excluding_vat: rate / 1.15,
-            base_rate: { vat: rate - rate / 1.15, vat_percentage: 15 },
+            // base_rate.vat excludes VAT charged on surcharges, so it is
+            // deliberately smaller than (rate - rate_excluding_vat) here
+            base_rate: { vat: (rate - rate / 1.15) * 0.9, vat_percentage: 15 },
             charged_weight: 12,
             actual_weight: 10,
             volumetric_weight: 12,
@@ -146,6 +148,12 @@ describe('mapRates', () => {
         expect(mapped.pricing.rate).toBeCloseTo(115 * DELIVERY_MARKUP);
         expect(mapped.pricing.rateExcludingVat).toBeCloseTo(100 * DELIVERY_MARKUP);
         expect(mapped.pricing.vat).toBeCloseTo(15 * DELIVERY_MARKUP);
+    });
+
+    test('vat is the total VAT on the fee, not the base-rate-only VAT', () => {
+        const [mapped] = mapRates([rawRate(115)]);
+
+        expect(mapped.pricing.vat).toBeCloseTo(mapped.pricing.rate - mapped.pricing.rateExcludingVat);
     });
 
     test('does not apply the markup to the VAT percentage', () => {
