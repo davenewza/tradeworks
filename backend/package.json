@@ -4,8 +4,8 @@
     "test": "keel test"
   },
   "dependencies": {
-    "@teamkeel/functions-runtime": "^0.470.0",
-    "@teamkeel/testing-runtime": "^0.470.0",
+    "@teamkeel/functions-runtime": "^0.471.0",
+    "@teamkeel/testing-runtime": "^0.471.0",
     "kysely": "^0.28.14"
   },
   "devDependencies": {
