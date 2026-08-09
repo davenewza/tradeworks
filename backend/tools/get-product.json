@@ -72,5 +72,20 @@
       "tool_id": "disable-product",
       "display_order": 2
     }
+  ],
+  "embedded_tools": [
+    {
+      "id": "channelFees",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-product-channel-fees"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false
+          }
+        }
+      ]
+    }
   ]
 }

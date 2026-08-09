@@ -1,33 +1,48 @@
-import { models, ChannelFeeType } from '@teamkeel/sdk';
+import { models, FeeMethod } from '@teamkeel/sdk';
 import { getOrCreateChannel } from './zohoSalesHelpers';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 // The fee custom modules in Zoho are Takealot-specific ("TAL ..."), so synced
-// categories are attached to this channel (created on first sync if missing).
-// The name matches the invoice "Sales Channel" dropdown value in Zoho.
+// fees are attached to this channel (created on first sync if missing). The
+// name matches the invoice "Sales Channel" dropdown value in Zoho.
 export const TAKEALOT_CHANNEL_NAME = 'Takealot Marketplace';
 
-// Zoho Books custom module API names.
-const SUCCESS_FEE_MODULE = 'cm_tal_success_fee_category';
-const FULFILLMENT_FEE_MODULE = 'cm_tal_fulfill_fee_category';
+// Zoho Books custom modules holding Takealot's fees. Each maps to a display
+// label, the method for applying it, and the Zoho field carrying its value.
+// Other channels get their own modules via their own sync; the stored model
+// (ChannelFee/ProductChannelFee) is channel-agnostic.
+const TAKEALOT_FEE_MODULES = [
+    {
+        moduleName: 'cm_tal_success_fee_category',
+        feeType: 'Success fee',
+        method: FeeMethod.Commission,
+        valueField: 'cf_percentage',
+    },
+    {
+        moduleName: 'cm_tal_fulfill_fee_category',
+        feeType: 'Fulfilment fee',
+        method: FeeMethod.Flat,
+        valueField: 'cf_amount',
+    },
+] as const;
 
 // Item lookup custom fields pointing at the fee modules. Zoho truncates
 // placeholder names at 30 characters, hence the clipped "categor".
-const ITEM_SUCCESS_FEE_PLACEHOLDER = 'cf_tal_success_fee_category';
-const ITEM_FULFILLMENT_FEE_PLACEHOLDER = 'cf_tal_fulfillment_fee_categor';
+const ITEM_FEE_PLACEHOLDERS = [
+    { placeholder: 'cf_tal_success_fee_category', labelFragment: 'success fee' },
+    { placeholder: 'cf_tal_fulfillment_fee_categor', labelFragment: 'fulfillment fee' },
+] as const;
 
 // ─── Zoho types ─────────────────────────────────────────────────────────────
 
 interface ZohoModuleRecord {
     module_record_id: string;
     record_name: string;
-    status?: string;
     cf_fee_category?: string;
     cf_percentage?: number;
     cf_amount?: number;
-    cf_size_category?: string;
-    cf_weight_category?: string;
+    [key: string]: unknown;
 }
 
 interface ZohoModuleRecordsResponse {
@@ -108,17 +123,16 @@ export async function getZohoAccessToken(ctx: ZohoFeeCtx): Promise<string> {
     return tokenData.access_token;
 }
 
-// ─── Fetch: fee category records ────────────────────────────────────────────
+// ─── Fetch: channel fees ────────────────────────────────────────────────────
 
-// A fee category as it exists in Zoho, normalised across the two modules.
-export interface ZohoFeeCategory {
+// A fee as it exists in Zoho, normalised across the fee modules into a single
+// value plus the method for applying it.
+export interface ZohoChannelFee {
     zohoRecordId: string;
-    feeType: ChannelFeeType;
+    feeType: string;
     name: string;
-    percentage: number | null;
-    amount: number | null;
-    sizeCategory: string | null;
-    weightCategory: string | null;
+    method: FeeMethod;
+    value: number;
 }
 
 async function fetchModuleRecords(
@@ -155,50 +169,44 @@ async function fetchModuleRecords(
     return records;
 }
 
-export async function fetchFeeCategories(ctx: ZohoFeeCtx, accessToken: string): Promise<ZohoFeeCategory[]> {
-    const successRecords = await fetchModuleRecords(ctx, accessToken, SUCCESS_FEE_MODULE);
-    const fulfillmentRecords = await fetchModuleRecords(ctx, accessToken, FULFILLMENT_FEE_MODULE);
+// Pull every fee record from the Takealot fee modules, normalising each into a
+// method + value labelled by fee type.
+export async function fetchChannelFees(ctx: ZohoFeeCtx, accessToken: string): Promise<ZohoChannelFee[]> {
+    const fees: ZohoChannelFee[] = [];
 
-    return [
-        ...successRecords.map((r) => ({
-            zohoRecordId: r.module_record_id,
-            feeType: ChannelFeeType.SuccessFee,
-            name: (r.record_name || r.cf_fee_category || '').trim(),
-            percentage: r.cf_percentage ?? null,
-            amount: null,
-            sizeCategory: null,
-            weightCategory: null,
-        })),
-        ...fulfillmentRecords.map((r) => ({
-            zohoRecordId: r.module_record_id,
-            feeType: ChannelFeeType.FulfillmentFee,
-            name: (r.record_name || r.cf_fee_category || '').trim(),
-            percentage: null,
-            amount: r.cf_amount ?? null,
-            sizeCategory: r.cf_size_category?.trim() || null,
-            weightCategory: r.cf_weight_category?.trim() || null,
-        })),
-    ];
+    for (const { moduleName, feeType, method, valueField } of TAKEALOT_FEE_MODULES) {
+        const records = await fetchModuleRecords(ctx, accessToken, moduleName);
+        for (const r of records) {
+            const raw = r[valueField];
+            fees.push({
+                zohoRecordId: r.module_record_id,
+                feeType,
+                name: (r.record_name || r.cf_fee_category || '').trim(),
+                method,
+                value: typeof raw === 'number' ? raw : Number(raw ?? 0),
+            });
+        }
+    }
+
+    return fees;
 }
 
 // ─── Fetch: item fee assignments ────────────────────────────────────────────
 
-// The fee lookups set on a Zoho item, keyed by the item's SKU. Both ids are
-// null when the item has no fees assigned (e.g. not sold on Takealot).
+// The fees assigned to a Zoho item (its fee-lookup custom fields), keyed by SKU.
+// `feeZohoIds` is empty when the item has no fees (e.g. not sold on Takealot).
 export interface ZohoItemFees {
     sku: string;
     itemName: string;
-    successFeeZohoId: string | null;
-    fulfillmentFeeZohoId: string | null;
+    feeZohoIds: string[];
 }
 
-// Extract the fee module record ids from an item's custom fields. Matches on
-// the field placeholder (api name) first, falling back to the label.
-export function getItemFeeAssignment(item: ZohoFeeItem): {
-    successFeeZohoId: string | null;
-    fulfillmentFeeZohoId: string | null;
-} {
-    const findValue = (placeholder: string, labelFragment: string): string | null => {
+// Extract the fee module record ids from an item's fee-lookup custom fields.
+// Matches on the field placeholder (api name) first, falling back to the label.
+export function getItemFeeAssignment(item: ZohoFeeItem): string[] {
+    const feeZohoIds: string[] = [];
+
+    for (const { placeholder, labelFragment } of ITEM_FEE_PLACEHOLDERS) {
         const field = (item.custom_fields ?? []).find(
             (cf) =>
                 cf.placeholder === placeholder ||
@@ -206,13 +214,10 @@ export function getItemFeeAssignment(item: ZohoFeeItem): {
                 cf.label?.toLowerCase().includes(labelFragment)
         );
         const value = field?.value == null ? '' : String(field.value).trim();
-        return value ? value : null;
-    };
+        if (value) feeZohoIds.push(value);
+    }
 
-    return {
-        successFeeZohoId: findValue(ITEM_SUCCESS_FEE_PLACEHOLDER, 'success fee'),
-        fulfillmentFeeZohoId: findValue(ITEM_FULFILLMENT_FEE_PLACEHOLDER, 'fulfillment fee'),
-    };
+    return feeZohoIds;
 }
 
 // Fetch full item details in bulk to obtain custom_fields (the list endpoint
@@ -248,8 +253,8 @@ async function fetchItemDetails(
 }
 
 // Pull every active item (with SKU) from Zoho along with its fee assignments.
-// Items with no fees assigned are included so a cleared fee in Zoho clears
-// here too on sync.
+// Items with no fees assigned are included so a cleared fee in Zoho clears here
+// too on sync.
 export async function fetchItemFeeAssignments(ctx: ZohoFeeCtx, accessToken: string): Promise<ZohoItemFees[]> {
     const assignments: ZohoItemFees[] = [];
     let page = 1;
@@ -286,7 +291,7 @@ export async function fetchItemFeeAssignments(ctx: ZohoFeeCtx, accessToken: stri
             assignments.push({
                 sku,
                 itemName: item.name,
-                ...getItemFeeAssignment(item),
+                feeZohoIds: getItemFeeAssignment(item),
             });
         }
 
@@ -299,39 +304,35 @@ export async function fetchItemFeeAssignments(ctx: ZohoFeeCtx, accessToken: stri
 
 // ─── Read-only diff pass ────────────────────────────────────────────────────
 
-// A single fee category to add or update. `name`/`type`/`value`/`change` are
-// the human-facing table columns; the rest is carried through hidden.
-export interface FeeCategoryChange {
+// A single fee to add or update. `name`/`feeType`/`value`/`change` are the
+// human-facing table columns; the rest is carried through hidden.
+export interface FeeChange {
     name: string;
-    type: string;
+    feeType: string;
     value: string;
     change: 'New' | 'Update';
     zohoRecordId: string;
-    feeType: ChannelFeeType;
-    percentage: number | null;
-    amount: number | null;
-    sizeCategory: string | null;
-    weightCategory: string | null;
+    method: FeeMethod;
+    numericValue: number;
 }
 
-// A single product fee assignment to add or update. `sku`/`product`/
-// `successFee`/`fulfillmentFee`/`change` are the table columns.
+// A product whose set of assigned fees needs to change. `fees` is the resulting
+// set (comma-joined names) for display; `feeZohoIds` is the desired set carried
+// through for the apply pass.
 export interface ProductFeeChange {
     sku: string;
     product: string;
-    successFee: string;
-    fulfillmentFee: string;
+    fees: string;
     change: 'New' | 'Update';
     productId: string;
-    successFeeZohoId: string | null;
-    fulfillmentFeeZohoId: string | null;
+    feeZohoIds: string[];
 }
 
 export interface FeeSyncPlan {
     channelName: string;
-    categories: FeeCategoryChange[];
+    fees: FeeChange[];
     productFees: ProductFeeChange[];
-    unchangedCategories: number;
+    unchangedFees: number;
     unchangedProductFees: number;
     // Zoho items that have fees but no matching product in our system.
     unmatchedSkus: string[];
@@ -345,82 +346,75 @@ function toNumberOrNull(value: unknown): number | null {
     return Number(value);
 }
 
-function displayValue(category: ZohoFeeCategory): string {
-    if (category.feeType === ChannelFeeType.SuccessFee) {
-        return category.percentage === null ? NO_FEE : `${category.percentage}%`;
-    }
-    return category.amount === null ? NO_FEE : `R${category.amount.toFixed(2)}`;
+function displayValue(fee: { method: FeeMethod; value: number }): string {
+    return fee.method === FeeMethod.Commission ? `${fee.value}%` : `R${fee.value.toFixed(2)}`;
 }
 
-function displayType(feeType: ChannelFeeType): string {
-    return feeType === ChannelFeeType.SuccessFee ? 'Success fee' : 'Fulfillment fee';
+function sameStringSet(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) return false;
+    for (const value of a) if (!b.has(value)) return false;
+    return true;
 }
 
 // Work out what needs to change to bring our fee data in line with Zoho.
-// Performs NO writes — everything is applied later in applyFeeSync(), after
-// the user confirms. Categories are matched on their Zoho record id and
-// product assignments on SKU; rows that already match Zoho are only counted.
+// Performs NO writes — everything is applied later in applyFeeSync(), after the
+// user confirms. Fees are matched on their Zoho record id; product assignments
+// are compared as sets (per product) so additions and removals both surface.
 export async function computeFeeSyncPlan(
-    zohoCategories: ZohoFeeCategory[],
+    zohoFees: ZohoChannelFee[],
     zohoItems: ZohoItemFees[]
 ): Promise<FeeSyncPlan> {
     const warnings: string[] = [];
-    const categoryByZohoId = new Map(zohoCategories.map((c) => [c.zohoRecordId, c]));
+    const feeByZohoId = new Map(zohoFees.map((f) => [f.zohoRecordId, f]));
 
-    // 1. Diff fee categories against what we have (across all channels —
-    // zohoRecordId is globally unique).
-    const zohoRecordIds = zohoCategories.map((c) => c.zohoRecordId);
-    const existingCategories =
+    // 1. Diff fees against what we have (across all channels — zohoRecordId is
+    // globally unique).
+    const zohoRecordIds = zohoFees.map((f) => f.zohoRecordId);
+    const existingFees =
         zohoRecordIds.length > 0
-            ? await models.channelFeeCategory.findMany({ where: { zohoRecordId: { oneOf: zohoRecordIds } } })
+            ? await models.channelFee.findMany({ where: { zohoRecordId: { oneOf: zohoRecordIds } } })
             : [];
-    const existingByZohoId = new Map(existingCategories.map((c) => [c.zohoRecordId, c]));
+    const existingByZohoId = new Map(existingFees.map((f) => [f.zohoRecordId, f]));
 
-    const categories: FeeCategoryChange[] = [];
-    let unchangedCategories = 0;
+    const fees: FeeChange[] = [];
+    let unchangedFees = 0;
 
-    for (const zohoCategory of zohoCategories) {
-        if (!zohoCategory.name) {
-            warnings.push(`Skipping fee record ${zohoCategory.zohoRecordId}: it has no name`);
+    for (const zohoFee of zohoFees) {
+        if (!zohoFee.name) {
+            warnings.push(`Skipping fee record ${zohoFee.zohoRecordId}: it has no name`);
             continue;
         }
 
-        const existing = existingByZohoId.get(zohoCategory.zohoRecordId);
-        const change: FeeCategoryChange = {
-            name: zohoCategory.name,
-            type: displayType(zohoCategory.feeType),
-            value: displayValue(zohoCategory),
+        const existing = existingByZohoId.get(zohoFee.zohoRecordId);
+        const change: FeeChange = {
+            name: zohoFee.name,
+            feeType: zohoFee.feeType,
+            value: displayValue(zohoFee),
             change: existing ? 'Update' : 'New',
-            zohoRecordId: zohoCategory.zohoRecordId,
-            feeType: zohoCategory.feeType,
-            percentage: zohoCategory.percentage,
-            amount: zohoCategory.amount,
-            sizeCategory: zohoCategory.sizeCategory,
-            weightCategory: zohoCategory.weightCategory,
+            zohoRecordId: zohoFee.zohoRecordId,
+            method: zohoFee.method,
+            numericValue: zohoFee.value,
         };
 
         if (!existing) {
-            categories.push(change);
+            fees.push(change);
             continue;
         }
 
         const needsUpdate =
-            existing.name !== zohoCategory.name ||
-            existing.feeType !== zohoCategory.feeType ||
-            toNumberOrNull(existing.percentage) !== zohoCategory.percentage ||
-            toNumberOrNull(existing.amount) !== zohoCategory.amount ||
-            (existing.sizeCategory ?? null) !== zohoCategory.sizeCategory ||
-            (existing.weightCategory ?? null) !== zohoCategory.weightCategory;
+            existing.name !== zohoFee.name ||
+            (existing.feeType ?? null) !== (zohoFee.feeType || null) ||
+            existing.method !== zohoFee.method ||
+            toNumberOrNull(existing.value) !== zohoFee.value;
 
         if (needsUpdate) {
-            categories.push(change);
+            fees.push(change);
         } else {
-            unchangedCategories++;
+            unchangedFees++;
         }
     }
 
-    // 2. Diff product fee assignments. Existing rows reference our category
-    // ids, so map them back to Zoho record ids for comparison.
+    // 2. Diff product fee assignments as sets.
     const itemBySku = new Map<string, ZohoItemFees>();
     for (const item of zohoItems) {
         if (itemBySku.has(item.sku)) {
@@ -437,86 +431,70 @@ export async function computeFeeSyncPlan(
     const channels = await models.channel.findMany({ where: { name: { equals: TAKEALOT_CHANNEL_NAME } } });
     const channel = channels.length > 0 ? channels[0] : null;
 
-    const existingRows = channel
-        ? await models.productChannelFee.findMany({ where: { channelId: channel.id } })
-        : [];
-    const rowByProductId = new Map(existingRows.map((r) => [r.productId, r]));
-
-    // Categories referenced by existing rows may predate this sync, so map ids
-    // to Zoho record ids across the whole table.
-    const referencedCategoryIds = [
-        ...new Set(
-            existingRows
-                .flatMap((r) => [r.successFeeCategoryId, r.fulfillmentFeeCategoryId])
-                .filter((id): id is string => id !== null)
-        ),
-    ];
-    const referencedCategories =
-        referencedCategoryIds.length > 0
-            ? await models.channelFeeCategory.findMany({ where: { id: { oneOf: referencedCategoryIds } } })
+    // Existing assignments for these products, mapped back to Zoho record ids
+    // and scoped to this channel's fees (so other channels are left alone).
+    const productIds = existingProducts.map((p) => p.id);
+    const existingRows =
+        channel && productIds.length > 0
+            ? await models.productChannelFee.findMany({ where: { productId: { oneOf: productIds } } })
             : [];
-    const zohoIdByCategoryId = new Map(referencedCategories.map((c) => [c.id, c.zohoRecordId]));
+    const linkedFeeIds = [...new Set(existingRows.map((r) => r.channelFeeId))];
+    const linkedFees =
+        linkedFeeIds.length > 0
+            ? await models.channelFee.findMany({ where: { id: { oneOf: linkedFeeIds } } })
+            : [];
+    const linkedFeeById = new Map(linkedFees.map((f) => [f.id, f]));
+
+    const currentByProductId = new Map<string, Set<string>>();
+    for (const row of existingRows) {
+        const fee = linkedFeeById.get(row.channelFeeId);
+        if (!fee || fee.channelId !== channel!.id) continue; // another channel → leave alone
+        const set = currentByProductId.get(row.productId) ?? new Set<string>();
+        set.add(fee.zohoRecordId);
+        currentByProductId.set(row.productId, set);
+    }
 
     const productFees: ProductFeeChange[] = [];
     const unmatchedSkus: string[] = [];
     let unchangedProductFees = 0;
 
     for (const [sku, item] of itemBySku) {
-        // Resolve dangling references (an item pointing at a deleted fee
-        // record) to "no fee" rather than failing the whole sync.
-        let successFeeZohoId = item.successFeeZohoId;
-        if (successFeeZohoId && !categoryByZohoId.has(successFeeZohoId)) {
-            warnings.push(`Item ${sku} references an unknown success fee record (${successFeeZohoId})`);
-            successFeeZohoId = null;
+        // Resolve the desired set, dropping references to unknown fee records.
+        const desired = new Set<string>();
+        for (const id of item.feeZohoIds) {
+            if (feeByZohoId.has(id)) desired.add(id);
+            else warnings.push(`Item ${sku} references an unknown fee record (${id})`);
         }
-        let fulfillmentFeeZohoId = item.fulfillmentFeeZohoId;
-        if (fulfillmentFeeZohoId && !categoryByZohoId.has(fulfillmentFeeZohoId)) {
-            warnings.push(`Item ${sku} references an unknown fulfillment fee record (${fulfillmentFeeZohoId})`);
-            fulfillmentFeeZohoId = null;
-        }
-
-        const hasAnyFee = successFeeZohoId !== null || fulfillmentFeeZohoId !== null;
 
         const product = productBySku.get(sku);
         if (!product) {
-            if (hasAnyFee) unmatchedSkus.push(sku);
+            if (desired.size > 0) unmatchedSkus.push(sku);
             continue;
         }
 
-        const existingRow = rowByProductId.get(product.id);
-        if (!existingRow) {
-            // No row and no fees → nothing worth recording.
-            if (!hasAnyFee) continue;
-        } else {
-            const currentSuccessZohoId = existingRow.successFeeCategoryId
-                ? zohoIdByCategoryId.get(existingRow.successFeeCategoryId) ?? null
-                : null;
-            const currentFulfillmentZohoId = existingRow.fulfillmentFeeCategoryId
-                ? zohoIdByCategoryId.get(existingRow.fulfillmentFeeCategoryId) ?? null
-                : null;
-            if (currentSuccessZohoId === successFeeZohoId && currentFulfillmentZohoId === fulfillmentFeeZohoId) {
-                unchangedProductFees++;
-                continue;
-            }
+        const current = currentByProductId.get(product.id) ?? new Set<string>();
+
+        if (sameStringSet(current, desired)) {
+            if (desired.size > 0) unchangedProductFees++;
+            continue; // both empty → nothing to record
         }
 
+        const desiredIds = [...desired];
         productFees.push({
             sku,
             product: product.name,
-            successFee: successFeeZohoId ? categoryByZohoId.get(successFeeZohoId)!.name : NO_FEE,
-            fulfillmentFee: fulfillmentFeeZohoId ? categoryByZohoId.get(fulfillmentFeeZohoId)!.name : NO_FEE,
-            change: rowByProductId.has(product.id) ? 'Update' : 'New',
+            fees: desiredIds.length > 0 ? desiredIds.map((id) => feeByZohoId.get(id)!.name).join(', ') : NO_FEE,
+            change: current.size > 0 ? 'Update' : 'New',
             productId: product.id,
-            successFeeZohoId,
-            fulfillmentFeeZohoId,
+            feeZohoIds: desiredIds,
         });
     }
 
     return {
         channelName: TAKEALOT_CHANNEL_NAME,
-        categories,
+        fees,
         productFees,
-        unchangedCategories,
+        unchangedFees,
         unchangedProductFees,
         unmatchedSkus,
         warnings,
@@ -526,93 +504,86 @@ export async function computeFeeSyncPlan(
 // ─── Apply pass ─────────────────────────────────────────────────────────────
 
 export interface FeeApplyResult {
-    categoriesCreated: number;
-    categoriesUpdated: number;
-    productFeesCreated: number;
-    productFeesUpdated: number;
+    feesCreated: number;
+    feesUpdated: number;
+    assignmentsAdded: number;
+    assignmentsRemoved: number;
+    productsChanged: number;
 }
 
-// Apply a fee sync plan: upsert the channel, its fee categories, and the
-// per-product assignments. Idempotent: categories are keyed on the unique
-// zohoRecordId and assignments on the unique [product, channel] pair, so a
-// step retry re-derives the same result rather than duplicating records.
+// Apply a fee sync plan: upsert the channel and its fees, then reconcile each
+// product's set of assigned fees (adding new links, removing stale ones).
+// Idempotent: fees are keyed on the unique zohoRecordId and assignments on the
+// unique [product, channelFee] pair, so a step retry re-derives the same result
+// rather than duplicating records.
 export async function applyFeeSync(plan: FeeSyncPlan): Promise<FeeApplyResult> {
     const channel = await getOrCreateChannel(plan.channelName, new Map());
     const now = new Date();
 
-    let categoriesCreated = 0;
-    let categoriesUpdated = 0;
+    let feesCreated = 0;
+    let feesUpdated = 0;
 
-    for (const category of plan.categories) {
+    for (const fee of plan.fees) {
         const values = {
             channelId: channel.id,
-            feeType: category.feeType,
-            name: category.name,
-            percentage: category.percentage,
-            amount: category.amount,
-            sizeCategory: category.sizeCategory,
-            weightCategory: category.weightCategory,
+            feeType: fee.feeType || null,
+            name: fee.name,
+            method: fee.method,
+            value: fee.numericValue,
             synchronisedAt: now,
         };
 
-        const existing = await models.channelFeeCategory.findOne({ zohoRecordId: category.zohoRecordId });
+        const existing = await models.channelFee.findOne({ zohoRecordId: fee.zohoRecordId });
         if (existing) {
-            await models.channelFeeCategory.update({ id: existing.id }, values);
-            categoriesUpdated++;
+            await models.channelFee.update({ id: existing.id }, values);
+            feesUpdated++;
         } else {
-            await models.channelFeeCategory.create({ ...values, zohoRecordId: category.zohoRecordId });
-            categoriesCreated++;
+            await models.channelFee.create({ ...values, zohoRecordId: fee.zohoRecordId });
+            feesCreated++;
         }
     }
 
-    // Resolve the category ids referenced by the assignments (some were just
-    // created above, others already existed).
-    const referencedZohoIds = [
-        ...new Set(
-            plan.productFees
-                .flatMap((pf) => [pf.successFeeZohoId, pf.fulfillmentFeeZohoId])
-                .filter((id): id is string => id !== null)
-        ),
-    ];
-    const referencedCategories =
-        referencedZohoIds.length > 0
-            ? await models.channelFeeCategory.findMany({ where: { zohoRecordId: { oneOf: referencedZohoIds } } })
-            : [];
-    const categoryIdByZohoId = new Map(referencedCategories.map((c) => [c.zohoRecordId, c.id]));
+    // All fees for this channel: used to map Zoho ids → our ids and to scope
+    // which of a product's existing assignments belong to this channel.
+    const channelFees = await models.channelFee.findMany({ where: { channelId: channel.id } });
+    const feeIdByZohoId = new Map(channelFees.map((f) => [f.zohoRecordId, f.id]));
+    const channelFeeIds = new Set(channelFees.map((f) => f.id));
 
-    let productFeesCreated = 0;
-    let productFeesUpdated = 0;
+    let assignmentsAdded = 0;
+    let assignmentsRemoved = 0;
+    let productsChanged = 0;
 
     for (const productFee of plan.productFees) {
-        const successFeeCategoryId = productFee.successFeeZohoId
-            ? categoryIdByZohoId.get(productFee.successFeeZohoId) ?? null
-            : null;
-        const fulfillmentFeeCategoryId = productFee.fulfillmentFeeZohoId
-            ? categoryIdByZohoId.get(productFee.fulfillmentFeeZohoId) ?? null
-            : null;
+        const desiredIds = new Set(
+            productFee.feeZohoIds.map((z) => feeIdByZohoId.get(z)).filter((id): id is string => !!id)
+        );
 
-        const existing = await models.productChannelFee.findMany({
-            where: { productId: productFee.productId, channelId: channel.id },
-            limit: 1,
+        const existingRows = await models.productChannelFee.findMany({
+            where: { productId: productFee.productId },
         });
+        const inScope = existingRows.filter((r) => channelFeeIds.has(r.channelFeeId));
+        const existingIds = new Set(inScope.map((r) => r.channelFeeId));
 
-        if (existing.length > 0) {
-            await models.productChannelFee.update(
-                { id: existing[0].id },
-                { successFeeCategoryId, fulfillmentFeeCategoryId, synchronisedAt: now }
-            );
-            productFeesUpdated++;
-        } else {
-            await models.productChannelFee.create({
-                productId: productFee.productId,
-                channelId: channel.id,
-                successFeeCategoryId,
-                fulfillmentFeeCategoryId,
-                synchronisedAt: now,
-            });
-            productFeesCreated++;
+        for (const feeId of desiredIds) {
+            if (!existingIds.has(feeId)) {
+                await models.productChannelFee.create({
+                    productId: productFee.productId,
+                    channelFeeId: feeId,
+                    synchronisedAt: now,
+                });
+                assignmentsAdded++;
+            }
         }
+
+        for (const row of inScope) {
+            if (!desiredIds.has(row.channelFeeId)) {
+                await models.productChannelFee.delete({ id: row.id });
+                assignmentsRemoved++;
+            }
+        }
+
+        productsChanged++;
     }
 
-    return { categoriesCreated, categoriesUpdated, productFeesCreated, productFeesUpdated };
+    return { feesCreated, feesUpdated, assignmentsAdded, assignmentsRemoved, productsChanged };
 }
