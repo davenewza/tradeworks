@@ -1,6 +1,7 @@
 model Channel {
     fields {
         name Text @unique
+        feeCategories ChannelFeeCategory[]
     }
 
     actions {
@@ -13,4 +14,64 @@ model Channel {
         expression: ctx.isAuthenticated,
         actions: [get, list, create]
     )
+}
+
+enum ChannelFeeType {
+    SuccessFee
+    FulfillmentFee
+}
+
+model ChannelFeeCategory {
+    fields {
+        channel Channel
+        feeType ChannelFeeType
+        name Text
+        // SuccessFee: percentage of the selling price (e.g. 12 = 12%).
+        percentage Decimal?
+        // FulfillmentFee: flat amount in rand, excluding VAT.
+        amount Decimal?
+        // FulfillmentFee: Takealot size/weight bands the amount applies to.
+        sizeCategory Text?
+        weightCategory Text?
+        zohoRecordId Text @unique
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getChannelFeeCategory(id)
+        list listChannelFeeCategories(channel.id?, feeType?) {
+            @orderBy(name: asc)
+        }
+    }
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, list]
+    )
+}
+
+model ProductChannelFee {
+    fields {
+        product Product
+        channel Channel
+        successFeeCategory ChannelFeeCategory?
+        fulfillmentFeeCategory ChannelFeeCategory?
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getProductChannelFee(id)
+        list listProductChannelFees(product.id?, channel.id?)
+    }
+
+    @unique([product, channel])
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, list]
+    )
+}
+
+flow SyncChannelFees {
+    @permission(expression: ctx.isAuthenticated)
 }
