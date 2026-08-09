@@ -35,6 +35,7 @@ model Product {
         synchronisedAt Timestamp?
         views ProductViews[]
         sales Sale[]
+        channelFees ProductChannelFee[]
     }
 
     actions {

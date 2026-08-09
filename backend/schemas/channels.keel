@@ -1,7 +1,7 @@
 model Channel {
     fields {
         name Text @unique
-        feeCategories ChannelFeeCategory[]
+        fees ChannelFee[]
     }
 
     actions {
@@ -16,30 +16,35 @@ model Channel {
     )
 }
 
-enum ChannelFeeType {
-    SuccessFee
-    FulfillmentFee
+// How a fee's value is applied to a sale.
+enum FeeMethod {
+    // value is a percentage of the selling price (e.g. 12 = 12%).
+    Commission
+    // value is a flat amount in rand, excluding VAT.
+    Flat
 }
 
-model ChannelFeeCategory {
+// A single fee charged by a channel. Channels differ in structure — some charge
+// a percentage commission, some a flat handling fee, some several fees — so a
+// fee carries a single `value` plus a `method` saying how to apply it.
+// `feeType` is a free-text label for grouping/display only (e.g. "Success fee",
+// "Referral fee"); it drives no logic. Fees are shared lookups keyed on their
+// Zoho record.
+model ChannelFee {
     fields {
         channel Channel
-        feeType ChannelFeeType
         name Text
-        // SuccessFee: percentage of the selling price (e.g. 12 = 12%).
-        percentage Decimal?
-        // FulfillmentFee: flat amount in rand, excluding VAT.
-        amount Decimal?
-        // FulfillmentFee: Takealot size/weight bands the amount applies to.
-        sizeCategory Text?
-        weightCategory Text?
+        feeType Text?
+        method FeeMethod
+        value Decimal
+        products ProductChannelFee[]
         zohoRecordId Text @unique
         synchronisedAt Timestamp?
     }
 
     actions {
-        get getChannelFeeCategory(id)
-        list listChannelFeeCategories(channel.id?, feeType?) {
+        get getChannelFee(id)
+        list listChannelFees(channel.id?, feeType?, method?) {
             @orderBy(name: asc)
         }
     }
@@ -50,21 +55,32 @@ model ChannelFeeCategory {
     )
 }
 
+// Assigns a fee to a product. A product has one row per fee that applies to it
+// on a channel, so it scales to channels with any number of fees. The channel
+// is reached through the fee.
 model ProductChannelFee {
     fields {
         product Product
-        channel Channel
-        successFeeCategory ChannelFeeCategory?
-        fulfillmentFeeCategory ChannelFeeCategory?
+        channelFee ChannelFee
+        // Display copies of the linked fee, so a product's fees are legible in
+        // one table without following each lookup. Optional so the computed
+        // columns are migration-safe on an already-populated table.
+        channelName Text? @computed(productChannelFee.channelFee.channel.name)
+        feeName Text? @computed(productChannelFee.channelFee.name)
+        feeType Text? @computed(productChannelFee.channelFee.feeType)
+        feeMethod FeeMethod? @computed(productChannelFee.channelFee.method)
+        feeValue Decimal? @computed(productChannelFee.channelFee.value)
         synchronisedAt Timestamp?
     }
 
     actions {
         get getProductChannelFee(id)
-        list listProductChannelFees(product.id?, channel.id?)
+        list listProductChannelFees(product.id?) {
+            @orderBy(feeType: asc)
+        }
     }
 
-    @unique([product, channel])
+    @unique([product, channelFee])
 
     @permission(
         expression: ctx.isAuthenticated,
