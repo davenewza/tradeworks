@@ -98,8 +98,7 @@ model ProductChannelFee {
         }
     }
 
-    @unique([product, channelFee])
-
+    //@unique([product, channelFee])
     @permission(
         expression: ctx.isAuthenticated,
         actions: [get, list]
