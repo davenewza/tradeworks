@@ -1,0 +1,15 @@
+{
+  "id": "create-channel-fee",
+  "action_name": "createChannelFee",
+  "inputs": {
+    "$.channel": {
+      "visible": false
+    },
+    "$.feeType": {
+      "display_name": "Description"
+    },
+    "$.value": {
+      "help_text": "The commission percentage or flat fee amount, inclusive of VAT"
+    }
+  }
+}

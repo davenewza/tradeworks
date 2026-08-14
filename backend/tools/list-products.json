@@ -1,9 +1,13 @@
 {
   "id": "list-products",
   "action_name": "listProducts",
+  "icon": "emoji:🤖",
   "response": {
+    "$.results[*].brandId": {
+      "display_order": 3
+    },
     "$.results[*].createdAt": {
-      "display_order": 12,
+      "display_order": 13,
       "visible": false
     },
     "$.results[*].heightInCm": {
@@ -11,7 +15,7 @@
       "visible": false
     },
     "$.results[*].id": {
-      "display_order": 11,
+      "display_order": 12,
       "link": {
         "tool_id": "get-product",
         "display_order": 0,
@@ -38,10 +42,17 @@
       "visible": false
     },
     "$.results[*].name": {
-      "display_order": 3
+      "display_order": 2
+    },
+    "$.results[*].sku": {
+      "display_order": 1
+    },
+    "$.results[*].synchronisedAt": {
+      "display_order": 11,
+      "visible": false
     },
     "$.results[*].updatedAt": {
-      "display_order": 13,
+      "display_order": 14,
       "visible": false
     },
     "$.results[*].volumeInLitres": {
@@ -51,9 +62,40 @@
       "display_order": 9,
       "visible": false
     },
+    "$.results[*].weightedFreightIn": {
+      "visible": false
+    },
+    "$.results[*].weightedLandedCost": {
+      "visible": false
+    },
+    "$.results[*].weightedUnitCost": {
+      "visible": false
+    },
     "$.results[*].widthInCm": {
       "display_order": 6,
       "visible": false
     }
+  },
+  "create_entry_action": {
+    "tool_id": "create-product",
+    "deleted": true
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "get-product",
+      "title": "View product",
+      "display_order": 0
+    },
+    {
+      "tool_id": "update-product",
+      "display_order": 2
+    },
+    {
+      "tool_id": "update-product-dimensions",
+      "display_order": 3
+    }
+  ],
+  "filter_config": {
+    "quick_search_field": "$.where.name.contains"
   }
 }

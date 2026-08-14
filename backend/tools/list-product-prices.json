@@ -1,14 +1,43 @@
 {
   "id": "list-product-prices",
   "action_name": "listProductPrices",
-  "response": {
-    "$.results[*].createdAt": {
-      "display_order": 8,
+  "name": "Product prices",
+  "icon": "tag",
+  "inputs": {
+    "$.where.priceList.id.notEquals": {
       "visible": false
     },
+    "$.where.priceList.id.oneOf": {
+      "visible": false
+    }
+  },
+  "response": {
+    "$.results[*].alwaysCommissionPercentage": {
+      "visible": false
+    },
+    "$.results[*].alwaysFlatTotal": {
+      "visible": false
+    },
+    "$.results[*].channelFees": {
+      "display_order": 8
+    },
+    "$.results[*].createdAt": {
+      "display_order": 26,
+      "visible": false
+    },
+    "$.results[*].flatFeeTotal": {
+      "display_order": 23,
+      "visible": false
+    },
+    "$.results[*].grossProfit": {
+      "display_order": 9
+    },
+    "$.results[*].grossProfitMargin": {
+      "display_name": "Gross margin",
+      "display_order": 10
+    },
     "$.results[*].id": {
-      "display_order": 7,
-      "visible": false,
+      "display_order": 25,
       "link": {
         "tool_id": "get-product-price",
         "display_order": 0,
@@ -22,32 +51,66 @@
         ]
       }
     },
+    "$.results[*].landedUnitCost": {
+      "display_name": "Landed cost",
+      "display_order": 7,
+      "visible": false
+    },
     "$.results[*].price": {
       "display_name": "Price excl VAT",
-      "display_order": 5
+      "display_order": 4
     },
     "$.results[*].priceInclVat": {
       "display_name": "Price incl VAT",
-      "display_order": 6
+      "display_order": 3
+    },
+    "$.results[*].priceListChannelName": {
+      "display_order": 21,
+      "visible": false
     },
     "$.results[*].priceListId": {
-      "display_order": 4,
+      "display_order": 24,
       "visible": false
     },
     "$.results[*].productId": {
       "display_order": 2
     },
     "$.results[*].productName": {
-      "display_order": 3,
+      "display_order": 20,
       "visible": false
     },
     "$.results[*].productSku": {
       "display_name": "SKU",
       "display_order": 1
     },
-    "$.results[*].updatedAt": {
-      "display_order": 9,
+    "$.results[*].successFeePercentage": {
+      "display_order": 22,
       "visible": false
+    },
+    "$.results[*].unitCost": {
+      "display_name": "Cost price",
+      "display_order": 5
+    },
+    "$.results[*].unitFreightIn": {
+      "display_name": "Freight-in",
+      "display_order": 6
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 27,
+      "visible": false
+    }
+  },
+  "get_entry_action": {
+    "tool_id": "get-product-price",
+    "deleted": true
+  },
+  "create_entry_action": {
+    "tool_id": "create-product-price",
+    "as_dialog": true
+  },
+  "display_layout": {
+    "config": {
+      "type": 3
     }
   }
 }

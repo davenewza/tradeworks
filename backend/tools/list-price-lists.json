@@ -1,9 +1,16 @@
 {
   "id": "list-price-lists",
   "action_name": "listPriceLists",
+  "name": "Price lists",
+  "icon": "emoji:💰",
   "response": {
+    "$.results[*].channelId": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
     "$.results[*].id": {
-      "visible": false,
       "link": {
         "tool_id": "get-price-list",
         "display_order": 0,
@@ -19,6 +26,16 @@
     },
     "$.results[*].updatedAt": {
       "visible": false
+    }
+  },
+  "display_layout": {
+    "config": {
+      "gallery_config": {
+        "title": {
+          "template": "{{$.results[*].name}}"
+        }
+      },
+      "type": 5
     }
   }
 }

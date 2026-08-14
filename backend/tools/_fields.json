@@ -1,0 +1,34 @@
+[
+  {
+    "id": "ProductPrice.priceInclVat",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "ProductPrice.price",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "ProductPrice.unitCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "ProductPrice.unitFreightIn",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "ProductPrice.landedUnitCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "ProductPrice.channelFees",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "ProductPrice.grossProfit",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA", "colourise": "NORMAL" } }
+  },
+  {
+    "id": "ProductPrice.grossProfitMargin",
+    "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-ZA" } }
+  }
+]

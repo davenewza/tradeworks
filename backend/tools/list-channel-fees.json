@@ -1,0 +1,10 @@
+{
+  "id": "list-channel-fees",
+  "action_name": "listChannelFees",
+  "entry_activity_actions": [
+    {
+      "tool_id": "update-channel-fee",
+      "as_dialog": true
+    }
+  ]
+}
