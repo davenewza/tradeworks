@@ -91,17 +91,21 @@ export interface ZohoFeeCtx {
 
 // ─── Authentication ─────────────────────────────────────────────────────────
 
-export async function getZohoAccessToken(ctx: ZohoFeeCtx): Promise<string> {
+// Fetch a Zoho access token via the client_credentials grant. The default scope
+// covers the channel-fee sync's needs (/items + custom modules); the cost sync
+// passes an Inventory scope for the landed-cost endpoints.
+export async function getZohoAccessToken(
+    ctx: ZohoFeeCtx,
+    scope: string = 'ZohoBooks.settings.READ,ZohoBooks.custommodules.ALL'
+): Promise<string> {
     const accountsBase = ctx.env.ZOHO_ACCOUNTS_BASE_URL.replace(/\/$/, '');
     const clientId = ctx.env.ZOHO_CLIENT_ID;
     const clientSecret = ctx.secrets.ZOHO_CLIENT_SECRET;
 
-    // settings.READ covers /items; custommodules.ALL covers the fee modules
-    // (Zoho offers no READ-only scope for custom modules).
     const url = `${accountsBase}/oauth/v2/token?client_id=${encodeURIComponent(
         clientId
     )}&client_secret=${encodeURIComponent(clientSecret)}&grant_type=client_credentials&scope=${encodeURIComponent(
-        'ZohoBooks.settings.READ,ZohoBooks.custommodules.ALL'
+        scope
     )}`;
 
     const response = await fetch(url, {
@@ -449,6 +453,7 @@ export async function computeFeeSyncPlan(
     for (const row of existingRows) {
         const fee = linkedFeeById.get(row.channelFeeId);
         if (!fee || fee.channelId !== channel!.id) continue; // another channel → leave alone
+        if (!fee.zohoRecordId) continue; // manually-added fee → not managed by the sync
         const set = currentByProductId.get(row.productId) ?? new Set<string>();
         set.add(fee.zohoRecordId);
         currentByProductId.set(row.productId, set);

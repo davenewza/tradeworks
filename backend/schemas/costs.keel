@@ -1,0 +1,91 @@
+// Product cost of goods, split by supplier bill. Freight-in differs per bill
+// (air vs sea especially), so cost is tracked per (product, bill) rather than as
+// a single figure on the product. The pricing calculator collapses these into a
+// single representative landed cost (weighted-average by default) and shows the
+// per-bill spread as a margin sensitivity. Synced from Zoho Books.
+
+// A supplier bill (purchase). Identified by its bill number, the natural key
+// shared with Zoho. Created on sync from the cost-of-goods records.
+model SupplierBill {
+    fields {
+        billNumber Text @unique
+        vendorName Text?
+        date Date?
+        costLines ProductCostLine[]
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getSupplierBill(id)
+        list listSupplierBills(billNumber?) {
+            @orderBy(date: desc)
+        }
+    }
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, list]
+    )
+}
+
+// One product's cost as recorded on a single supplier bill: cost of goods plus
+// the freight-in allocated per unit, both excl VAT. `landedUnitCost` is the sum
+// the calculator prices off. Cost records are shared lookups keyed on their Zoho
+// record; a product has at most one line per bill.
+model ProductCostLine {
+    fields {
+        product Product
+        supplierBill SupplierBill
+        // Cost of goods per unit on this bill, excl VAT.
+        unitCost Decimal
+        // Freight-in allocated per unit on this bill, excl VAT. Defaults to 0
+        // when a bill carries no freight (e.g. local stock).
+        unitFreightIn Decimal @default(0.0)
+        // Units received on this bill — the weight for a weighted-average cost.
+        quantity Decimal?
+        landedUnitCost Decimal @computed(productCostLine.unitCost + productCostLine.unitFreightIn)
+        // Quantity-weighted contributions, so a product's weighted-average cost of
+        // goods / freight are SUM(extended…) / SUM(quantity) (SUM can't take a
+        // product of two fields directly).
+        extendedUnitCost Decimal? @computed(productCostLine.unitCost * productCostLine.quantity)
+        extendedFreightIn Decimal? @computed(productCostLine.unitFreightIn * productCostLine.quantity)
+        // Display copies of the linked records, so a product's cost history is
+        // legible in one table without following each lookup. Optional to stay
+        // migration-safe, matching the channel-fee models.
+        productName Text? @computed(productCostLine.product.name)
+        productSku Text? @computed(productCostLine.product.sku)
+        billNumber Text? @computed(productCostLine.supplierBill.billNumber)
+        billDate Date? @computed(productCostLine.supplierBill.date)
+        zohoRecordId Text @unique
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getProductCostLine(id)
+        list listProductCostLines(product.id?, supplierBill.id?) {
+            @orderBy(billDate: desc)
+        }
+    }
+
+    @unique([product, supplierBill])
+
+    @permission(
+        expression: ctx.isAuthenticated,
+        actions: [get, list]
+    )
+}
+
+flow SyncSupplierCosts {
+    inputs {
+        dateFrom Date
+        dateTo Date
+    }
+    @permission(expression: ctx.isAuthenticated)
+}
+
+// Interactive pricing calculator, run from the Console. Pick a product, set a
+// target margin or sale price (and optional marketing ROAS), and see the fees,
+// profit and per-bill freight sensitivity. Reads only — explores prices.
+flow PricingCalculator {
+    @permission(expression: ctx.isAuthenticated)
+}

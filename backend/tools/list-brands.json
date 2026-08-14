@@ -1,5 +1,61 @@
 {
   "id": "list-brands",
   "action_name": "listBrands",
-  "title": "Our Brands"
+  "name": "Brands",
+  "icon": "emoji:🍏",
+  "title": "Our Brands",
+  "response": {
+    "$.pageInfo": {
+      "visible": true
+    },
+    "$.pageInfo.count": {
+      "visible": true
+    },
+    "$.pageInfo.endCursor": {
+      "visible": true
+    },
+    "$.pageInfo.hasNextPage": {
+      "visible": true
+    },
+    "$.pageInfo.pageNumber": {
+      "visible": true
+    },
+    "$.pageInfo.startCursor": {
+      "visible": true
+    },
+    "$.pageInfo.totalCount": {
+      "visible": true
+    },
+    "$.results[*].createdAt": {
+      "display_order": 5,
+      "visible": false
+    },
+    "$.results[*].id": {
+      "display_order": 4,
+      "link": {
+        "tool_id": "get-brand",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].name": {
+      "display_order": 2
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 6,
+      "visible": false
+    }
+  },
+  "display_layout": {
+    "config": {
+      "inbox_config": {}
+    }
+  }
 }

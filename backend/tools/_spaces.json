@@ -1,0 +1,113 @@
+[
+  {
+    "id": "space-product-pricing",
+    "name": "Product Pricing",
+    "icon": "sack-dollar",
+    "display_order": 0,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-price-lists",
+        "link": {
+          "tool_id": "list-price-lists",
+          "title": "Price lists",
+          "display_order": 0
+        },
+        "hidden": false
+      }
+    ],
+    "groups": null,
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": null
+  },
+  {
+    "id": "space-products",
+    "name": "Products",
+    "icon": "telescope",
+    "display_order": 0,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-brands",
+        "link": {
+          "tool_id": "list-brands",
+          "title": "Brands",
+          "display_order": 1
+        },
+        "hidden": true
+      },
+      {
+        "id": "action-list-products",
+        "link": {
+          "tool_id": "list-products",
+          "title": "Products",
+          "display_order": 2
+        },
+        "hidden": true
+      }
+    ],
+    "groups": [
+      {
+        "id": "group-products",
+        "name": "Our Catalog",
+        "description": "",
+        "display_order": 1,
+        "hidden": false,
+        "actions": [
+          {
+            "id": "action-list-brands-5QNx4",
+            "link": {
+              "tool_id": "list-brands",
+              "title": "Brands",
+              "display_order": 0
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-list-products-BQ4Wj",
+            "link": {
+              "tool_id": "list-products",
+              "title": "Products",
+              "display_order": 0
+            },
+            "hidden": false
+          }
+        ]
+      },
+      {
+        "id": "group-pricing",
+        "name": "Product Pricing",
+        "description": "",
+        "display_order": 2,
+        "hidden": false,
+        "actions": [
+          {
+            "id": "action-list-price-lists-8H5Dx",
+            "link": {
+              "tool_id": "list-price-lists",
+              "title": "Price lists",
+              "description": "View all the active price lists for each channel",
+              "display_order": 1
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-list-product-prices",
+            "link": {
+              "tool_id": "list-product-prices",
+              "title": "Product prices",
+              "display_order": 2
+            },
+            "hidden": false
+          }
+        ]
+      }
+    ],
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": null
+  }
+]

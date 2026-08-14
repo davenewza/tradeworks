@@ -2,13 +2,21 @@
   "id": "list-product-channel-fees",
   "action_name": "listProductChannelFees",
   "response": {
+    "$.results[*].channelFeeId": {
+      "display_order": 7,
+      "visible": false
+    },
     "$.results[*].channelName": {
       "display_name": "Channel",
       "display_order": 1
     },
-    "$.results[*].feeType": {
-      "display_name": "Fee",
-      "display_order": 2
+    "$.results[*].createdAt": {
+      "display_order": 9,
+      "visible": false
+    },
+    "$.results[*].feeMethod": {
+      "display_name": "Method",
+      "display_order": 4
     },
     "$.results[*].feeName": {
       "display_name": "Category",
@@ -26,9 +34,9 @@
         ]
       }
     },
-    "$.results[*].feeMethod": {
-      "display_name": "Method",
-      "display_order": 4
+    "$.results[*].feeType": {
+      "display_name": "Fee",
+      "display_order": 2
     },
     "$.results[*].feeValue": {
       "display_name": "Value",
@@ -37,17 +45,9 @@
     "$.results[*].productId": {
       "display_order": 6
     },
-    "$.results[*].channelFeeId": {
-      "display_order": 7,
-      "visible": false
-    },
     "$.results[*].synchronisedAt": {
       "display_name": "Last synced",
       "display_order": 8
-    },
-    "$.results[*].createdAt": {
-      "display_order": 9,
-      "visible": false
     },
     "$.results[*].updatedAt": {
       "display_order": 10,

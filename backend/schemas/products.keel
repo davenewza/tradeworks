@@ -8,7 +8,6 @@ model Brand {
 
     actions {
         get getBrand(id)
-        create createBrand() with (name, logo?)
         list listBrands()
         update updateBrandName(id) with (name)
         update updateBrandLogo(id) with (logo)
@@ -16,7 +15,7 @@ model Brand {
 
     @permission(
         expression: ctx.isAuthenticated,
-        actions: [get, create, list, update, delete]
+        actions: [get, list, update, delete]
     )
 }
 
@@ -36,20 +35,17 @@ model Product {
         views ProductViews[]
         sales Sale[]
         channelFees ProductChannelFee[]
+        costLines ProductCostLine[]
+        // Weighted-average cost of goods and freight-in across the product's
+        // supplier bills, weighted by units received. SUM is COALESCE'd to 0, so
+        // the IF guards the no-cost-lines 0/0 case.
+        weightedUnitCost Decimal? @computed(IF(SUM(product.costLines.quantity) > 0, SUM(product.costLines.extendedUnitCost) / SUM(product.costLines.quantity), SUM(product.costLines.extendedUnitCost) * 0))
+        weightedFreightIn Decimal? @computed(IF(SUM(product.costLines.quantity) > 0, SUM(product.costLines.extendedFreightIn) / SUM(product.costLines.quantity), SUM(product.costLines.extendedFreightIn) * 0))
+        weightedLandedCost Decimal? @computed(product.weightedUnitCost + product.weightedFreightIn)
     }
 
     actions {
         get getProduct(id)
-        create createProduct() with (
-            name,
-            sku,
-            image,
-            brand.id,
-            lengthInCm,
-            widthInCm,
-            heightInCm,
-            weightInGrams,
-        )
         list listProducts(name?, sku?, brand.id?) {
             @where(product.isEnabled)
             @orderBy(name: asc)
@@ -68,7 +64,7 @@ model Product {
 
     @permission(
         expression: ctx.isAuthenticated,
-        actions: [get, create, list, update, delete]
+        actions: [get, list, update, delete]
     )
 }
 

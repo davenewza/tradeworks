@@ -2,6 +2,10 @@ model PriceList {
     fields {
         name Text
         description Text?
+        // The sales channel this price list is for. Its channel fees are what
+        // apply to each product's pricing. Optional for migration safety, but it
+        // should be set — with no channel, channel fees resolve to zero.
+        channel Channel?
         numberOfProducts Number @computed(COUNT(priceList.products.id))
         products ProductPrice[]
         discounts DiscountTier[]
@@ -9,7 +13,7 @@ model PriceList {
 
     actions {
         get getPriceList(id)
-        create createPriceList() with (name, description?)
+        create createPriceList() with (name, description?, channel.id?)
         list listPriceLists()
         update updatePriceList(id) with (name, description?)
     }
@@ -31,8 +35,38 @@ model ProductPrice {
         productName Text @computed(productPrice.product.name)
         productSku Text @computed(productPrice.product.sku)
         priceList PriceList
-        price Decimal @computed(productPrice.priceInclVat / 115 * 100)
+        // The one entered value; everything below is derived from it plus the
+        // product's synced costs/fees and the price list's channel.
         priceInclVat Decimal
+        price Decimal @computed(productPrice.priceInclVat / 115 * 100)
+        // The price list's channel name, hoisted to a direct field. Aggregate
+        // filters can't reference a multi-hop root path, so the fee filters below
+        // match this direct field against each fee's channelName. Channel names
+        // are unique, so this is an exact channel match.
+        priceListChannelName Text? @computed(productPrice.priceList.channel.name)
+        // Landed cost, split into cost of goods and freight-in (weighted averages
+        // across the product's bills). landedUnitCost is their sum.
+        unitCost Decimal? @computed(productPrice.product.weightedUnitCost)
+        unitFreightIn Decimal? @computed(productPrice.product.weightedFreightIn)
+        landedUnitCost Decimal? @computed(productPrice.product.weightedLandedCost)
+        // Applicable channel fees for this product on the price list's channel.
+        // A commission fee is a % of the incl-VAT price; a flat fee is a rand
+        // amount. No matching fees → zero.
+        successFeePercentage Decimal? @computed(SUMIF(productPrice.product.channelFees.feeValue, productPrice.product.channelFees.feeMethod == FeeMethod.Commission && productPrice.product.channelFees.channelName == productPrice.priceListChannelName))
+        flatFeeTotal Decimal? @computed(SUMIF(productPrice.product.channelFees.feeValue, productPrice.product.channelFees.feeMethod == FeeMethod.Flat && productPrice.product.channelFees.channelName == productPrice.priceListChannelName))
+        // Channel-wide fees applied to every product (no per-product assignment),
+        // aggregated straight off the price list's channel.
+        alwaysCommissionPercentage Decimal? @computed(SUMIF(productPrice.priceList.channel.fees.value, productPrice.priceList.channel.fees.alwaysApplied == true && productPrice.priceList.channel.fees.method == FeeMethod.Commission))
+        alwaysFlatTotal Decimal? @computed(SUMIF(productPrice.priceList.channel.fees.value, productPrice.priceList.channel.fees.alwaysApplied == true && productPrice.priceList.channel.fees.method == FeeMethod.Flat))
+        // Channel fees are charged VAT-inclusive, so strip VAT to get the real
+        // (deductible) cost gross profit is measured against. Combines per-product
+        // fees with the channel's always-applied fees.
+        channelFees Decimal? @computed(((productPrice.flatFeeTotal + productPrice.alwaysFlatTotal) + (productPrice.successFeePercentage + productPrice.alwaysCommissionPercentage) / 100 * productPrice.priceInclVat) / 115 * 100)
+        grossProfit Decimal? @computed(productPrice.price - productPrice.landedUnitCost - productPrice.channelFees)
+        // Stored as a 0–1 ratio; the Console formats it as a percentage (rounded
+        // to a whole number). The engine has no ROUND function, so display-time
+        // percent formatting is how we round.
+        grossProfitMargin Decimal? @computed(IF(productPrice.price > 0, productPrice.grossProfit / productPrice.price, productPrice.grossProfit * 0))
     }
 
     actions {

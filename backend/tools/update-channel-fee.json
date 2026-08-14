@@ -1,0 +1,9 @@
+{
+  "id": "update-channel-fee",
+  "action_name": "updateChannelFee",
+  "inputs": {
+    "$.where": {
+      "visible": false
+    }
+  }
+}

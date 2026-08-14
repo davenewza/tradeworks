@@ -17,10 +17,12 @@ model Channel {
 }
 
 // How a fee's value is applied to a sale.
+// Fee values are VAT-inclusive (as charged by the channel); pricing strips the
+// VAT to get the deductible cost.
 enum FeeMethod {
-    // value is a percentage of the selling price (e.g. 12 = 12%).
+    // value is a percentage of the VAT-inclusive selling price (e.g. 12 = 12%).
     Commission
-    // value is a flat amount in rand, excluding VAT.
+    // value is a flat amount in rand, VAT-inclusive.
     Flat
 }
 
@@ -37,21 +39,37 @@ model ChannelFee {
         feeType Text?
         method FeeMethod
         value Decimal
+        // When true, the fee applies to every product on the channel without a
+        // per-product assignment (e.g. a general 1% Shopify commission). Pricing
+        // aggregates these straight off the channel; no ProductChannelFee needed.
+        alwaysApplied Boolean @default(false)
         products ProductChannelFee[]
-        zohoRecordId Text @unique
+        // Set for fees synced from Zoho; null for fees added manually in the
+        // Console. The sync only ever touches rows with a Zoho record.
+        zohoRecordId Text? @unique
         synchronisedAt Timestamp?
     }
 
     actions {
         get getChannelFee(id)
-        list listChannelFees(channel.id?, feeType?, method?) {
+        list listChannelFees(channel.id) {
             @orderBy(name: asc)
         }
+        create createChannelFee() with (
+            channel.id,
+            name,
+            feeType?,
+            method,
+            value,
+            alwaysApplied?,
+        )
+        update updateChannelFee(id) with (name, feeType?, method, value, alwaysApplied?)
+        delete deleteChannelFee(id)
     }
 
     @permission(
         expression: ctx.isAuthenticated,
-        actions: [get, list]
+        actions: [get, list, create, update, delete]
     )
 }
 
