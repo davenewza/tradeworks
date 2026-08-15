@@ -1,0 +1,86 @@
+{
+  "id": "list-orders",
+  "action_name": "listOrders",
+  "response": {
+    "$.results[*].channelId": {
+      "display_order": 4
+    },
+    "$.results[*].createdAt": {
+      "display_order": 18,
+      "visible": false
+    },
+    "$.results[*].date": {
+      "display_order": 1
+    },
+    "$.results[*].discountAmount": {
+      "display_order": 10,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].id": {
+      "display_order": 17
+    },
+    "$.results[*].invoiceNumber": {
+      "display_order": 2
+    },
+    "$.results[*].invoiceStatus": {
+      "display_order": 11
+    },
+    "$.results[*].lineItemId": {
+      "display_order": 3
+    },
+    "$.results[*].netAmount": {
+      "display_order": 8,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].onPromotion": {
+      "display_order": 12
+    },
+    "$.results[*].price": {
+      "display_order": 7
+    },
+    "$.results[*].productId": {
+      "display_order": 5
+    },
+    "$.results[*].quantity": {
+      "display_order": 6
+    },
+    "$.results[*].synchronisedAt": {
+      "display_order": 16
+    },
+    "$.results[*].taxAmount": {
+      "display_order": 9,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].total": {
+      "display_order": 13
+    },
+    "$.results[*].totalExclVat": {
+      "display_order": 15
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 19,
+      "visible": false
+    },
+    "$.results[*].vat": {
+      "display_order": 14
+    }
+  }
+}

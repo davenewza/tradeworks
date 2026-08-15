@@ -1,0 +1,9 @@
+[
+  {
+    "id": "chart_3HwTVmEMAdueG0MtxhoZyj3e89A",
+    "name": "Revenue by month",
+    "config": "{\"query\":{\"measures\":[\"sale.total_sum\"],\"limit\":500,\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\",\"dateRange\":\"this year\"}]},\"settings\":{\"chartType\":\"bar\",\"xField\":\"sale_date_month\",\"yField\":\"sale_total_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":false,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":true,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-08-15T07:15:57.922031Z",
+    "updatedAt": "2026-08-15T07:15:57.922031Z"
+  }
+]

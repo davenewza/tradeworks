@@ -42,6 +42,15 @@ model Product {
         weightedUnitCost Decimal? @computed(IF(SUM(product.costLines.quantity) > 0, SUM(product.costLines.extendedUnitCost) / SUM(product.costLines.quantity), SUM(product.costLines.extendedUnitCost) * 0))
         weightedFreightIn Decimal? @computed(IF(SUM(product.costLines.quantity) > 0, SUM(product.costLines.extendedFreightIn) / SUM(product.costLines.quantity), SUM(product.costLines.extendedFreightIn) * 0))
         weightedLandedCost Decimal? @computed(product.weightedUnitCost + product.weightedFreightIn)
+        // Purchase history summary across the product's supplier bills.
+        totalSupplierBills Number? @computed(COUNT(product.costLines.id))
+        totalUnitsPurchased Decimal? @computed(SUM(product.costLines.quantity))
+        // Sales history summary across the product's synced sales. Revenue and
+        // average price use the realized net amount (excl VAT, after discount),
+        // so promotions/discounts are reflected — not the list price.
+        totalUnitsSold Number? @computed(SUM(product.sales.quantity))
+        totalSalesValue Decimal? @computed(SUM(product.sales.netAmount))
+        averageSalePrice Decimal? @computed(IF(SUM(product.sales.quantity) > 0, SUM(product.sales.netAmount) / SUM(product.sales.quantity), SUM(product.sales.netAmount) * 0))
     }
 
     actions {

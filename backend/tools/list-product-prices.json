@@ -100,6 +100,11 @@
       "visible": false
     }
   },
+  "pagination": {
+    "page_size": {
+      "default_value": 200
+    }
+  },
   "get_entry_action": {
     "tool_id": "get-product-price",
     "deleted": true
