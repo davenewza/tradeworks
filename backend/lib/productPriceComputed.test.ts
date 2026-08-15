@@ -128,3 +128,59 @@ describe('ProductPrice computed pricing', () => {
         expect(num((await models.productPrice.findOne({ id: created.id }))!.channelFees)).toBeCloseTo(1.0, 2);
     });
 });
+
+describe('Product purchase details', () => {
+    test('summarises cost, freight and volumes across supplier bills', async () => {
+        const brand = await models.brand.create({ name: 'B' });
+        const product = await models.product.create({ name: 'Kit', sku: 'K-1', brandId: brand.id });
+        const bill1 = await models.supplierBill.create({ billNumber: 'B1' });
+        const bill2 = await models.supplierBill.create({ billNumber: 'B2' });
+        // 10 @ 100/60 and 30 @ 120/20.
+        await models.productCostLine.create({ productId: product.id, supplierBillId: bill1.id, unitCost: 100, unitFreightIn: 60, quantity: 10, zohoRecordId: 'c1' });
+        await models.productCostLine.create({ productId: product.id, supplierBillId: bill2.id, unitCost: 120, unitFreightIn: 20, quantity: 30, zohoRecordId: 'c2' });
+
+        const p = await models.product.findOne({ id: product.id });
+        expect(num(p!.totalSupplierBills)).toBe(2);
+        expect(num(p!.totalUnitsPurchased)).toBe(40);
+        // (100*10 + 120*30)/40 = 115 ; (60*10 + 20*30)/40 = 30
+        expect(num(p!.weightedUnitCost)).toBeCloseTo(115, 6);
+        expect(num(p!.weightedFreightIn)).toBeCloseTo(30, 6);
+        expect(num(p!.weightedLandedCost)).toBeCloseTo(145, 6);
+    });
+
+    test('is empty for a product with no bills', async () => {
+        const brand = await models.brand.create({ name: 'B' });
+        const product = await models.product.create({ name: 'Bare', sku: 'K-2', brandId: brand.id });
+        const p = await models.product.findOne({ id: product.id });
+        expect(num(p!.totalSupplierBills)).toBe(0);
+        expect(num(p!.weightedUnitCost)).toBe(0);
+    });
+});
+
+describe('Product sales details', () => {
+    test('summarises units and net revenue (post-discount), not list price', async () => {
+        const brand = await models.brand.create({ name: 'B' });
+        const product = await models.product.create({ name: 'Kit', sku: 'S-1', brandId: brand.id });
+        const channel = await models.channel.create({ name: 'Takealot' });
+        // Line 1: list 1150/unit but net 800 after a discount (qty 2); line 2: net 1500 (qty 3).
+        const s1 = await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', channelId: channel.id, date: new Date('2024-01-01'), productId: product.id, quantity: 2, price: 1150, netAmount: 800, discountAmount: 200, invoiceStatus: 'paid' });
+        await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', channelId: channel.id, date: new Date('2024-02-01'), productId: product.id, quantity: 3, price: 575, netAmount: 1500, invoiceStatus: 'paid' });
+
+        const p = await models.product.findOne({ id: product.id });
+        expect(num(p!.totalUnitsSold)).toBe(5);
+        // net revenue = 800 + 1500 = 2300 (NOT list 1150*2 + 575*3 = 4025)
+        expect(num(p!.totalSalesValue)).toBeCloseTo(2300, 2);
+        // avg net price = 2300 / 5 = 460
+        expect(num(p!.averageSalePrice)).toBeCloseTo(460, 6);
+        // tax is derived from netAmount: 800 * 0.15 = 120
+        expect(num((await models.sale.findOne({ id: s1.id }))!.taxAmount)).toBeCloseTo(120, 6);
+    });
+
+    test('is empty for a product with no sales', async () => {
+        const brand = await models.brand.create({ name: 'B' });
+        const product = await models.product.create({ name: 'Bare', sku: 'S-2', brandId: brand.id });
+        const p = await models.product.findOne({ id: product.id });
+        expect(num(p!.totalUnitsSold)).toBe(0);
+        expect(num(p!.averageSalePrice)).toBe(0);
+    });
+});

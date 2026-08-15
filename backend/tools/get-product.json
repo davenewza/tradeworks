@@ -2,6 +2,11 @@
   "id": "get-product",
   "action_name": "getProduct",
   "response": {
+    "$.averageSalePrice": {
+      "display_name": "Avg sale price",
+      "display_order": 1,
+      "section_name": "a1b2c3d4-0000-4000-8000-salesdetailxx"
+    },
     "$.brandId": {
       "display_order": 3,
       "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
@@ -31,6 +36,26 @@
     "$.sku": {
       "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
+    "$.totalSalesValue": {
+      "display_name": "Total sales value",
+      "display_order": 2,
+      "section_name": "a1b2c3d4-0000-4000-8000-salesdetailxx"
+    },
+    "$.totalSupplierBills": {
+      "display_name": "Supplier bills",
+      "display_order": 4,
+      "section_name": "a1b2c3d4-0000-4000-8000-purchasedetail"
+    },
+    "$.totalUnitsPurchased": {
+      "display_name": "Units purchased",
+      "display_order": 5,
+      "section_name": "a1b2c3d4-0000-4000-8000-purchasedetail"
+    },
+    "$.totalUnitsSold": {
+      "display_name": "Units sold",
+      "display_order": 3,
+      "section_name": "a1b2c3d4-0000-4000-8000-salesdetailxx"
+    },
     "$.volumeInLitres": {
       "display_order": 10,
       "visible": false,
@@ -42,13 +67,19 @@
       "section_name": "b654f55a-86fa-45b1-9499-fef707a5d042"
     },
     "$.weightedFreightIn": {
-      "visible": false
+      "display_name": "Avg freight-in",
+      "display_order": 2,
+      "section_name": "a1b2c3d4-0000-4000-8000-purchasedetail"
     },
     "$.weightedLandedCost": {
-      "visible": false
+      "display_name": "Avg landed cost",
+      "display_order": 3,
+      "section_name": "a1b2c3d4-0000-4000-8000-purchasedetail"
     },
     "$.weightedUnitCost": {
-      "visible": false
+      "display_name": "Avg cost price",
+      "display_order": 1,
+      "section_name": "a1b2c3d4-0000-4000-8000-purchasedetail"
     },
     "$.widthInCm": {
       "display_order": 6,
@@ -58,9 +89,21 @@
   },
   "sections": [
     {
+      "name": "a1b2c3d4-0000-4000-8000-purchasedetail",
+      "title": "Purchase details",
+      "display_order": 5,
+      "visible": true
+    },
+    {
+      "name": "a1b2c3d4-0000-4000-8000-salesdetailxx",
+      "title": "Sales details",
+      "display_order": 6,
+      "visible": true
+    },
+    {
       "name": "b654f55a-86fa-45b1-9499-fef707a5d042",
       "title": "Dimensions",
-      "display_order": 6,
+      "display_order": 7,
       "visible": true
     },
     {

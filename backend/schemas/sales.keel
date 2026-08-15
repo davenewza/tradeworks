@@ -7,6 +7,20 @@ model Sale {
         product Product
         quantity Number
         price Decimal
+        // Realized line figures from Zoho, net of any discount. These supersede
+        // the derived total/vat below for revenue and margin analysis (which use
+        // the list price and can't see discounts).
+        netAmount Decimal?
+        // item_total — line total excl VAT, after discount
+        // Zoho exposes no per-line tax amount (only tax_percentage), and VAT is a
+        // uniform 15% here, so derive it from the net amount.
+        taxAmount Decimal? @computed(sale.netAmount * 0.15)
+        discountAmount Decimal?
+        // discount_amount — line discount (excl VAT)
+        invoiceStatus Text?
+        // invoice status (e.g. paid, draft, overdue)
+        onPromotion Boolean?
+        // invoice "On Promotion" custom field
         total Decimal @computed(sale.price * sale.quantity)
         vat Decimal @computed(sale.total * 0.15)
         totalExclVat Decimal @computed(sale.total - sale.vat)
@@ -23,7 +37,7 @@ model Sale {
             quantity,
             price,
         )
-        list listOrders(date?, product.id?)
+        list listSales(date?, product.id?, channel.id?)
         write handleInvoiceWebhook(Any) returns (Any) {
             @permission(expression: true)
         }
@@ -32,7 +46,7 @@ model Sale {
     @unique([invoiceNumber, lineItemId])
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, create, list]
     )
 }
@@ -49,3 +63,11 @@ flow ScheduledSyncSales {
     @schedule("every 6 hours")
     @permission(expression: true)
 }
+
+team Warehouse {
+    roles {
+        Operator
+    }
+ }
+
+role Operator { }

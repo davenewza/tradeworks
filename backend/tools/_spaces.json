@@ -73,6 +73,15 @@
               "display_order": 0
             },
             "hidden": false
+          },
+          {
+            "id": "action-list-channels",
+            "link": {
+              "tool_id": "list-channels",
+              "title": "Channels",
+              "display_order": 0
+            },
+            "hidden": false
           }
         ]
       },
@@ -87,7 +96,7 @@
             "id": "action-list-price-lists-8H5Dx",
             "link": {
               "tool_id": "list-price-lists",
-              "title": "Price lists",
+              "title": "Price Lists",
               "description": "View all the active price lists for each channel",
               "display_order": 1
             },
@@ -100,11 +109,34 @@
               "title": "Product prices",
               "display_order": 2
             },
-            "hidden": false
+            "hidden": true
           }
         ]
       }
     ],
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": null
+  },
+  {
+    "id": "space-sales",
+    "name": "Sales",
+    "icon": "sack-dollar",
+    "display_order": 0,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-orders",
+        "link": {
+          "tool_id": "list-orders",
+          "title": "List orders",
+          "display_order": 0
+        },
+        "hidden": false
+      }
+    ],
+    "groups": null,
     "links": null,
     "metrics": null,
     "topics": null,

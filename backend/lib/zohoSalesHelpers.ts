@@ -4,6 +4,7 @@ export interface ZohoInvoice {
     invoice_id: string;
     invoice_number: string;
     date: string;
+    status?: string;
     line_items: ZohoLineItem[];
     custom_fields?: ZohoCustomField[];
 }
@@ -20,6 +21,22 @@ export interface ZohoLineItem {
     name: string;
     quantity: number;
     rate: number;
+    // Realized line figures (net of discount). item_total is excl VAT; Zoho
+    // exposes no per-line tax amount, so tax is derived from netAmount downstream.
+    item_total?: number;
+    discount_amount?: number;
+}
+
+// Read the invoice's "On Promotion" custom field, if present.
+export function getOnPromotionFromInvoice(invoice: ZohoInvoice): boolean | null {
+    const field = (invoice.custom_fields ?? []).find(
+        (cf) => cf.label?.trim().toLowerCase() === 'on promotion'
+    );
+    if (!field) return null;
+    const value = String(field.value ?? '').trim().toLowerCase();
+    if (value === 'true' || value === 'yes') return true;
+    if (value === 'false' || value === 'no') return false;
+    return null;
 }
 
 export interface ZohoInvoicesResponse {
@@ -249,31 +266,29 @@ export async function processInvoiceLineItems(
         const price = lineItem.rate;
         const now = new Date();
 
+        // Realized line figures (net of discount) + invoice-level attributes.
+        // Always written so a re-sync backfills these onto existing rows.
+        const realized = {
+            netAmount: lineItem.item_total ?? null,
+            discountAmount: lineItem.discount_amount ?? null,
+            invoiceStatus: invoice.status ?? null,
+            onPromotion: getOnPromotionFromInvoice(invoice),
+        };
+
         try {
             if (existingSale) {
-                const needsUpdate =
-                    existingSale.quantity !== quantity ||
-                    Number(existingSale.price) !== price ||
-                    existingSale.productId !== product.id;
-
-                if (needsUpdate) {
-                    await models.sale.update(
-                        { id: existingSale.id },
-                        {
-                            quantity: quantity,
-                            price: price,
-                            productId: product.id,
-                            date: saleDate,
-                            synchronisedAt: now,
-                        }
-                    );
-                    result.updated++;
-                } else {
-                    await models.sale.update(
-                        { id: existingSale.id },
-                        { synchronisedAt: now }
-                    );
-                }
+                await models.sale.update(
+                    { id: existingSale.id },
+                    {
+                        quantity: quantity,
+                        price: price,
+                        productId: product.id,
+                        date: saleDate,
+                        ...realized,
+                        synchronisedAt: now,
+                    }
+                );
+                result.updated++;
             } else {
                 await models.sale.create({
                     invoiceNumber: invoice.invoice_number,
@@ -283,6 +298,7 @@ export async function processInvoiceLineItems(
                     product: { id: product.id },
                     quantity: quantity,
                     price: price,
+                    ...realized,
                     synchronisedAt: now,
                 });
                 result.created++;

@@ -1,5 +1,37 @@
 [
   {
+    "id": "Product.weightedUnitCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.weightedFreightIn",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.weightedLandedCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.averageSalePrice",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.totalSalesValue",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Sale.netAmount",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Sale.taxAmount",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Sale.discountAmount",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+  },
+  {
     "id": "ProductPrice.priceInclVat",
     "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
   },

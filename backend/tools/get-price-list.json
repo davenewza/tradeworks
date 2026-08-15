@@ -1,6 +1,14 @@
 {
   "id": "get-price-list",
   "action_name": "getPriceList",
+  "response": {
+    "$.channelId": {
+      "visible": false
+    },
+    "$.name": {
+      "visible": false
+    }
+  },
   "sections": [
     {
       "name": "cbdc81c4-b8af-4c18-ad4c-c9373b92ccfe",
@@ -9,10 +17,24 @@
       "visible": true
     }
   ],
+  "create_entry_action": {
+    "tool_id": "create-price-list",
+    "deleted": true
+  },
   "entry_activity_actions": [
     {
-      "tool_id": "update-price-list",
-      "display_order": 0
+      "tool_id": "list-product-prices",
+      "title": "View full price list",
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.where.priceList.id.equals",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ],
+      "emphasize": true
     },
     {
       "tool_id": "create-product-price",
@@ -42,6 +64,10 @@
         }
       ],
       "skip_confirmation": true
+    },
+    {
+      "tool_id": "update-price-list",
+      "display_order": 3
     }
   ],
   "embedded_tools": [
