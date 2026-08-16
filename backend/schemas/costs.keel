@@ -82,10 +82,3 @@ flow SyncSupplierCosts {
     }
     @permission(expression: ctx.isAuthenticated)
 }
-
-// Interactive pricing calculator, run from the Console. Pick a product, set a
-// target margin or sale price (and optional marketing ROAS), and see the fees,
-// profit and per-bill freight sensitivity. Reads only — explores prices.
-flow PricingCalculator {
-    @permission(expression: ctx.isAuthenticated)
-}
