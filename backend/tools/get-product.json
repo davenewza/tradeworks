@@ -37,7 +37,6 @@
       "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
     "$.totalSalesValue": {
-      "display_name": "Total sales value",
       "display_order": 2,
       "section_name": "a1b2c3d4-0000-4000-8000-salesdetailxx"
     },
@@ -131,7 +130,6 @@
   "embedded_tools": [
     {
       "id": "prices",
-      "title": "Prices",
       "display_order": 0,
       "tools": [
         {
@@ -146,13 +144,22 @@
     },
     {
       "id": "channelFees",
+      "display_order": 0,
       "tools": [
         {
           "action_link": {
-            "tool_id": "list-product-channel-fees"
+            "tool_id": "list-product-channel-fees",
+            "title": "Assigned fees"
           },
           "response_overrides": {
             "$.results[*].productId": false
+          }
+        },
+        {
+          "action_link": {
+            "tool_id": "list-channel-fees-always-applied",
+            "title": "Global Fees",
+            "display_order": 1
           }
         }
       ]
