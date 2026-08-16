@@ -74,8 +74,21 @@ model ProductPrice {
             @embed(product)
         }
         create createProductPrice() with (product.id, priceList.id, priceInclVat)
-        list listProductPrices(priceList.id) {
-            @embed(product)
+        list listProductPrices(
+            priceList.id,
+            productName?,
+            productSku?,
+            product.brand.id?,
+        ) {
+            @searchable(
+                productName,
+                productSku
+            )
+            @sortable(
+                productName,
+                productSku
+            )
+            @orderBy(productName: desc)
         }
         update updateProductPrice(id) with (priceInclVat)
         delete deleteProductPrice(id)
