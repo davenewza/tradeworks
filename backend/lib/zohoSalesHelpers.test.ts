@@ -1,6 +1,12 @@
 import { models, resetDatabase } from '@teamkeel/testing';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { ZohoInvoice, processInvoiceLineItems, formatModifiedSince } from './zohoSalesHelpers';
+import {
+    ZohoInvoice,
+    processInvoiceLineItems,
+    formatModifiedSince,
+    isZohoDailyRateLimit,
+    partitionInvoicesByChange,
+} from './zohoSalesHelpers';
 
 beforeEach(resetDatabase);
 
@@ -17,7 +23,7 @@ async function seedProduct(sku = 'RL-NA396') {
 
 // Build a one-line invoice; `lineItemId` is the (volatile) Zoho id, `orderItemId`
 // the stable source id carried in the line description.
-function invoice(lineItemId: string, opts: { managed?: boolean; orderItemId?: string; qty?: number } = {}): ZohoInvoice {
+function invoice(lineItemId: string, opts: { managed?: boolean; orderItemId?: string; qty?: number; modified?: string } = {}): ZohoInvoice {
     const custom_fields: any[] = [];
     if (opts.managed) custom_fields.push({ customfield_id: '1', label: 'ManagedByWebhook', value: 'true' });
     return {
@@ -25,6 +31,7 @@ function invoice(lineItemId: string, opts: { managed?: boolean; orderItemId?: st
         invoice_number: 'IT100',
         date: '2026-01-15',
         status: 'paid',
+        last_modified_time: opts.modified,
         custom_fields,
         line_items: [
             {
@@ -86,5 +93,57 @@ describe('processInvoiceLineItems dedup', () => {
         expect(sales).toHaveLength(1);
         expect(sales[0].lineKey).toBe('LINE-A');
         expect(sales[0].orderItemId).toBeNull();
+    });
+
+    test("stores the invoice's last_modified_time for the unchanged-skip check", async () => {
+        await seedProduct();
+        await processInvoiceLineItems(invoice('LINE-A', { modified: '2026-01-15T09:00:00+0000' }), new Map());
+
+        const sales = await models.sale.findMany({ where: {} });
+        expect(sales[0].zohoModifiedTime).toBe('2026-01-15T09:00:00+0000');
+    });
+});
+
+describe('isZohoDailyRateLimit', () => {
+    test('true for a 429 carrying Zoho error code 45', () => {
+        expect(isZohoDailyRateLimit(429, '{"code":45,"message":"The API call for this organization has exceeded the maximum call rate limit of 10,000"}')).toBe(true);
+    });
+    test('true for a 429 whose message mentions the call rate limit', () => {
+        expect(isZohoDailyRateLimit(429, 'exceeded the maximum call rate limit')).toBe(true);
+    });
+    test('false for a 429 that is a different Zoho error (e.g. burst code 4)', () => {
+        expect(isZohoDailyRateLimit(429, '{"code":4,"message":"invalid token"}')).toBe(false);
+    });
+    test('false for non-429 statuses', () => {
+        expect(isZohoDailyRateLimit(500, '{"code":45}')).toBe(false);
+    });
+});
+
+describe('partitionInvoicesByChange', () => {
+    const summaries = [
+        { invoice_number: 'A', last_modified_time: '2026-01-01T00:00:00+0000' },
+        { invoice_number: 'B', last_modified_time: '2026-01-02T00:00:00+0000' },
+        { invoice_number: 'C', last_modified_time: '2026-01-03T00:00:00+0000' },
+    ];
+
+    test('skips invoices whose stored modified time matches; fetches the rest', () => {
+        const stored = new Map<string, string | null>([
+            ['A', '2026-01-01T00:00:00+0000'], // unchanged → skip
+            ['B', '2025-12-01T00:00:00+0000'], // changed → fetch
+            // C never synced → fetch
+        ]);
+        const { toFetch, skipped } = partitionInvoicesByChange(summaries, stored);
+        expect(skipped).toBe(1);
+        expect(toFetch.map((s) => s.invoice_number)).toEqual(['B', 'C']);
+    });
+
+    test('always fetches when the stored time is null or the summary has none', () => {
+        const stored = new Map<string, string | null>([['A', null]]);
+        const { toFetch, skipped } = partitionInvoicesByChange(
+            [{ invoice_number: 'A', last_modified_time: undefined }, { invoice_number: 'A2', last_modified_time: '2026-01-01T00:00:00+0000' }],
+            stored
+        );
+        expect(skipped).toBe(0);
+        expect(toFetch).toHaveLength(2);
     });
 });
