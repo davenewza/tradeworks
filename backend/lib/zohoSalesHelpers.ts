@@ -21,10 +21,29 @@ export interface ZohoLineItem {
     name: string;
     quantity: number;
     rate: number;
+    // The channel integration stores the source order-line id here (Takealot
+    // orderItemId, etc.) — stable across Zoho re-saves, unlike line_item_id.
+    description?: string;
     // Realized line figures (net of discount). item_total is excl VAT; Zoho
     // exposes no per-line tax amount, so tax is derived from netAmount downstream.
     item_total?: number;
     discount_amount?: number;
+}
+
+// True when the invoice is maintained by a channel integration (ManagedByWebhook
+// custom field). Only these invoices carry a stable source line id in `description`.
+export function isManagedByWebhook(invoice: ZohoInvoice): boolean {
+    return (invoice.custom_fields ?? []).some(
+        (cf) => cf.label?.trim().toLowerCase() === 'managedbywebhook' && String(cf.value).trim().toLowerCase() === 'true'
+    );
+}
+
+// The stable per-line identity used to dedup sales. For integration-managed
+// invoices it's the source order-line id (carried in `description`); otherwise
+// it falls back to the Zoho line_item_id (stable for manually-kept invoices).
+export function getLineKey(invoice: ZohoInvoice, lineItem: ZohoLineItem): { orderItemId: string | null; lineKey: string } {
+    const orderItemId = isManagedByWebhook(invoice) ? lineItem.description?.trim() || null : null;
+    return { orderItemId, lineKey: orderItemId ?? lineItem.line_item_id };
 }
 
 // Read the invoice's "On Promotion" custom field, if present.
@@ -72,6 +91,13 @@ export function formatDate(date: Date): string {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+// Zoho's `last_modified_time` filter wants YYYY-MM-DDTHH:MM:SS with a timezone
+// offset (no colon in the offset). We emit UTC. The `+` must be percent-encoded
+// as %2B in the query string.
+export function formatModifiedSince(date: Date): string {
+    return date.toISOString().slice(0, 19) + '+0000';
 }
 
 export async function getZohoAccessToken(ctx: {
@@ -244,16 +270,20 @@ export async function processInvoiceLineItems(
             continue;
         }
 
+        // Stable dedup key — orderItemId (source line id) if the invoice is
+        // integration-managed, else the Zoho line_item_id.
+        const { orderItemId, lineKey } = getLineKey(invoice, lineItem);
+
         // Look up existing sale from pre-populated map or query directly
         let existingSale: { id: string; quantity: number; price: any; productId: string | null } | undefined;
-        const saleKey = `${invoice.invoice_number}-${lineItem.line_item_id}`;
+        const saleKey = `${invoice.invoice_number}-${lineKey}`;
         if (options?.existingSalesMap) {
             existingSale = options.existingSalesMap.get(saleKey);
         } else {
             const found = await models.sale.findMany({
                 where: {
                     invoiceNumber: { equals: invoice.invoice_number },
-                    lineItemId: { equals: lineItem.line_item_id },
+                    lineKey: { equals: lineKey },
                 },
             });
             existingSale = found.length > 0
@@ -280,6 +310,9 @@ export async function processInvoiceLineItems(
                 await models.sale.update(
                     { id: existingSale.id },
                     {
+                        // Refresh line_item_id too — Zoho rotates it on re-save.
+                        lineItemId: lineItem.line_item_id,
+                        orderItemId: orderItemId,
                         quantity: quantity,
                         price: price,
                         productId: product.id,
@@ -293,6 +326,8 @@ export async function processInvoiceLineItems(
                 await models.sale.create({
                     invoiceNumber: invoice.invoice_number,
                     lineItemId: lineItem.line_item_id,
+                    orderItemId: orderItemId,
+                    lineKey: lineKey,
                     channel: { id: channel.id },
                     date: saleDate,
                     product: { id: product.id },

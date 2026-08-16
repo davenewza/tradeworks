@@ -4,7 +4,7 @@ import {
     getZohoAccessToken,
     getChannelFromInvoice,
     fetchInvoiceDetailsBatch,
-    formatDate,
+    formatModifiedSince,
     processInvoiceLineItems,
 } from '../lib/zohoSalesHelpers';
 
@@ -12,11 +12,11 @@ const LOOKBACK_HOURS = 48;
 
 export default ScheduledSyncSales({}, async (ctx) => {
     const now = new Date();
-    const start = new Date(now.getTime() - LOOKBACK_HOURS * 60 * 60 * 1000);
-    const startDate = formatDate(start);
-    const endDate = formatDate(now);
+    // Sweep by last-modified rather than invoice date, so edits to older invoices
+    // (refunds, late status/payment changes) are picked up — not just recent dates.
+    const modifiedSince = formatModifiedSince(new Date(now.getTime() - LOOKBACK_HOURS * 60 * 60 * 1000));
 
-    console.log(`Scheduled sync: ${startDate} to ${endDate}`);
+    console.log(`Scheduled sync: invoices modified since ${modifiedSince}`);
 
     const accessToken = await ctx.step("authenticate", async () => {
         return await getZohoAccessToken(ctx);
@@ -37,7 +37,7 @@ export default ScheduledSyncSales({}, async (ctx) => {
         const currentPage = page;
 
         const pageResult = await ctx.step(`sync-page-${currentPage}`, async () => {
-            const invoicesUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/invoices?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&date_start=${startDate}&date_end=${endDate}&page=${currentPage}&per_page=200`;
+            const invoicesUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/invoices?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&last_modified_time=${modifiedSince.replace('+', '%2B')}&page=${currentPage}&per_page=200`;
 
             const invoicesResponse = await fetch(invoicesUrl, {
                 method: 'GET',
@@ -171,7 +171,7 @@ export default ScheduledSyncSales({}, async (ctx) => {
         content: [
             ctx.ui.display.keyValue({
                 data: [
-                    { key: "Date range", value: `${startDate} to ${endDate}` },
+                    { key: "Modified since", value: modifiedSince },
                     { key: "Invoices processed", value: totalInvoicesProcessed },
                     { key: "Sales created", value: salesCreated },
                     { key: "Sales updated", value: salesUpdated },
