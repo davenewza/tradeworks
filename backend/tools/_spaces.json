@@ -129,8 +129,8 @@
       {
         "id": "action-list-orders",
         "link": {
-          "tool_id": "list-orders",
-          "title": "List orders",
+          "tool_id": "list-sales",
+          "title": "Sales",
           "display_order": 0
         },
         "hidden": false
@@ -140,6 +140,13 @@
     "links": null,
     "metrics": null,
     "topics": null,
-    "charts": null
+    "charts": [
+      {
+        "id": "chart-attach-chart-3-hz-0-g-ngm-py-vync-5-ov-8-sw-6-l-b-777-v",
+        "chart_id": "chart_3Hz0gNGMPyVYNC5Ov8Sw6lB777V",
+        "display_order": 0,
+        "hidden": false
+      }
+    ]
   }
 ]

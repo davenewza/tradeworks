@@ -4,6 +4,15 @@
   "name": "Product prices",
   "icon": "tag",
   "inputs": {
+    "$.where.priceList": {
+      "visible": false
+    },
+    "$.where.priceList.id": {
+      "visible": false
+    },
+    "$.where.priceList.id.equals": {
+      "visible": false
+    },
     "$.where.priceList.id.notEquals": {
       "visible": false
     },
@@ -13,31 +22,54 @@
   },
   "response": {
     "$.results[*].alwaysCommissionPercentage": {
-      "visible": false
-    },
-    "$.results[*].alwaysFlatTotal": {
-      "visible": false
-    },
-    "$.results[*].channelFees": {
-      "display_order": 8
-    },
-    "$.results[*].createdAt": {
-      "display_order": 26,
-      "visible": false
-    },
-    "$.results[*].flatFeeTotal": {
       "display_order": 23,
       "visible": false
     },
+    "$.results[*].alwaysFlatTotal": {
+      "display_order": 24,
+      "visible": false
+    },
+    "$.results[*].channelFees": {
+      "display_order": 19,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].createdAt": {
+      "display_order": 40,
+      "visible": false
+    },
+    "$.results[*].flatFeeTotal": {
+      "display_order": 35,
+      "visible": false
+    },
     "$.results[*].grossProfit": {
-      "display_order": 9
+      "display_order": 21,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA",
+          "colourise": "NORMAL"
+        }
+      }
     },
     "$.results[*].grossProfitMargin": {
       "display_name": "Gross margin",
-      "display_order": 10
+      "display_order": 22,
+      "format": {
+        "number_config": {
+          "mode": "PERCENTAGE",
+          "locale": "en-ZA"
+        }
+      }
     },
     "$.results[*].id": {
-      "display_order": 25,
+      "display_order": 38,
       "link": {
         "tool_id": "get-product-price",
         "display_order": 0,
@@ -53,50 +85,186 @@
     },
     "$.results[*].landedUnitCost": {
       "display_name": "Landed cost",
-      "display_order": 7,
-      "visible": false
+      "display_order": 17,
+      "visible": false,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
     },
     "$.results[*].price": {
       "display_name": "Price excl VAT",
-      "display_order": 4
+      "display_order": 11,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
     },
     "$.results[*].priceInclVat": {
       "display_name": "Price incl VAT",
-      "display_order": 3
+      "display_order": 9,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
     },
     "$.results[*].priceListChannelName": {
-      "display_order": 21,
+      "display_order": 32,
       "visible": false
     },
     "$.results[*].priceListId": {
-      "display_order": 24,
+      "display_order": 36,
       "visible": false
     },
-    "$.results[*].productId": {
+    "$.results[*].product.averageSalePrice": {
+      "display_order": 33,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].product.brandId": {
       "display_order": 2
     },
-    "$.results[*].productName": {
-      "display_order": 20,
+    "$.results[*].product.createdAt": {
+      "display_order": 39
+    },
+    "$.results[*].product.heightInCm": {
+      "display_order": 12
+    },
+    "$.results[*].product.id": {
+      "display_order": 37
+    },
+    "$.results[*].product.image": {
+      "display_order": 6
+    },
+    "$.results[*].product.isEnabled": {
+      "display_order": 18
+    },
+    "$.results[*].product.lengthInCm": {
+      "display_order": 8
+    },
+    "$.results[*].product.name": {
+      "display_order": 1
+    },
+    "$.results[*].product.sku": {
+      "display_order": 4
+    },
+    "$.results[*].product.synchronisedAt": {
+      "display_order": 20
+    },
+    "$.results[*].product.totalSalesValue": {
+      "display_order": 31,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].product.totalSupplierBills": {
+      "display_order": 28
+    },
+    "$.results[*].product.totalUnitsPurchased": {
+      "display_order": 29
+    },
+    "$.results[*].product.totalUnitsSold": {
+      "display_order": 30
+    },
+    "$.results[*].product.updatedAt": {
+      "display_order": 41
+    },
+    "$.results[*].product.volumeInLitres": {
+      "display_order": 16
+    },
+    "$.results[*].product.weightInGrams": {
+      "display_order": 14
+    },
+    "$.results[*].product.weightedFreightIn": {
+      "display_order": 26,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].product.weightedLandedCost": {
+      "display_order": 27,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].product.weightedUnitCost": {
+      "display_order": 25,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].product.widthInCm": {
+      "display_order": 10
+    },
+    "$.results[*].productId": {
+      "display_order": 7,
       "visible": false
+    },
+    "$.results[*].productName": {
+      "display_order": 5
     },
     "$.results[*].productSku": {
       "display_name": "SKU",
-      "display_order": 1
+      "display_order": 3
     },
     "$.results[*].successFeePercentage": {
-      "display_order": 22,
+      "display_order": 34,
       "visible": false
     },
     "$.results[*].unitCost": {
       "display_name": "Cost price",
-      "display_order": 5
+      "display_order": 13,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
     },
     "$.results[*].unitFreightIn": {
       "display_name": "Freight-in",
-      "display_order": 6
+      "display_order": 15,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
     },
     "$.results[*].updatedAt": {
-      "display_order": 27,
+      "display_order": 42,
       "visible": false
     }
   },
@@ -117,5 +285,8 @@
     "config": {
       "type": 3
     }
+  },
+  "filter_config": {
+    "quick_search_field": "$.where.productName.contains"
   }
 }
