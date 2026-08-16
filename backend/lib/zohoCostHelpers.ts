@@ -67,7 +67,9 @@ export interface ZohoLandedCost {
 // ─── Pure transform: bill + its landed costs → per-line cost data ─────────────
 
 // A cost-of-goods line as sourced from Zoho, normalised to what a ProductCostLine
-// needs. `zohoRecordId` is the bill line item id — unique per product per bill.
+// needs. `zohoRecordId` is a stable per-(product, bill) key — `${bill_id}::${sku}`
+// — NOT the Zoho line_item_id (which rotates when a bill is re-saved and can be
+// one of several lines for the same product).
 export interface ZohoCostLine {
     zohoRecordId: string;
     sku: string;
@@ -79,10 +81,14 @@ export interface ZohoCostLine {
     quantity: number | null;
 }
 
-// Build one cost line per product line on a bill, summing every landed cost
-// allocated to that line and spreading it per unit. Landed-cost expense lines
-// (`is_landedcost`) and lines without a SKU are excluded — they aren't products.
-// Pure so it can be tested against captured Zoho payloads without the network.
+// Build one cost line per PRODUCT on a bill, summing every landed cost allocated
+// to that product and spreading it per unit. A product can appear on more than
+// one line of a bill (split lines, or the same SKU billed twice); the stored
+// grain is one line per (product, bill) — @unique([product, supplierBill]) — so
+// those lines are folded together: quantities and freight sum, and the unit cost
+// is quantity-weighted. Landed-cost expense lines (`is_landedcost`) and lines
+// without a SKU are excluded — they aren't products. Pure so it can be tested
+// against captured Zoho payloads without the network.
 export function buildCostLinesForBill(bill: ZohoBillDetail, landedCosts: ZohoLandedCost[]): ZohoCostLine[] {
     // Total freight allocated to each bill line, summed across all landed costs
     // on the bill (freight + customs + fees, possibly from several source bills).
@@ -94,25 +100,56 @@ export function buildCostLinesForBill(bill: ZohoBillDetail, landedCosts: ZohoLan
         }
     }
 
-    const lines: ZohoCostLine[] = [];
+    // Fold every product line into one accumulator per SKU.
+    interface Acc {
+        sku: string;
+        costTimesQty: number; // Σ rate·qty, for a quantity-weighted unit cost
+        rateSum: number; // fallback when no quantities are present
+        rateCount: number;
+        qty: number;
+        hasQty: boolean;
+        freight: number;
+    }
+    const bySku = new Map<string, Acc>();
+
     for (const li of bill.line_items ?? []) {
         if (li.is_landedcost) continue; // a landed-cost expense line, not a product
         const sku = (li.sku ?? '').trim();
         if (!sku) continue;
 
-        const quantity = typeof li.quantity === 'number' ? li.quantity : null;
-        const freightTotal = freightByLineId.get(li.line_item_id) ?? 0;
-        const unitFreightIn = quantity && quantity > 0 ? freightTotal / quantity : 0;
+        const rate = li.rate ?? 0;
+        const qty = typeof li.quantity === 'number' ? li.quantity : null;
+        const freight = freightByLineId.get(li.line_item_id) ?? 0;
+
+        const acc = bySku.get(sku) ?? { sku, costTimesQty: 0, rateSum: 0, rateCount: 0, qty: 0, hasQty: false, freight: 0 };
+        acc.rateSum += rate;
+        acc.rateCount += 1;
+        acc.freight += freight;
+        if (qty !== null) {
+            acc.qty += qty;
+            acc.hasQty = true;
+            acc.costTimesQty += rate * qty;
+        }
+        bySku.set(sku, acc);
+    }
+
+    const lines: ZohoCostLine[] = [];
+    for (const acc of bySku.values()) {
+        const totalQty = acc.hasQty ? acc.qty : 0;
+        const unitCost = totalQty > 0 ? acc.costTimesQty / totalQty : acc.rateSum / acc.rateCount;
+        const unitFreightIn = totalQty > 0 ? acc.freight / totalQty : 0;
 
         lines.push({
-            zohoRecordId: li.line_item_id,
-            sku,
+            // Stable per-(product, bill) identity — survives Zoho re-saves and is a
+            // single value even when the SKU spans several lines on the bill.
+            zohoRecordId: `${bill.bill_id}::${acc.sku}`,
+            sku: acc.sku,
             billNumber: bill.bill_number,
             billDate: bill.date ?? null,
             vendorName: bill.vendor_name ?? null,
-            unitCost: li.rate ?? 0,
+            unitCost,
             unitFreightIn,
-            quantity,
+            quantity: acc.hasQty ? acc.qty : null,
         });
     }
     return lines;
@@ -224,7 +261,9 @@ function toNumberOrNull(value: unknown): number | null {
 
 // Work out what needs to change to bring cost lines in line with Zoho. Performs
 // NO writes — everything is applied later in applyCostSync(), after the user
-// confirms. Cost lines are matched on their Zoho record id (the bill line item).
+// confirms. Cost lines are matched on the (product, bill) business key — the same
+// grain as @unique([product, supplierBill]) — not the Zoho line id, which rotates
+// on re-save and would otherwise re-create an existing line and hit the constraint.
 export async function computeCostSyncPlan(zohoLines: ZohoCostLine[]): Promise<CostSyncPlan> {
     const warnings: string[] = [];
 
@@ -247,13 +286,23 @@ export async function computeCostSyncPlan(zohoLines: ZohoCostLine[]): Promise<Co
         skus.length > 0 ? await models.product.findMany({ where: { sku: { oneOf: skus } } }) : [];
     const productBySku = new Map(existingProducts.map((p) => [p.sku, p]));
 
-    // Existing cost lines, matched on Zoho record id.
-    const zohoRecordIds = usable.map((l) => l.zohoRecordId);
-    const existingLines =
-        zohoRecordIds.length > 0
-            ? await models.productCostLine.findMany({ where: { zohoRecordId: { oneOf: zohoRecordIds } } })
+    // Resolve which referenced bills already exist, so existing cost lines can be
+    // matched on (product, supplierBill) — the real grain — rather than on the
+    // computed billNumber field (which may be unpopulated on older rows).
+    const billNumbersInput = [...new Set(usable.map((l) => l.billNumber))];
+    const existingBills =
+        billNumbersInput.length > 0
+            ? await models.supplierBill.findMany({ where: { billNumber: { oneOf: billNumbersInput } } })
             : [];
-    const existingByZohoId = new Map(existingLines.map((l) => [l.zohoRecordId, l]));
+    const billIdByNumber = new Map(existingBills.map((b) => [b.billNumber, b.id]));
+
+    // Existing cost lines for these products, keyed on (product, bill).
+    const productIds = existingProducts.map((p) => p.id);
+    const existingLines =
+        productIds.length > 0
+            ? await models.productCostLine.findMany({ where: { productId: { oneOf: productIds } } })
+            : [];
+    const existingByProductBill = new Map(existingLines.map((l) => [`${l.productId}::${l.supplierBillId}`, l]));
 
     const costLines: CostLineChange[] = [];
     const unmatchedSkus = new Set<string>();
@@ -267,13 +316,13 @@ export async function computeCostSyncPlan(zohoLines: ZohoCostLine[]): Promise<Co
             continue;
         }
 
-        const existing = existingByZohoId.get(line.zohoRecordId);
+        const billId = billIdByNumber.get(line.billNumber);
+        const existing = billId ? existingByProductBill.get(`${product.id}::${billId}`) : undefined;
         const needsUpdate =
             !existing ||
             toNumberOrNull(existing.unitCost) !== line.unitCost ||
             toNumberOrNull(existing.unitFreightIn) !== line.unitFreightIn ||
-            toNumberOrNull(existing.quantity) !== line.quantity ||
-            existing.productId !== product.id;
+            toNumberOrNull(existing.quantity) !== line.quantity;
 
         if (!needsUpdate) {
             unchangedCostLines++;
@@ -347,9 +396,11 @@ async function getOrCreateSupplierBill(
 }
 
 // Apply a cost sync plan: upsert each supplier bill (by number), then upsert each
-// cost line (by Zoho record id). Idempotent — a step retry re-derives the same
-// result rather than duplicating records. Cost lines absent from Zoho are left in
-// place (cost history is cumulative, not reconciled away).
+// cost line by its (product, bill) key — matching @unique([product, supplierBill]).
+// Idempotent — a step retry re-derives the same result rather than duplicating
+// records, and a bill re-saved in Zoho (rotating its line ids) updates the existing
+// line instead of colliding on the constraint. Cost lines absent from Zoho are left
+// in place (cost history is cumulative, not reconciled away).
 export async function applyCostSync(plan: CostSyncPlan, progress?: ProgressReporter): Promise<CostApplyResult> {
     const now = new Date();
     const billCache = new Map<string, string>();
@@ -373,9 +424,15 @@ export async function applyCostSync(plan: CostSyncPlan, progress?: ProgressRepor
             synchronisedAt: now,
         };
 
-        const existing = await models.productCostLine.findOne({ zohoRecordId: line.zohoRecordId });
+        // Match on the (product, bill) business key, not the (rotating) Zoho line
+        // id, so a re-saved bill updates the existing line instead of colliding on
+        // @unique([product, supplierBill]). zohoRecordId is refreshed on update.
+        const existingRows = await models.productCostLine.findMany({
+            where: { productId: line.productId, supplierBillId: bill.id },
+        });
+        const existing = existingRows[0];
         if (existing) {
-            await models.productCostLine.update({ id: existing.id }, values);
+            await models.productCostLine.update({ id: existing.id }, { ...values, zohoRecordId: line.zohoRecordId });
             costLinesUpdated++;
         } else {
             await models.productCostLine.create({ ...values, zohoRecordId: line.zohoRecordId });
