@@ -70,7 +70,8 @@ describe('buildCostLinesForBill', () => {
         expect(lines).toHaveLength(2); // the is_landedcost line is excluded
 
         const bread = lines.find((l) => l.sku === 'BREADBOARD')!;
-        expect(bread.zohoRecordId).toBe('li-1');
+        // Stable per-(product, bill) key, not the Zoho line_item_id.
+        expect(bread.zohoRecordId).toBe('b1::BREADBOARD');
         expect(bread.unitCost).toBe(9.03);
         // (99.73 + 20.27) / 20 = 6.00
         expect(bread.unitFreightIn).toBeCloseTo(6.0, 10);
@@ -99,6 +100,37 @@ describe('buildCostLinesForBill', () => {
             { landed_cost_id: 'lc', cost_allocations: [{ bill_item_id: 'li-1', allocated_amount: 50 }] },
         ]);
         expect(line.unitFreightIn).toBe(0);
+    });
+
+    test('folds two lines of the same SKU into one (product, bill) cost line', () => {
+        // The same product billed on two lines — different quantities, different
+        // freight. Must collapse to a single line (quantities + freight summed,
+        // unit cost quantity-weighted), matching @unique([product, supplierBill]).
+        const twoLines: ZohoBillDetail = {
+            ...bill,
+            line_items: [
+                { line_item_id: 'li-a', sku: 'BREADBOARD', rate: 10, quantity: 30 },
+                { line_item_id: 'li-b', sku: 'BREADBOARD', rate: 14, quantity: 10 },
+            ],
+        };
+        const lines = buildCostLinesForBill(twoLines, [
+            {
+                landed_cost_id: 'lc',
+                cost_allocations: [
+                    { bill_item_id: 'li-a', allocated_amount: 60 },
+                    { bill_item_id: 'li-b', allocated_amount: 20 },
+                ],
+            },
+        ]);
+
+        expect(lines).toHaveLength(1);
+        const line = lines[0];
+        expect(line.zohoRecordId).toBe('b1::BREADBOARD');
+        expect(line.quantity).toBe(40); // 30 + 10
+        // Quantity-weighted unit cost: (10·30 + 14·10) / 40 = 11.
+        expect(line.unitCost).toBeCloseTo(11, 10);
+        // Freight per unit: (60 + 20) / 40 = 2.
+        expect(line.unitFreightIn).toBeCloseTo(2, 10);
     });
 
     test('excludes lines without a SKU', () => {
@@ -281,5 +313,29 @@ describe('applyCostSync', () => {
         const lines = await linesForProduct(product.id);
         expect(lines).toHaveLength(1);
         expect(Number(lines[0].unitFreightIn)).toBeCloseTo(90.0, 2);
+    });
+
+    test('a rotated Zoho record id for the same (product, bill) updates, not duplicates', async () => {
+        // Regression for the production error
+        // (product_cost_line_product_supplier_bill_udx): Zoho rotates line ids when
+        // a bill is re-saved, so the second sync arrives with a different
+        // zohoRecordId for a (product, bill) that already has a line. Matching on
+        // (product, bill) must update it, not create a second row and hit the
+        // unique constraint.
+        const product = await createProduct('UR-FS292');
+        await applyCostSync(await computeCostSyncPlan([costLine({ zohoRecordId: 'b1::UR-FS292' })]));
+
+        // Same bill + product, brand-new record id (as if the bill was re-saved).
+        const result = await applyCostSync(
+            await computeCostSyncPlan([costLine({ zohoRecordId: 'b2::UR-FS292', unitFreightIn: 75.0 })])
+        );
+
+        expect(result.costLinesCreated).toBe(0);
+        expect(result.costLinesUpdated).toBe(1);
+
+        const lines = await linesForProduct(product.id);
+        expect(lines).toHaveLength(1); // no duplicate, no constraint violation
+        expect(Number(lines[0].unitFreightIn)).toBeCloseTo(75.0, 2);
+        expect(lines[0].zohoRecordId).toBe('b2::UR-FS292'); // refreshed to the latest
     });
 });
