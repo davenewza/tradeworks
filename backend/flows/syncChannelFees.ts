@@ -67,14 +67,16 @@ export default SyncChannelFees(config, async (ctx) => {
     });
 
     // ── Step: authenticate with Zoho ─────────────────────────────────────────
-    const accessToken = (await ctx.step('authenticate', async () => {
+    const accessToken = (await ctx.step('authenticate', { loadingMessage: 'Signing in to Zoho…' }, async () => {
         return await getZohoAccessToken(ctx);
     })) as unknown as string;
 
     // ── Step: read-only diff — work out what needs to change ─────────────────
-    const plan = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async () => {
+    const plan = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+        progress.set({ message: 'Fetching fee definitions from Zoho…' });
         const fees = await fetchChannelFees(ctx, accessToken);
-        const items = await fetchItemFeeAssignments(ctx, accessToken);
+        const items = await fetchItemFeeAssignments(ctx, accessToken, progress);
+        progress.set({ message: 'Comparing against existing fees…' });
         return await computeFeeSyncPlan(fees, items);
     })) as unknown as FeeSyncPlan;
 
@@ -126,8 +128,8 @@ export default SyncChannelFees(config, async (ctx) => {
     });
 
     // ── Step: apply — upsert fees and reconcile product assignments ──────────
-    const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async () => {
-        return await applyFeeSync(plan);
+    const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+        return await applyFeeSync(plan, progress);
     })) as unknown as FeeApplyResult;
 
     // ── Completion: summary of what was applied ──────────────────────────────

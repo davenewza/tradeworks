@@ -11,6 +11,25 @@ import {
 
 beforeEach(resetDatabase);
 
+// A ProgressReporter that records what a step reported, so tests can assert the
+// per-item progress without a live flow runtime.
+function recordingProgress() {
+    const state = { total: undefined as number | undefined, current: 0, logs: [] as string[] };
+    const reporter = {
+        set(patch: { total?: number; current?: number }) {
+            if (patch.total !== undefined) state.total = patch.total;
+            if (patch.current !== undefined) state.current = patch.current;
+        },
+        increment(n = 1) {
+            state.current += n;
+        },
+        log(message: string) {
+            state.logs.push(message);
+        },
+    };
+    return { reporter, state };
+}
+
 // ─── buildCostLinesForBill (pure) ─────────────────────────────────────────────
 // Fixtures mirror the real Zoho payloads captured from bill "Nicole20210322".
 
@@ -234,6 +253,22 @@ describe('applyCostSync', () => {
 
         const lines = await linesForProduct(product.id);
         expect(lines).toHaveLength(1);
+    });
+
+    test('reports progress: sets the total once and increments per cost line', async () => {
+        await createProduct('UR-FS292');
+        await createProduct('UR-FS400');
+        const plan = await computeCostSyncPlan([
+            costLine({ zohoRecordId: 'z-a', sku: 'UR-FS292' }),
+            costLine({ zohoRecordId: 'z-b', sku: 'UR-FS400' }),
+        ]);
+
+        const { reporter, state } = recordingProgress();
+        await applyCostSync(plan, reporter);
+
+        expect(state.total).toBe(2);
+        expect(state.current).toBe(2); // one increment per cost line
+        expect(state.logs).toHaveLength(2);
     });
 
     test('updates an existing line in place rather than duplicating it', async () => {

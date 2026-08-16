@@ -163,8 +163,8 @@ describe('Product sales details', () => {
         const product = await models.product.create({ name: 'Kit', sku: 'S-1', brandId: brand.id });
         const channel = await models.channel.create({ name: 'Takealot' });
         // Line 1: list 1150/unit but net 800 after a discount (qty 2); line 2: net 1500 (qty 3).
-        const s1 = await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', channelId: channel.id, date: new Date('2024-01-01'), productId: product.id, quantity: 2, price: 1150, netAmount: 800, discountAmount: 200, invoiceStatus: 'paid' });
-        await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', channelId: channel.id, date: new Date('2024-02-01'), productId: product.id, quantity: 3, price: 575, netAmount: 1500, invoiceStatus: 'paid' });
+        const s1 = await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: new Date('2024-01-01'), productId: product.id, quantity: 2, price: 1150, netAmount: 800, discountAmount: 200, invoiceStatus: 'paid' });
+        await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: new Date('2024-02-01'), productId: product.id, quantity: 3, price: 575, netAmount: 1500, invoiceStatus: 'paid' });
 
         const p = await models.product.findOne({ id: product.id });
         expect(num(p!.totalUnitsSold)).toBe(5);

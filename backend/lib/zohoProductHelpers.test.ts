@@ -4,6 +4,25 @@ import { applyProductSync, SyncCandidate } from './zohoProductHelpers';
 
 beforeEach(resetDatabase);
 
+// A ProgressReporter that records what a step reported, so tests can assert the
+// per-item progress without a live flow runtime.
+function recordingProgress() {
+    const state = { total: undefined as number | undefined, current: 0, logs: [] as string[] };
+    const reporter = {
+        set(patch: { total?: number; current?: number }) {
+            if (patch.total !== undefined) state.total = patch.total;
+            if (patch.current !== undefined) state.current = patch.current;
+        },
+        increment(n = 1) {
+            state.current += n;
+        },
+        log(message: string) {
+            state.logs.push(message);
+        },
+    };
+    return { reporter, state };
+}
+
 // Build a SyncCandidate; the apply pass only reads sku/name/brand, so the
 // display/hidden fields are filled with representative values.
 function candidate(overrides: Partial<SyncCandidate> & Pick<SyncCandidate, 'sku' | 'name' | 'brand'>): SyncCandidate {
@@ -94,6 +113,23 @@ describe('applyProductSync', () => {
         expect(after!.name).toBe('Untouched');
         expect(after!.synchronisedAt).toBeNull();
         expect(after!.id).toBe(untouched.id);
+    });
+
+    test('reports progress: sets the total once and increments per product', async () => {
+        const { reporter, state } = recordingProgress();
+
+        await applyProductSync(
+            [
+                candidate({ sku: 'PR-1', name: 'One', brand: 'Acme' }),
+                candidate({ sku: 'PR-2', name: 'Two', brand: 'Acme' }),
+                candidate({ sku: 'PR-3', name: 'Three', brand: 'Acme' }),
+            ],
+            reporter
+        );
+
+        expect(state.total).toBe(3);
+        expect(state.current).toBe(3); // one increment per product
+        expect(state.logs).toHaveLength(3);
     });
 
     test('is idempotent — re-running a create becomes an update, no duplicates', async () => {

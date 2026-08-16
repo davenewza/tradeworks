@@ -1,5 +1,6 @@
 import { models, FeeMethod } from '@teamkeel/sdk';
 import { getOrCreateChannel } from './zohoSalesHelpers';
+import { ProgressReporter } from './progress';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -259,11 +260,16 @@ async function fetchItemDetails(
 // Pull every active item (with SKU) from Zoho along with its fee assignments.
 // Items with no fees assigned are included so a cleared fee in Zoho clears here
 // too on sync.
-export async function fetchItemFeeAssignments(ctx: ZohoFeeCtx, accessToken: string): Promise<ZohoItemFees[]> {
+export async function fetchItemFeeAssignments(
+    ctx: ZohoFeeCtx,
+    accessToken: string,
+    progress?: ProgressReporter
+): Promise<ZohoItemFees[]> {
     const assignments: ZohoItemFees[] = [];
     let page = 1;
     let hasMorePages = true;
 
+    progress?.set({ message: 'Fetching item fee assignments from Zoho…' });
     while (hasMorePages) {
         const itemsUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/items?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&filter_by=Status.Active&page=${page}&per_page=200`;
 
@@ -300,6 +306,7 @@ export async function fetchItemFeeAssignments(ctx: ZohoFeeCtx, accessToken: stri
         }
 
         hasMorePages = itemsData.page_context?.has_more_page ?? false;
+        progress?.set({ message: `Fetched fee assignments for ${assignments.length} item${assignments.length === 1 ? '' : 's'}…` });
         page++;
     }
 
@@ -521,12 +528,19 @@ export interface FeeApplyResult {
 // Idempotent: fees are keyed on the unique zohoRecordId and assignments on the
 // unique [product, channelFee] pair, so a step retry re-derives the same result
 // rather than duplicating records.
-export async function applyFeeSync(plan: FeeSyncPlan): Promise<FeeApplyResult> {
+export async function applyFeeSync(plan: FeeSyncPlan, progress?: ProgressReporter): Promise<FeeApplyResult> {
     const channel = await getOrCreateChannel(plan.channelName, new Map());
     const now = new Date();
 
     let feesCreated = 0;
     let feesUpdated = 0;
+
+    progress?.set({
+        current: 0,
+        total: plan.fees.length + plan.productFees.length,
+        unit: 'changes',
+        counter: 'count',
+    });
 
     for (const fee of plan.fees) {
         const values = {
@@ -546,6 +560,9 @@ export async function applyFeeSync(plan: FeeSyncPlan): Promise<FeeApplyResult> {
             await models.channelFee.create({ ...values, zohoRecordId: fee.zohoRecordId });
             feesCreated++;
         }
+
+        progress?.increment();
+        progress?.log(`${existing ? 'Updated' : 'Added'} fee ${fee.name}`);
     }
 
     // All fees for this channel: used to map Zoho ids → our ids and to scope
@@ -588,6 +605,8 @@ export async function applyFeeSync(plan: FeeSyncPlan): Promise<FeeApplyResult> {
         }
 
         productsChanged++;
+        progress?.increment();
+        progress?.log(`Reconciled fees for ${productFee.sku} — ${productFee.product}`);
     }
 
     return { feesCreated, feesUpdated, assignmentsAdded, assignmentsRemoved, productsChanged };

@@ -1,4 +1,5 @@
 import { models } from '@teamkeel/sdk';
+import { ProgressReporter } from './progress';
 
 // ─── Zoho types ─────────────────────────────────────────────────────────────
 
@@ -148,13 +149,15 @@ async function fetchItemDetails(
 // are products that already match Zoho exactly (nothing to do).
 export async function computeSyncCandidates(
     ctx: ZohoProductCtx,
-    accessToken: string
+    accessToken: string,
+    progress?: ProgressReporter
 ): Promise<SyncCandidate[]> {
     // 1. Collect every active item from Zoho (with custom_fields for brand).
     const items: ZohoItem[] = [];
     let page = 1;
     let hasMorePages = true;
 
+    progress?.set({ message: 'Fetching items from Zoho…' });
     while (hasMorePages) {
         const itemsUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/items?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&filter_by=Status.Active&page=${page}&per_page=200`;
 
@@ -187,8 +190,11 @@ export async function computeSyncCandidates(
         }
 
         hasMorePages = itemsData.page_context?.has_more_page ?? false;
+        progress?.set({ message: `Fetched ${items.length} item${items.length === 1 ? '' : 's'} from Zoho…` });
         page++;
     }
+
+    progress?.set({ message: 'Comparing against existing products…' });
 
     // 2. Batch-load the existing products (and their current brand names) so we
     // can diff without a query per item.
@@ -257,7 +263,10 @@ export interface ApplyResult {
 // Create/update only the selected candidates, creating any missing brands along
 // the way. Idempotent: keyed on the unique SKU, so a step retry re-derives the
 // same result rather than duplicating records.
-export async function applyProductSync(selected: SyncCandidate[]): Promise<ApplyResult> {
+export async function applyProductSync(
+    selected: SyncCandidate[],
+    progress?: ProgressReporter
+): Promise<ApplyResult> {
     const brandCache = new Map<string, string>(); // brand name → brand id
 
     async function getOrCreateBrand(brandName: string): Promise<string> {
@@ -276,6 +285,8 @@ export async function applyProductSync(selected: SyncCandidate[]): Promise<Apply
     const synced: SyncedProduct[] = [];
     let created = 0;
     let updated = 0;
+
+    progress?.set({ current: 0, total: selected.length, unit: 'products', counter: 'count' });
 
     for (const candidate of selected) {
         const brandId = await getOrCreateBrand(candidate.brand);
@@ -304,6 +315,9 @@ export async function applyProductSync(selected: SyncCandidate[]): Promise<Apply
             brand: candidate.brand,
             change: existing ? 'Update' : 'New',
         });
+
+        progress?.increment();
+        progress?.log(`${existing ? 'Updated' : 'Added'} ${candidate.sku} — ${candidate.name}`);
     }
 
     return { synced, created, updated };

@@ -184,7 +184,7 @@ export default ImportProductViews({}, async (ctx, inputs) => {
         return created.id;
     }) as unknown as string;
 
-    const parsedRows = await ctx.step("parse-file", async () => {
+    const parsedRows = await ctx.step("parse-file", { loadingMessage: 'Parsing the uploaded file…' }, async () => {
         const buffer = await inputs.fileContent.read();
         const content = buffer.toString("utf-8");
 
@@ -211,7 +211,7 @@ export default ImportProductViews({}, async (ctx, inputs) => {
     }
 
     // Process in a single durable step
-    const importResult = await ctx.step("import-views", async () => {
+    const importResult = await ctx.step("import-views", async ({ progress }) => {
         // Batch lookup all products by SKU
         const allSkus = [...new Set(parsedRows.map((r) => r.sku))];
         const products = await models.product.findMany({
@@ -235,12 +235,15 @@ export default ImportProductViews({}, async (ctx, inputs) => {
         let skipped = 0;
         const unmatchedSkus: string[] = [];
 
+        progress.set({ current: 0, total: parsedRows.length, unit: 'rows', counter: 'count' });
+
         for (const row of parsedRows) {
             const productId = productMap.get(row.sku);
 
             if (!productId) {
                 unmatchedSkus.push(row.sku);
                 skipped++;
+                progress.increment();
                 continue;
             }
 
@@ -263,6 +266,8 @@ export default ImportProductViews({}, async (ctx, inputs) => {
                 existingMap.set(productId, newRecord.id);
                 created++;
             }
+
+            progress.increment();
         }
 
         return { created, updated, skipped, unmatchedSkus, totalRows: parsedRows.length };
