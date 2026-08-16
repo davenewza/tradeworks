@@ -1,0 +1,35 @@
+{
+  "id": "list-channel-fees-always-applied",
+  "action_name": "listChannelFeesAlwaysApplied",
+  "response": {
+    "$.results[*].alwaysApplied": {
+      "visible": false
+    },
+    "$.results[*].channelId": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "link": {
+        "tool_id": "get-channel-fee",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    },
+    "$.results[*].zohoRecordId": {
+      "visible": false
+    }
+  }
+}

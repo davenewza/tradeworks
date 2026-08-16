@@ -31,6 +31,10 @@ model Sale {
         // invoice status (e.g. paid, draft, overdue)
         onPromotion Boolean?
         // invoice "On Promotion" custom field
+        // Zoho's invoice last_modified_time, stored so a re-sync can skip the
+        // per-invoice detail fetch when the invoice is unchanged — the biggest
+        // lever on Zoho's daily API quota. Null for rows synced before this field.
+        zohoModifiedTime Text?
         total Decimal @computed(sale.price * sale.quantity)
         vat Decimal @computed(sale.total * 0.15)
         totalExclVat Decimal @computed(sale.total - sale.vat)

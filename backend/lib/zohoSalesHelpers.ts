@@ -5,8 +5,42 @@ export interface ZohoInvoice {
     invoice_number: string;
     date: string;
     status?: string;
+    // Zoho's last-modified timestamp, present on both the list and detail
+    // responses. Used to skip the detail fetch for unchanged invoices.
+    last_modified_time?: string;
     line_items: ZohoLineItem[];
     custom_fields?: ZohoCustomField[];
+}
+
+// Zoho's daily per-organisation API quota (error code 45 on a 429). Unlike a
+// transient burst 429, a code-45 response keeps failing until the quota resets
+// the next day — so callers must STOP rather than retry (retrying just burns
+// more of a quota that's already gone).
+export function isZohoDailyRateLimit(status: number, body: string): boolean {
+    if (status !== 429) return false;
+    return /"code"\s*:\s*45\b/.test(body) || /call rate limit/i.test(body);
+}
+
+// Split invoice summaries into those needing a detail fetch and those we can
+// skip because we already hold their current version (a stored last_modified_time
+// equal to Zoho's). Invoices with no stored time (never synced, or synced before
+// the field existed) are always fetched. This is the main saving on the daily
+// API quota: re-syncs stop re-fetching every unchanged invoice's detail.
+export function partitionInvoicesByChange<T extends { invoice_number: string; last_modified_time?: string }>(
+    summaries: T[],
+    storedModifiedByInvoice: Map<string, string | null>
+): { toFetch: T[]; skipped: number } {
+    const toFetch: T[] = [];
+    let skipped = 0;
+    for (const summary of summaries) {
+        const stored = storedModifiedByInvoice.get(summary.invoice_number);
+        if (stored && summary.last_modified_time && stored === summary.last_modified_time) {
+            skipped++;
+        } else {
+            toFetch.push(summary);
+        }
+    }
+    return { toFetch, skipped };
 }
 
 export interface ZohoCustomField {
@@ -154,11 +188,14 @@ export async function fetchInvoiceDetailsBatch(
     baseUrl: string,
     orgId: string,
     accessToken: string
-): Promise<{ invoices: ZohoInvoice[]; failures: number }> {
+): Promise<{ invoices: ZohoInvoice[]; failures: number; rateLimited: boolean }> {
     const results: ZohoInvoice[] = [];
     let failures = 0;
+    let rateLimited = false;
 
     for (let i = 0; i < invoiceSummaries.length; i += INVOICE_FETCH_BATCH_SIZE) {
+        // Quota's gone — stop firing calls; the run will pause and resume next time.
+        if (rateLimited) break;
         const batch = invoiceSummaries.slice(i, i + INVOICE_FETCH_BATCH_SIZE);
 
         const batchResults = await Promise.all(
@@ -180,6 +217,12 @@ export async function fetchInvoiceDetailsBatch(
                         }
 
                         const errorText = await response.text();
+                        // A daily-quota 429 won't recover today — don't waste the
+                        // remaining retries; flag it and let the run pause.
+                        if (isZohoDailyRateLimit(response.status, errorText)) {
+                            rateLimited = true;
+                            return null;
+                        }
                         console.error(
                             `Failed to fetch invoice ${summary.invoice_number} (attempt ${attempt}/${INVOICE_FETCH_MAX_RETRIES}): ${response.status} - ${errorText}`
                         );
@@ -201,10 +244,13 @@ export async function fetchInvoiceDetailsBatch(
 
         const successful = batchResults.filter((inv): inv is ZohoInvoice => inv !== null);
         results.push(...successful);
+        // When rate-limited, the nulls in this batch are the quota casualties, not
+        // data failures — don't count them (they're re-fetched next run).
+        if (rateLimited) break;
         failures += batchResults.length - successful.length;
     }
 
-    return { invoices: results, failures };
+    return { invoices: results, failures, rateLimited };
 }
 
 export async function getOrCreateChannel(
@@ -303,6 +349,9 @@ export async function processInvoiceLineItems(
             discountAmount: lineItem.discount_amount ?? null,
             invoiceStatus: invoice.status ?? null,
             onPromotion: getOnPromotionFromInvoice(invoice),
+            // Stored so the next sync can skip this invoice's detail fetch while
+            // it's unchanged (see partitionInvoicesByChange).
+            zohoModifiedTime: invoice.last_modified_time ?? null,
         };
 
         try {

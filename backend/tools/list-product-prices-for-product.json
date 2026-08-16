@@ -1,0 +1,86 @@
+{
+  "id": "list-product-prices-for-product",
+  "action_name": "listProductPricesForProduct",
+  "response": {
+    "$.results[*].alwaysCommissionPercentage": {
+      "visible": false
+    },
+    "$.results[*].alwaysFlatTotal": {
+      "visible": false
+    },
+    "$.results[*].channelFees": {
+      "display_order": 5
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].flatFeeTotal": {
+      "visible": false
+    },
+    "$.results[*].grossProfit": {
+      "display_order": 6
+    },
+    "$.results[*].grossProfitMargin": {
+      "display_name": "Gross margin",
+      "display_order": 7
+    },
+    "$.results[*].id": {
+      "link": {
+        "tool_id": "get-product-price",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].landedUnitCost": {
+      "visible": false
+    },
+    "$.results[*].price": {
+      "display_name": "Price excl VAT",
+      "display_order": 4
+    },
+    "$.results[*].priceInclVat": {
+      "display_name": "Price incl VAT",
+      "display_order": 3
+    },
+    "$.results[*].priceListChannelName": {
+      "display_name": "Channel",
+      "display_order": 2,
+      "visible": false
+    },
+    "$.results[*].priceListId": {
+      "visible": false
+    },
+    "$.results[*].priceListName": {
+      "display_name": "Price list",
+      "display_order": 1
+    },
+    "$.results[*].productId": {
+      "visible": false
+    },
+    "$.results[*].productName": {
+      "visible": false
+    },
+    "$.results[*].productSku": {
+      "visible": false
+    },
+    "$.results[*].successFeePercentage": {
+      "visible": false
+    },
+    "$.results[*].unitCost": {
+      "visible": false
+    },
+    "$.results[*].unitFreightIn": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}

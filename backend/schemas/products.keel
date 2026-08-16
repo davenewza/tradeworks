@@ -36,6 +36,7 @@ model Product {
         sales Sale[]
         channelFees ProductChannelFee[]
         costLines ProductCostLine[]
+        prices ProductPrice[]
         // Weighted-average cost of goods and freight-in across the product's
         // supplier bills, weighted by units received. SUM is COALESCE'd to 0, so
         // the IF guards the no-cost-lines 0/0 case.

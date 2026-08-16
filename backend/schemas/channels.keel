@@ -55,6 +55,9 @@ model ChannelFee {
         list listChannelFees(channel.id) {
             @orderBy(name: asc)
         }
+        list listChannelFeesAlwaysApplied(channel.id?) {
+            @where(channelFee.alwaysApplied)
+        }
         create createChannelFee() with (
             channel.id,
             name,
@@ -83,17 +86,17 @@ model ProductChannelFee {
         // Display copies of the linked fee, so a product's fees are legible in
         // one table without following each lookup. Optional so the computed
         // columns are migration-safe on an already-populated table.
-        channelName Text? @computed(productChannelFee.channelFee.channel.name)
-        feeName Text? @computed(productChannelFee.channelFee.name)
+        channelName Text @computed(productChannelFee.channelFee.channel.name)
+        feeName Text @computed(productChannelFee.channelFee.name)
         feeType Text? @computed(productChannelFee.channelFee.feeType)
-        feeMethod FeeMethod? @computed(productChannelFee.channelFee.method)
-        feeValue Decimal? @computed(productChannelFee.channelFee.value)
+        feeMethod FeeMethod @computed(productChannelFee.channelFee.method)
+        feeValue Decimal @computed(productChannelFee.channelFee.value)
         synchronisedAt Timestamp?
     }
 
     actions {
         get getProductChannelFee(id)
-        list listProductChannelFees(product.id?) {
+        list listProductChannelFees(product.id) {
             @orderBy(feeType: asc)
         }
     }
