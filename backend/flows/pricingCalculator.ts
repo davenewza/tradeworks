@@ -34,7 +34,7 @@ const BASIS_LABEL: Record<string, string> = {
 };
 
 export default PricingCalculator(config, async (ctx) => {
-    const products = await ctx.step('load-products', async () => loadPricingProducts());
+    const products = await ctx.step('load-products', { loadingMessage: 'Loading products…' }, async () => loadPricingProducts());
     if (products.length === 0) {
         return ctx.complete({
             title: 'No products',

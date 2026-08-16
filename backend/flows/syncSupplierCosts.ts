@@ -69,13 +69,14 @@ export default SyncSupplierCosts(config, async (ctx, inputs) => {
     });
 
     // ── Step: authenticate with Zoho (Inventory scope) ───────────────────────
-    const accessToken = (await ctx.step('authenticate', async () => {
+    const accessToken = (await ctx.step('authenticate', { loadingMessage: 'Signing in to Zoho…' }, async () => {
         return await getZohoInventoryToken(ctx);
     })) as unknown as string;
 
     // ── Step: read-only diff — fetch bills + landed costs, work out changes ───
-    const plan = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async () => {
-        const lines = await fetchLandedCostLines(ctx, accessToken, dateFrom, dateTo);
+    const plan = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+        const lines = await fetchLandedCostLines(ctx, accessToken, dateFrom, dateTo, progress);
+        progress.set({ message: 'Comparing against existing cost lines…' });
         return await computeCostSyncPlan(lines);
     })) as unknown as CostSyncPlan;
 
@@ -111,8 +112,8 @@ export default SyncSupplierCosts(config, async (ctx, inputs) => {
     });
 
     // ── Step: apply — upsert bills and cost lines ────────────────────────────
-    const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async () => {
-        return await applyCostSync(plan);
+    const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+        return await applyCostSync(plan, progress);
     })) as unknown as CostApplyResult;
 
     // ── Completion: summary of what was applied ──────────────────────────────

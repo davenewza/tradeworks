@@ -9,7 +9,9 @@ model Sale {
         // Dedup identity: orderItemId when present (stable across Zoho re-saves),
         // else the Zoho line_item_id. line_item_id alone is NOT stable — Zoho
         // regenerates it on every invoice re-save, which was duplicating sales.
-        lineKey Text?
+        // Required: it's half of @unique below, and a null would escape that
+        // constraint (Postgres treats NULLs as distinct). Always set on write.
+        lineKey Text
         channel Channel
         date Date
         product Product
@@ -36,15 +38,6 @@ model Sale {
     }
 
     actions {
-        create createSale() with (
-            invoiceNumber,
-            lineItemId,
-            channel.id,
-            date,
-            product.id,
-            quantity,
-            price,
-        )
         list listSales(date?, product.id?, channel.id?)
         write handleInvoiceWebhook(Any) returns (Any) {
             @permission(expression: true)
@@ -55,7 +48,7 @@ model Sale {
 
     @permission(
         roles: [Operator],
-        actions: [get, create, list]
+        actions: [get, list]
     )
 }
 

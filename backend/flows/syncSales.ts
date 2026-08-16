@@ -9,7 +9,7 @@ import {
 } from '../lib/zohoSalesHelpers';
 
 export default SyncSales({}, async (ctx, inputs) => {
-    const accessToken = await ctx.step("authenticate", async () => {
+    const accessToken = await ctx.step("authenticate", { loadingMessage: 'Signing in to Zoho…' }, async () => {
         return await getZohoAccessToken(ctx);
     });
 
@@ -30,7 +30,8 @@ export default SyncSales({}, async (ctx, inputs) => {
     while (hasMorePages) {
         const currentPage = page;
 
-        const pageResult = await ctx.step(`sync-page-${currentPage}`, async () => {
+        const pageResult = await ctx.step(`sync-page-${currentPage}`, async ({ progress }) => {
+            progress.set({ message: `Fetching invoices (page ${currentPage})…` });
             const invoicesUrl = `${ctx.env.ZOHO_BOOKS_BASE_URL}/invoices?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&date_start=${startDate}&date_end=${endDate}&page=${currentPage}&per_page=200`;
 
             const invoicesResponse = await fetch(invoicesUrl, {
@@ -119,6 +120,14 @@ export default SyncSales({}, async (ctx, inputs) => {
                 }
             }
 
+            progress.set({
+                current: 0,
+                total: invoices.length,
+                unit: 'invoices',
+                counter: 'count',
+                message: `Page ${currentPage}: importing ${invoices.length} invoice${invoices.length === 1 ? '' : 's'}…`,
+            });
+
             for (const invoice of invoices) {
                 const invoiceResult = await processInvoiceLineItems(invoice, channelCache, {
                     productMap,
@@ -130,6 +139,7 @@ export default SyncSales({}, async (ctx, inputs) => {
                 for (const error of invoiceResult.errors) {
                     console.error(error);
                 }
+                progress.increment();
             }
 
             return {

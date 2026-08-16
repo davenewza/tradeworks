@@ -1,5 +1,6 @@
 import { models } from '@teamkeel/sdk';
 import { ZohoFeeCtx, getZohoAccessToken } from './zohoChannelFeeHelpers';
+import { ProgressReporter } from './progress';
 
 // Sources product cost of goods (unit cost + freight-in per supplier bill) from
 // Zoho Inventory's landed-cost feature. Freight/duties/fees are recorded as
@@ -138,12 +139,17 @@ export async function fetchLandedCostLines(
     ctx: ZohoFeeCtx,
     accessToken: string,
     dateFrom: string,
-    dateTo: string
+    dateTo: string,
+    progress?: ProgressReporter
 ): Promise<ZohoCostLine[]> {
     const org = ctx.env.ZOHO_BOOKS_ORG_ID;
     const costLines: ZohoCostLine[] = [];
     let page = 1;
     let hasMore = true;
+    let billsWalked = 0;
+    let billsWithCosts = 0;
+
+    progress?.set({ message: 'Walking Zoho bills…', unit: 'bills', counter: 'count' });
 
     while (hasMore) {
         const listUrl = `${INVENTORY_BASE}/bills?organization_id=${org}&date_start=${dateFrom}&date_end=${dateTo}&per_page=100&page=${page}&sort_column=date&sort_order=A`;
@@ -153,6 +159,11 @@ export async function fetchLandedCostLines(
         for (const summary of bills) {
             await sleep(CALL_SPACING_MS);
             const detail: ZohoBillDetail = (await getJson(`${INVENTORY_BASE}/bills/${summary.bill_id}?organization_id=${org}`, accessToken)).bill;
+            billsWalked++;
+            progress?.set({
+                current: billsWalked,
+                message: `Walked ${billsWalked} bill${billsWalked === 1 ? '' : 's'} · ${billsWithCosts} with landed costs`,
+            });
             const allocated = detail.allocated_landed_costs ?? [];
             if (allocated.length === 0) continue; // no freight → skip
 
@@ -163,6 +174,8 @@ export async function fetchLandedCostLines(
                 landedCosts.push(lc);
             }
 
+            billsWithCosts++;
+            progress?.log(`${detail.bill_number}: ${allocated.length} landed cost${allocated.length === 1 ? '' : 's'}`);
             costLines.push(...buildCostLinesForBill(detail, landedCosts));
         }
 
@@ -337,13 +350,15 @@ async function getOrCreateSupplierBill(
 // cost line (by Zoho record id). Idempotent — a step retry re-derives the same
 // result rather than duplicating records. Cost lines absent from Zoho are left in
 // place (cost history is cumulative, not reconciled away).
-export async function applyCostSync(plan: CostSyncPlan): Promise<CostApplyResult> {
+export async function applyCostSync(plan: CostSyncPlan, progress?: ProgressReporter): Promise<CostApplyResult> {
     const now = new Date();
     const billCache = new Map<string, string>();
 
     let costLinesCreated = 0;
     let costLinesUpdated = 0;
     let billsCreated = 0;
+
+    progress?.set({ current: 0, total: plan.costLines.length, unit: 'cost lines', counter: 'count' });
 
     for (const line of plan.costLines) {
         const bill = await getOrCreateSupplierBill(line.billNumber, line.billDate, line.vendorName, billCache);
@@ -366,6 +381,9 @@ export async function applyCostSync(plan: CostSyncPlan): Promise<CostApplyResult
             await models.productCostLine.create({ ...values, zohoRecordId: line.zohoRecordId });
             costLinesCreated++;
         }
+
+        progress?.increment();
+        progress?.log(`${existing ? 'Updated' : 'Added'} ${line.sku} · bill ${line.billNumber}`);
     }
 
     return { costLinesCreated, costLinesUpdated, billsCreated };

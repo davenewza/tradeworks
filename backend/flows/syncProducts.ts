@@ -44,13 +44,13 @@ export default SyncProducts(config, async (ctx) => {
     });
 
     // ── Step: authenticate with Zoho ─────────────────────────────────────────
-    const accessToken = (await ctx.step('authenticate', async () => {
+    const accessToken = (await ctx.step('authenticate', { loadingMessage: 'Signing in to Zoho…' }, async () => {
         return await getZohoAccessToken(ctx);
     })) as unknown as string;
 
     // ── Step: read-only diff — work out what needs adding/updating ───────────
-    const candidates = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async () => {
-        return await computeSyncCandidates(ctx, accessToken);
+    const candidates = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+        return await computeSyncCandidates(ctx, accessToken, progress);
     })) as unknown as SyncCandidate[];
 
     // Nothing to do → finish early.
@@ -92,8 +92,8 @@ export default SyncProducts(config, async (ctx) => {
     }
 
     // ── Step: apply — create/update selected products (and their brands) ─────
-    const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async () => {
-        return await applyProductSync(selected);
+    const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+        return await applyProductSync(selected, progress);
     })) as unknown as ApplyResult;
 
     // ── Completion: full list of what was added/updated ──────────────────────
