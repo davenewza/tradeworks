@@ -93,6 +93,13 @@ export function formatDate(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
+// Zoho's `last_modified_time` filter wants YYYY-MM-DDTHH:MM:SS with a timezone
+// offset (no colon in the offset). We emit UTC. The `+` must be percent-encoded
+// as %2B in the query string.
+export function formatModifiedSince(date: Date): string {
+    return date.toISOString().slice(0, 19) + '+0000';
+}
+
 export async function getZohoAccessToken(ctx: {
     env: { ZOHO_ACCOUNTS_BASE_URL: string; ZOHO_CLIENT_ID: string };
     secrets: { ZOHO_CLIENT_SECRET: string };

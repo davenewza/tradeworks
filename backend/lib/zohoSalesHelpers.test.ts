@@ -1,8 +1,14 @@
 import { models, resetDatabase } from '@teamkeel/testing';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { ZohoInvoice, processInvoiceLineItems } from './zohoSalesHelpers';
+import { ZohoInvoice, processInvoiceLineItems, formatModifiedSince } from './zohoSalesHelpers';
 
 beforeEach(resetDatabase);
+
+describe('formatModifiedSince', () => {
+    test('formats UTC with a colon-free offset for the Zoho last_modified_time filter', () => {
+        expect(formatModifiedSince(new Date('2026-08-13T06:30:00.000Z'))).toBe('2026-08-13T06:30:00+0000');
+    });
+});
 
 async function seedProduct(sku = 'RL-NA396') {
     const brand = await models.brand.create({ name: 'B' });
