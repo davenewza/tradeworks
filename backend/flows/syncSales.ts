@@ -94,7 +94,8 @@ export default SyncSales({}, async (ctx, inputs) => {
                     where: { invoiceNumber: { oneOf: Array.from(allInvoiceNumbers) } },
                 });
                 for (const sale of existingSales) {
-                    existingSalesMap.set(`${sale.invoiceNumber}-${sale.lineItemId}`, {
+                    // Key by the stable lineKey (matches processInvoiceLineItems).
+                    existingSalesMap.set(`${sale.invoiceNumber}-${sale.lineKey}`, {
                         id: sale.id,
                         quantity: sale.quantity,
                         price: sale.price,

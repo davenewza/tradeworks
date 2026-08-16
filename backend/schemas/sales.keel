@@ -2,6 +2,14 @@ model Sale {
     fields {
         invoiceNumber Text
         lineItemId Text
+        // Stable per-line identity from the source order (Takealot orderItemId,
+        // Amazon OrderItemId, Shopify line id), carried on the Zoho line. Null for
+        // invoices not managed by a channel integration.
+        orderItemId Text?
+        // Dedup identity: orderItemId when present (stable across Zoho re-saves),
+        // else the Zoho line_item_id. line_item_id alone is NOT stable — Zoho
+        // regenerates it on every invoice re-save, which was duplicating sales.
+        lineKey Text?
         channel Channel
         date Date
         product Product
@@ -43,7 +51,7 @@ model Sale {
         }
     }
 
-    @unique([invoiceNumber, lineItemId])
+    @unique([invoiceNumber, lineKey])
 
     @permission(
         roles: [Operator],
