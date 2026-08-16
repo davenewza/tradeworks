@@ -130,6 +130,21 @@
   ],
   "embedded_tools": [
     {
+      "id": "prices",
+      "title": "Prices",
+      "display_order": 0,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-product-prices-for-product"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false
+          }
+        }
+      ]
+    },
+    {
       "id": "channelFees",
       "tools": [
         {

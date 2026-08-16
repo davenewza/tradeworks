@@ -44,6 +44,10 @@ model ProductPrice {
         // match this direct field against each fee's channelName. Channel names
         // are unique, so this is an exact channel match.
         priceListChannelName Text? @computed(productPrice.priceList.channel.name)
+        // Price list name, hoisted for display (e.g. on the product page, which
+        // lists a product's price across every price list). Optional so adding it
+        // to a populated table is migration-safe; populated on next write.
+        priceListName Text? @computed(productPrice.priceList.name)
         // Landed cost, split into cost of goods and freight-in (weighted averages
         // across the product's bills). landedUnitCost is their sum.
         unitCost Decimal? @computed(productPrice.product.weightedUnitCost)
@@ -89,6 +93,10 @@ model ProductPrice {
                 productSku
             )
             @orderBy(productName: desc)
+        }
+        // A product's prices across every price list — embedded on the product page.
+        list listProductPricesForProduct(product.id) {
+            @orderBy(priceListName: asc)
         }
         update updateProductPrice(id) with (priceInclVat)
         delete deleteProductPrice(id)

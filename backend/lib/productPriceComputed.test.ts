@@ -127,6 +127,16 @@ describe('ProductPrice computed pricing', () => {
 
         expect(num((await models.productPrice.findOne({ id: created.id }))!.channelFees)).toBeCloseTo(1.0, 2);
     });
+
+    test('exposes the price list name (for the product-page prices view)', async () => {
+        const { product, takealot } = await seed();
+        const priceList = await models.priceList.create({ name: 'Takealot Retail', channelId: takealot.id });
+        const created = await models.productPrice.create({ productId: product.id, priceListId: priceList.id, priceInclVat: 500 });
+
+        const pp = await models.productPrice.findOne({ id: created.id });
+        expect(pp!.priceListName).toBe('Takealot Retail');
+        expect(pp!.priceListChannelName).toBe('Takealot Marketplace');
+    });
 });
 
 describe('Product purchase details', () => {
