@@ -12,6 +12,14 @@ export interface ZohoInvoice {
     custom_fields?: ZohoCustomField[];
 }
 
+// True for a Postgres unique-constraint violation surfaced through the Keel
+// model API — used to recover from a concurrent-create race (two webhook/sync
+// invocations inserting the same (invoiceNumber, lineKey) at once).
+export function isUniqueViolation(error: unknown): boolean {
+    const message = String((error as { message?: unknown } | null)?.message ?? error);
+    return message.includes('duplicate key value') || message.includes('unique constraint');
+}
+
 // Zoho's daily per-organisation API quota (error code 45 on a 429). Unlike a
 // transient burst 429, a code-45 response keeps failing until the quota resets
 // the next day — so callers must STOP rather than retry (retrying just burns
@@ -354,38 +362,55 @@ export async function processInvoiceLineItems(
             zohoModifiedTime: invoice.last_modified_time ?? null,
         };
 
+        // The mutable fields, shared by the update and the race-recovery update.
+        // Refresh line_item_id too — Zoho rotates it on re-save.
+        const updatePayload = {
+            lineItemId: lineItem.line_item_id,
+            orderItemId: orderItemId,
+            quantity: quantity,
+            price: price,
+            productId: product.id,
+            date: saleDate,
+            ...realized,
+            synchronisedAt: now,
+        };
+
         try {
             if (existingSale) {
-                await models.sale.update(
-                    { id: existingSale.id },
-                    {
-                        // Refresh line_item_id too — Zoho rotates it on re-save.
-                        lineItemId: lineItem.line_item_id,
-                        orderItemId: orderItemId,
-                        quantity: quantity,
-                        price: price,
-                        productId: product.id,
-                        date: saleDate,
-                        ...realized,
-                        synchronisedAt: now,
-                    }
-                );
+                await models.sale.update({ id: existingSale.id }, updatePayload);
                 result.updated++;
             } else {
-                await models.sale.create({
-                    invoiceNumber: invoice.invoice_number,
-                    lineItemId: lineItem.line_item_id,
-                    orderItemId: orderItemId,
-                    lineKey: lineKey,
-                    channel: { id: channel.id },
-                    date: saleDate,
-                    product: { id: product.id },
-                    quantity: quantity,
-                    price: price,
-                    ...realized,
-                    synchronisedAt: now,
-                });
-                result.created++;
+                try {
+                    await models.sale.create({
+                        invoiceNumber: invoice.invoice_number,
+                        lineItemId: lineItem.line_item_id,
+                        orderItemId: orderItemId,
+                        lineKey: lineKey,
+                        channel: { id: channel.id },
+                        date: saleDate,
+                        product: { id: product.id },
+                        quantity: quantity,
+                        price: price,
+                        ...realized,
+                        synchronisedAt: now,
+                    });
+                    result.created++;
+                } catch (error) {
+                    // Concurrent create: another webhook/sync inserted this
+                    // (invoiceNumber, lineKey) between our lookup and this insert.
+                    // Recover by updating the row that now exists, so this
+                    // delivery's data still lands (idempotent under races).
+                    if (!isUniqueViolation(error)) throw error;
+                    const raced = await models.sale.findMany({
+                        where: {
+                            invoiceNumber: { equals: invoice.invoice_number },
+                            lineKey: { equals: lineKey },
+                        },
+                    });
+                    if (raced.length === 0) throw error;
+                    await models.sale.update({ id: raced[0].id }, updatePayload);
+                    result.updated++;
+                }
             }
         } catch (error) {
             result.skipped++;

@@ -6,6 +6,7 @@ import {
     formatModifiedSince,
     isZohoDailyRateLimit,
     partitionInvoicesByChange,
+    isUniqueViolation,
 } from './zohoSalesHelpers';
 
 beforeEach(resetDatabase);
@@ -101,6 +102,53 @@ describe('processInvoiceLineItems dedup', () => {
 
         const sales = await models.sale.findMany({ where: {} });
         expect(sales[0].zohoModifiedTime).toBe('2026-01-15T09:00:00+0000');
+    });
+
+    test('recovers from a concurrent-create race by updating the row that now exists', async () => {
+        // Reproduces the production webhook error: a row for (invoiceNumber,
+        // lineKey) already exists (a concurrent webhook just created it), but our
+        // in-memory lookup is stale, so we take the create path and hit
+        // sale_invoice_number_line_key_udx. Must recover, not fail.
+        const product = await seedProduct();
+        const channel = await models.channel.create({ name: 'Other' });
+        await models.sale.create({
+            invoiceNumber: 'IT100',
+            lineItemId: 'OLD',
+            lineKey: 'OI-1',
+            channelId: channel.id,
+            date: new Date('2026-01-15'),
+            productId: product.id,
+            quantity: 1,
+            price: 299,
+        });
+
+        // Stale (empty) existingSalesMap forces the create path deterministically.
+        const r = await processInvoiceLineItems(
+            invoice('LINE-NEW', { managed: true, orderItemId: 'OI-1', qty: 4 }),
+            new Map(),
+            { productMap: new Map([['RL-NA396', { id: product.id }]]), existingSalesMap: new Map() }
+        );
+
+        expect(r.created).toBe(0);
+        expect(r.updated).toBe(1); // recovered as an update
+        expect(r.skipped).toBe(0);
+        expect(r.errors).toHaveLength(0);
+
+        const sales = await models.sale.findMany({ where: {} });
+        expect(sales).toHaveLength(1); // no duplicate, no constraint error
+        expect(sales[0].quantity).toBe(4); // this delivery's data still landed
+        expect(sales[0].lineItemId).toBe('LINE-NEW');
+    });
+});
+
+describe('isUniqueViolation', () => {
+    test('true for a Postgres duplicate-key error', () => {
+        expect(
+            isUniqueViolation(new Error('duplicate key value violates unique constraint "sale_invoice_number_line_key_udx"'))
+        ).toBe(true);
+    });
+    test('false for unrelated errors', () => {
+        expect(isUniqueViolation(new Error('connection terminated unexpectedly'))).toBe(false);
     });
 });
 
