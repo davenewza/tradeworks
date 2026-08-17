@@ -28,7 +28,7 @@ model ProductViews {
     )
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [list]
     )
 }
@@ -40,7 +40,7 @@ flow ImportProductViews {
         type ViewsImportType
         fileContent File
     }
-    @permission(expression: ctx.isAuthenticated)
+    @permission(roles: [Operator])
 }
 
 model ProductPerformance {
