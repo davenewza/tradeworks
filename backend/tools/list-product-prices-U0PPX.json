@@ -1,0 +1,194 @@
+{
+  "id": "list-product-prices-U0PPX",
+  "action_name": "listProductPrices",
+  "name": "Product prices (product page view)",
+  "icon": "tag",
+  "inputs": {
+    "$.where.priceList": {
+      "visible": false
+    },
+    "$.where.priceList.id": {
+      "visible": false
+    },
+    "$.where.priceList.id.equals": {
+      "visible": false
+    },
+    "$.where.priceList.id.notEquals": {
+      "visible": false
+    },
+    "$.where.priceList.id.oneOf": {
+      "visible": false
+    }
+  },
+  "response": {
+    "$.results[*].alwaysCommissionPercentage": {
+      "display_order": 23,
+      "visible": false
+    },
+    "$.results[*].alwaysFlatTotal": {
+      "display_order": 24,
+      "visible": false
+    },
+    "$.results[*].channelFees": {
+      "display_order": 19,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].createdAt": {
+      "display_order": 40,
+      "visible": false
+    },
+    "$.results[*].flatFeeTotal": {
+      "display_order": 35,
+      "visible": false
+    },
+    "$.results[*].grossProfit": {
+      "display_order": 21,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA",
+          "colourise": "NORMAL"
+        }
+      }
+    },
+    "$.results[*].grossProfitMargin": {
+      "display_name": "Gross margin",
+      "display_order": 22,
+      "format": {
+        "number_config": {
+          "mode": "PERCENTAGE",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].id": {
+      "display_order": 38,
+      "link": {
+        "tool_id": "get-product-price",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].landedUnitCost": {
+      "display_name": "Landed cost",
+      "display_order": 17,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].price": {
+      "display_name": "Price excl VAT",
+      "display_order": 11,
+      "visible": false,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].priceInclVat": {
+      "display_name": "Price incl VAT",
+      "display_order": 9,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].priceListChannelName": {
+      "display_order": 32,
+      "visible": false
+    },
+    "$.results[*].priceListId": {
+      "display_order": 36,
+      "visible": false
+    },
+    "$.results[*].productId": {
+      "display_order": 7,
+      "visible": false
+    },
+    "$.results[*].productName": {
+      "display_order": 5,
+      "visible": false
+    },
+    "$.results[*].productSku": {
+      "display_name": "SKU",
+      "display_order": 3
+    },
+    "$.results[*].successFeePercentage": {
+      "display_order": 34,
+      "visible": false
+    },
+    "$.results[*].unitCost": {
+      "display_name": "Cost price",
+      "display_order": 13,
+      "visible": false,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].unitFreightIn": {
+      "display_name": "Freight-in",
+      "display_order": 15,
+      "visible": false,
+      "format": {
+        "number_config": {
+          "mode": "CURRENCY",
+          "currency_code": "ZAR",
+          "locale": "en-ZA"
+        }
+      }
+    },
+    "$.results[*].updatedAt": {
+      "display_order": 42,
+      "visible": false
+    }
+  },
+  "pagination": {
+    "page_size": {
+      "default_value": 200
+    }
+  },
+  "get_entry_action": {
+    "tool_id": "get-product-price",
+    "deleted": true
+  },
+  "create_entry_action": {
+    "tool_id": "create-product-price",
+    "as_dialog": true
+  },
+  "display_layout": {
+    "config": {
+      "type": 3
+    }
+  },
+  "filter_config": {
+    "quick_search_field": "$.where.productName.contains"
+  }
+}
