@@ -2,9 +2,17 @@
   {
     "id": "dashboard_3HwSw5F1W8NFwHglBS1P0cKt873",
     "name": "Sales overview",
-    "items": "[{\"id\":\"item-1786778171230-q5yrgc5\",\"chartId\":\"chart_3HwTVmEMAdueG0MtxhoZyj3e89A\",\"layout\":{\"i\":\"item-1786778171230-q5yrgc5\",\"x\":0,\"y\":0,\"w\":24,\"h\":6,\"minW\":4,\"minH\":3}}]",
-    "filters": "[{\"id\":\"f_msvbopwsmpmx\",\"type\":\"date\",\"member\":\"sale.date\",\"defaultOperator\":\"inDateRange\",\"name\":\"Order Date\"}]",
+    "items": "[{\"id\":\"item-1786778171230-q5yrgc5\",\"chartId\":\"chart_3HwTVmEMAdueG0MtxhoZyj3e89A\",\"layout\":{\"i\":\"item-1786778171230-q5yrgc5\",\"x\":0,\"y\":0,\"w\":24,\"h\":7,\"minW\":4,\"minH\":3}},{\"id\":\"item-1786942774656-uvj73ol\",\"chartId\":\"chart_3I1r4Ny4KjPw3hrzIquFYHzIjTo\",\"layout\":{\"i\":\"item-1786942774656-uvj73ol\",\"x\":0,\"y\":7,\"w\":24,\"h\":9,\"minW\":4,\"minH\":3}}]",
+    "filters": "[{\"id\":\"f_msvbopwsmpmx\",\"name\":\"Order Date\",\"type\":\"date\",\"member\":\"sale.date\",\"defaultOperator\":\"inDateRange\"},{\"id\":\"f_mswrlvnrwrdr\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\",\"name\":\"Brand\"}]",
     "createdAt": "2026-08-15T07:11:13.811926Z",
-    "updatedAt": "2026-08-16T04:46:42.961575Z"
+    "updatedAt": "2026-08-17T05:00:17.036648Z"
+  },
+  {
+    "id": "dashboard_3I1tD2JSru5Lq5Ie2IYdtWsYfy2",
+    "name": "Product Sales Quantities",
+    "items": "[{\"id\":\"item-1786943781044-ynggzrj\",\"chartId\":\"chart_3I1tBYq44PDZsEOPsah9JJLmYvR\",\"layout\":{\"i\":\"item-1786943781044-ynggzrj\",\"x\":0,\"y\":0,\"w\":24,\"h\":11,\"minW\":4,\"minH\":3}}]",
+    "filters": "[{\"id\":\"f_msws77pvr5k4\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\",\"defaultValue\":[\"Makerzoid\"]},{\"id\":\"f_msws7sn5sv91\",\"type\":\"date\",\"member\":\"sale.date\",\"defaultOperator\":\"inDateRange\",\"name\":\"Date\"}]",
+    "createdAt": "2026-08-17T05:16:18.577282Z",
+    "updatedAt": "2026-08-17T05:17:12.902197Z"
   }
 ]

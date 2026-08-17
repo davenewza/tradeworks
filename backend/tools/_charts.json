@@ -2,9 +2,9 @@
   {
     "id": "chart_3HwTVmEMAdueG0MtxhoZyj3e89A",
     "name": "Revenue by month",
-    "config": "{\"query\":{\"measures\":[\"sale.total_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"limit\":500},\"settings\":{\"chartType\":\"bar\",\"xField\":\"sale_date_month\",\"yField\":\"sale_total_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":false,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":true,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "config": "{\"query\":{\"measures\":[\"sale.total_excl_vat_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"limit\":500,\"dimensions\":[]},\"settings\":{\"chartType\":\"bar\",\"xField\":\"sale_date_month\",\"yField\":\"sale_total_excl_vat_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":true,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":true,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
     "createdAt": "2026-08-15T07:15:57.922031Z",
-    "updatedAt": "2026-08-16T04:46:07.991669Z"
+    "updatedAt": "2026-08-17T04:30:41.072937Z"
   },
   {
     "id": "chart_3Hz0gNGMPyVYNC5Ov8Sw6lB777V",
@@ -12,5 +12,26 @@
     "config": "{\"query\":{\"measures\":[\"sale.total_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"day\",\"dateRange\":\"last 7 days\"}],\"limit\":500},\"settings\":{\"chartType\":\"bar\",\"xField\":\"sale_date_day\",\"yField\":\"sale_total_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":false,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":true,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
     "createdAt": "2026-08-16T04:48:19.684775Z",
     "updatedAt": "2026-08-16T04:49:27.188345Z"
+  },
+  {
+    "id": "chart_3I1r4Ny4KjPw3hrzIquFYHzIjTo",
+    "name": "Revenue by brand",
+    "config": "{\"query\":{\"measures\":[\"sale.total_excl_vat_sum\"],\"dimensions\":[\"brand.name\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"limit\":500},\"settings\":{\"chartType\":\"line\",\"xField\":\"sale_date_month\",\"yField\":\"sale_total_excl_vat_sum\",\"pivotField\":\"brand_name\",\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":true,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-08-17T04:58:43.306982Z",
+    "updatedAt": "2026-08-17T04:58:48.768818Z"
+  },
+  {
+    "id": "chart_3I1tBYq44PDZsEOPsah9JJLmYvR",
+    "name": "Product Sales Quantities",
+    "config": "{\"query\":{\"limit\":500,\"measures\":[\"sale.quantity_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"dimensions\":[\"product.sku\",\"product.name\"]},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{},\"pageSize\":25,\"pivot\":{\"x\":[\"product.sku\",\"product.name\",\"measures\"],\"y\":[\"sale.date.month\"]}},\"version\":3}",
+    "createdAt": "2026-08-17T05:16:07.155783Z",
+    "updatedAt": "2026-08-17T05:16:07.155783Z"
+  },
+  {
+    "id": "chart_3I1tbdW7gvem4Wkx8QKjGP0iGLQ",
+    "name": "Revenue this month",
+    "config": "{\"query\":{\"limit\":500,\"filters\":[{\"member\":\"sale.date\",\"operator\":\"inDateRange\",\"values\":[\"2026-08-01T00:00:00.000Z\",\"2026-08-17T23:59:59.999Z\"]}],\"dimensions\":[],\"measures\":[\"sale.total_excl_vat_sum\"]},\"settings\":{\"chartType\":\"kpi\",\"valueField\":\"sale_total_excl_vat_sum\",\"label\":\"\",\"format\":\"\",\"sparkline\":null},\"version\":3}",
+    "createdAt": "2026-08-17T05:19:34.328468Z",
+    "updatedAt": "2026-08-17T05:19:34.328468Z"
   }
 ]
