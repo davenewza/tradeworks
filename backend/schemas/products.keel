@@ -14,7 +14,7 @@ model Brand {
     }
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, list, update, delete]
     )
 }
@@ -73,7 +73,7 @@ model Product {
     }
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, list, update, delete]
     )
 }
@@ -135,7 +135,7 @@ model EquipmentBox {
     }
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, create, list, update, delete]
     )
 }

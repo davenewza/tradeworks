@@ -67,12 +67,14 @@ model ChannelFee {
             alwaysApplied?,
         )
         update updateChannelFee(id) with (name, feeType?, method, value, alwaysApplied?)
-        delete deleteChannelFee(id)
+        delete deleteChannelFee(id) {
+            @permission(roles: [Administrator])
+        }
     }
 
     @permission(
-        expression: ctx.isAuthenticated,
-        actions: [get, list, create, update, delete]
+        roles: [Operator],
+        actions: [get, list, create, update]
     )
 }
 
@@ -99,16 +101,17 @@ model ProductChannelFee {
         list listProductChannelFees(product.id) {
             @orderBy(feeType: asc)
         }
+        delete deleteProductChannelFee(id)
     }
 
     @unique([product, channelFee])
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, list]
     )
 }
 
 flow SyncChannelFees {
-    @permission(expression: ctx.isAuthenticated)
+    @permission(roles: [Operator])
 }

@@ -1,0 +1,10 @@
+role Operator { }
+role Administrator { }
+
+team Warehouse {
+    roles {
+        Operator
+    }
+ }
+
+ 

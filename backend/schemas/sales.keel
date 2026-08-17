@@ -61,18 +61,10 @@ flow SyncSales {
         start Date
         end Date
     }
-    @permission(expression: ctx.isAuthenticated)
+    @permission(roles: [Operator])
 }
 
 flow ScheduledSyncSales {
     @schedule("every 6 hours")
-    @permission(expression: true)
+    @permission(roles: [Operator])
 }
-
-team Warehouse {
-    roles {
-        Operator
-    }
- }
-
-role Operator { }

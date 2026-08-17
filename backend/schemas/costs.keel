@@ -3,7 +3,6 @@
 // a single figure on the product. The pricing calculator collapses these into a
 // single representative landed cost (weighted-average by default) and shows the
 // per-bill spread as a margin sensitivity. Synced from Zoho Books.
-
 // A supplier bill (purchase). Identified by its bill number, the natural key
 // shared with Zoho. Created on sync from the cost-of-goods records.
 model SupplierBill {
@@ -23,7 +22,7 @@ model SupplierBill {
     }
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, list]
     )
 }
@@ -70,7 +69,7 @@ model ProductCostLine {
     @unique([product, supplierBill])
 
     @permission(
-        expression: ctx.isAuthenticated,
+        roles: [Operator],
         actions: [get, list]
     )
 }
@@ -80,5 +79,5 @@ flow SyncSupplierCosts {
         dateFrom Date
         dateTo Date
     }
-    @permission(expression: ctx.isAuthenticated)
+    @permission(roles: [Operator])
 }
