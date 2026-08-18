@@ -19,6 +19,15 @@ This is a full-stack quote management application built with Keel (backend frame
 - Zoho Books API v3 for accounting integration (OpenAPI schema at `docs/zoho-books-api/`)
 - ShipLogic API for delivery rate calculations
 
+**IMPORTANT — shared Zoho API quota:** this app shares the Zoho org's daily API
+quota with the separate Takealot→Zoho webhook app
+(github.com/davenewza/sales-zoho-integration). Exhausting the quota here (heavy
+sync flows, repeated manual full syncs during development) starves that app's
+invoice deliveries — this silently dropped ~140 Takealot sales on 16–17 Aug 2026
+(pre-fix; deliveries now back off and retry, but they get delayed). Budget API
+calls in sync work: prefer last-modified windows and unchanged-skips over full
+re-fetches, and expect any Zoho call to fail with a daily rate-limit error.
+
 **Frontend:**
 - Vue 3 (Composition API available but Options API primarily used)
 - Vite for build tooling
