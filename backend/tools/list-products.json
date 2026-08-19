@@ -3,97 +3,53 @@
   "action_name": "listProducts",
   "icon": "emoji:🤖",
   "response": {
-    "$.results[*].brandId": {
-      "display_order": 3
-    },
-    "$.results[*].createdAt": {
-      "display_order": 13,
-      "visible": false
-    },
-    "$.results[*].heightInCm": {
-      "display_order": 7,
-      "visible": false
-    },
+    "$.results[*].sku": { "display_order": 1 },
+    "$.results[*].name": { "display_order": 2 },
+    "$.results[*].brandId": { "display_order": 3 },
     "$.results[*].id": {
       "display_order": 12,
       "link": {
         "tool_id": "get-product",
         "display_order": 0,
         "data_mapping": [
-          {
-            "key": "$.id",
-            "path": {
-              "path": "$.results[*].id"
-            }
-          }
+          { "key": "$.id", "path": { "path": "$.results[*].id" } }
         ]
       }
     },
-    "$.results[*].image": {
-      "display_order": 4,
-      "visible": false
-    },
-    "$.results[*].isEnabled": {
-      "display_order": 10,
-      "visible": false
-    },
-    "$.results[*].lengthInCm": {
-      "display_order": 5,
-      "visible": false
-    },
-    "$.results[*].name": {
-      "display_order": 2
-    },
-    "$.results[*].sku": {
-      "display_order": 1
-    },
-    "$.results[*].synchronisedAt": {
-      "display_order": 11,
-      "visible": false
-    },
-    "$.results[*].updatedAt": {
-      "display_order": 14,
-      "visible": false
-    },
-    "$.results[*].volumeInLitres": {
-      "visible": false
-    },
-    "$.results[*].weightInGrams": {
-      "display_order": 9,
-      "visible": false
-    },
-    "$.results[*].weightedFreightIn": {
-      "visible": false
-    },
-    "$.results[*].weightedLandedCost": {
-      "visible": false
-    },
-    "$.results[*].weightedUnitCost": {
-      "visible": false
-    },
-    "$.results[*].widthInCm": {
-      "display_order": 6,
-      "visible": false
-    }
-  },
-  "create_entry_action": {
-    "tool_id": "create-product",
-    "deleted": true
+    "$.results[*].image": { "visible": false },
+    "$.results[*].isEnabled": { "visible": false },
+    "$.results[*].lengthInCm": { "visible": false },
+    "$.results[*].widthInCm": { "visible": false },
+    "$.results[*].heightInCm": { "visible": false },
+    "$.results[*].weightInGrams": { "visible": false },
+    "$.results[*].volumeInLitres": { "visible": false },
+    "$.results[*].weightedUnitCost": { "visible": false },
+    "$.results[*].weightedFreightIn": { "visible": false },
+    "$.results[*].weightedLandedCost": { "visible": false },
+    "$.results[*].totalSupplierBills": { "visible": false },
+    "$.results[*].totalUnitsPurchased": { "visible": false },
+    "$.results[*].totalUnitsSold": { "visible": false },
+    "$.results[*].totalSalesValue": { "visible": false },
+    "$.results[*].averageSalePrice": { "visible": false },
+    "$.results[*].stockAvailable": { "visible": false },
+    "$.results[*].stockOnWay": { "visible": false },
+    "$.results[*].estimatedMonthlySale": { "visible": false },
+    "$.results[*].currentStockCover": { "visible": false },
+    "$.results[*].totalStockCover": { "visible": false },
+    "$.results[*].stockSynchronisedAt": { "visible": false },
+    "$.results[*].synchronisedAt": { "visible": false },
+    "$.results[*].views": { "visible": false },
+    "$.results[*].sales": { "visible": false },
+    "$.results[*].channelFees": { "visible": false },
+    "$.results[*].costLines": { "visible": false },
+    "$.results[*].prices": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false }
   },
   "entry_activity_actions": [
-    {
-      "tool_id": "get-product",
-      "title": "View product",
-      "display_order": 0
-    },
-    {
-      "tool_id": "update-product",
-      "display_order": 2
-    },
-    {
-      "tool_id": "update-product-dimensions",
-      "display_order": 3
-    }
+    { "tool_id": "get-product", "title": "View product", "display_order": 0 },
+    { "tool_id": "update-product", "display_order": 2 },
+    { "tool_id": "update-product-dimensions", "display_order": 3 }
   ],
   "filter_config": {
     "quick_search_field": "$.where.name.contains"

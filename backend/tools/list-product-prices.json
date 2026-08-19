@@ -36,7 +36,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -54,7 +54,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA",
+          "locale": "en-GB",
           "colourise": "NORMAL"
         }
       }
@@ -65,7 +65,7 @@
       "format": {
         "number_config": {
           "mode": "PERCENTAGE",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -92,7 +92,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -104,7 +104,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -115,7 +115,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -153,7 +153,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -165,7 +165,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
