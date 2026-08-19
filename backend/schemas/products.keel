@@ -52,6 +52,21 @@ model Product {
         totalUnitsSold Number? @computed(SUM(product.sales.quantity))
         totalSalesValue Decimal? @computed(SUM(product.sales.netAmount))
         averageSalePrice Decimal? @computed(IF(SUM(product.sales.quantity) > 0, SUM(product.sales.netAmount) / SUM(product.sales.quantity), SUM(product.sales.netAmount) * 0))
+        // ─── Stock & cover ──────────────────────────────────────────────────
+        // Refreshed daily by ScheduledSyncStock. stockAvailable mirrors Zoho's
+        // stock_on_hand (physical units on hand; can be negative when sales are
+        // billed ahead of stock). stockOnWay is units on future-dated supplier
+        // bills — Phase 2, so it stays 0 until that sync lands.
+        stockAvailable Number?
+        stockOnWay Number @default(0)
+        // Trailing run-rate: units sold in the last 365 days ÷ months active
+        // (capped at 12). Written by the daily job; null when never sold.
+        estimatedMonthlySale Decimal?
+        stockSynchronisedAt Timestamp?
+        // Months of cover. Guarded like the sheet: with a 0/unknown monthly
+        // estimate the ratio is undefined, so cover is null (shown blank).
+        currentStockCover Decimal? @computed(IF(product.estimatedMonthlySale > 0, product.stockAvailable / product.estimatedMonthlySale, null))
+        totalStockCover Decimal? @computed(IF(product.estimatedMonthlySale > 0, (product.stockAvailable + product.stockOnWay) / product.estimatedMonthlySale, null))
     }
 
     actions {
@@ -80,6 +95,14 @@ model Product {
 
 flow SyncProducts {
     @permission(expression: ctx.isAuthenticated)
+}
+
+// Daily refresh of stock levels and cover. Pulls stock_on_hand from Zoho items
+// and derives the trailing monthly sales estimate from local Sale history — a
+// handful of Zoho calls, run off-peak to stay clear of the shared daily quota.
+flow ScheduledSyncStock {
+    @schedule("every day at 2am")
+    @permission(roles: [Operator])
 }
 
 model EquipmentBox {
