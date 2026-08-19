@@ -3,14 +3,24 @@
   "action_name": "getBrand",
   "entry_activity_actions": [
     {
-      "tool_id": "update-brand-name",
-      "title": "Update name",
-      "as_dialog": false,
+      "tool_id": "list-product-stock",
+      "title": "View stock & cover",
+      "data_mapping": [
+        { "key": "$.where.brand.id.equals", "path": { "path": "$.id" } }
+      ],
+      "emphasize": true,
       "display_order": 0
     },
     {
+      "tool_id": "update-brand-name",
+      "title": "Update name",
+      "as_dialog": false,
+      "display_order": 1
+    },
+    {
       "tool_id": "update-brand-logo",
-      "title": "Update logo"
+      "title": "Update logo",
+      "display_order": 2
     }
   ],
   "embedded_tools": [

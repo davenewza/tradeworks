@@ -62,5 +62,20 @@
   {
     "id": "ProductPrice.grossProfitMargin",
     "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.estimatedMonthlySale",
+    "display_name": "Est. monthly sales",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.currentStockCover",
+    "display_name": "Current cover (months)",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-ZA" } }
+  },
+  {
+    "id": "Product.totalStockCover",
+    "display_name": "Total cover (months)",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-ZA" } }
   }
 ]

@@ -2,6 +2,36 @@
   "id": "get-product",
   "action_name": "getProduct",
   "response": {
+    "$.stockAvailable": {
+      "display_name": "Stock available",
+      "display_order": 1,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
+    "$.stockOnWay": {
+      "display_name": "Stock on way",
+      "display_order": 2,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
+    "$.estimatedMonthlySale": {
+      "display_name": "Est. monthly sales",
+      "display_order": 3,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
+    "$.currentStockCover": {
+      "display_name": "Current cover (months)",
+      "display_order": 4,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
+    "$.totalStockCover": {
+      "display_name": "Total cover (months)",
+      "display_order": 5,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
+    "$.stockSynchronisedAt": {
+      "display_name": "Stock synced",
+      "display_order": 6,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
     "$.averageSalePrice": {
       "display_name": "Avg sale price",
       "display_order": 1,
@@ -125,6 +155,12 @@
     }
   },
   "sections": [
+    {
+      "name": "a1b2c3d4-0000-4000-8000-stockcoverxx",
+      "title": "Stock & cover",
+      "display_order": 2,
+      "visible": true
+    },
     {
       "name": "a1b2c3d4-0000-4000-8000-purchasedetail",
       "title": "Purchase details",
