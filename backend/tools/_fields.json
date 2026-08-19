@@ -1,67 +1,67 @@
 [
   {
     "id": "Product.weightedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Product.weightedFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Product.weightedLandedCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Product.averageSalePrice",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Product.totalSalesValue",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Sale.netAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Sale.taxAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "Sale.discountAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.priceInclVat",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.price",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.unitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.unitFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.landedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.channelFees",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
     "id": "ProductPrice.grossProfit",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-ZA", "colourise": "NORMAL" } }
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB", "colourise": "NORMAL" } }
   },
   {
     "id": "ProductPrice.grossProfitMargin",
-    "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-ZA" } }
+    "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-GB" } }
   },
   {
     "id": "Product.estimatedMonthlySale",
