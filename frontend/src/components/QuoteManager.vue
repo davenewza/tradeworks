@@ -214,7 +214,7 @@ export default {
     },
     
     formatCurrency(amount) {
-      return parseFloat(amount).toLocaleString('en-ZA', {
+      return parseFloat(amount).toLocaleString('en-GB', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })

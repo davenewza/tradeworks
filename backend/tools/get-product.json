@@ -40,7 +40,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -83,7 +83,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -120,7 +120,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -132,7 +132,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
@@ -144,7 +144,7 @@
         "number_config": {
           "mode": "CURRENCY",
           "currency_code": "ZAR",
-          "locale": "en-ZA"
+          "locale": "en-GB"
         }
       }
     },
