@@ -90,7 +90,8 @@
         "values": [
           { "value": "GoodSupply", "display_value": "Good supply", "colour": "green", "display_order": 1 },
           { "value": "LowSupply", "display_value": "Low supply", "colour": "sunshine", "display_order": 2 },
-          { "value": "InsufficientSupply", "display_value": "Shortfall", "colour": "red", "display_order": 3 }
+          { "value": "InsufficientSupply", "display_value": "Shortfall", "colour": "red", "display_order": 3 },
+          { "value": "Oversupply", "display_value": "Oversupply", "colour": "purple", "display_order": 4 }
         ]
       }
     }
