@@ -42,6 +42,10 @@
       "display_name": "Total cover",
       "display_order": 8
     },
+    "$.results[*].stockCoverStatus": {
+      "display_name": "Status",
+      "display_order": 9
+    },
     "$.results[*].id": {
       "display_order": 20,
       "link": {

@@ -1,4 +1,5 @@
 import { models, resetDatabase } from '@teamkeel/testing';
+import { StockCoverStatus } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { computeStockCover, estimatedMonthlySale, loadSaleAggregates, monthsActive, round1 } from './stockCoverHelpers';
 
@@ -101,5 +102,38 @@ describe('computeStockCover', () => {
     test('negative stock (billed ahead of stock) yields negative cover', () => {
         // -3 / 2 = -1.5
         expect(computeStockCover(-3, 0, 2)).toEqual({ current: -1.5, total: -1.5 });
+    });
+});
+
+describe('Product stockCoverStatus (computed enum)', () => {
+    beforeEach(resetDatabase);
+
+    // leadTimeInDays / 30 = lead time in months. Bands: cover < lead → red;
+    // lead ≤ cover < 2×lead → amber; cover ≥ 2×lead → green.
+    async function makeProduct(sku: string, cover: number | null, leadTimeInDays = 60) {
+        const brand = await models.brand.create({ name: `B-${sku}`, leadTimeInDays });
+        const product = await models.product.create({ name: sku, sku, brandId: brand.id, currentStockCover: cover });
+        return { product, brand };
+    }
+    const statusOf = async (id: string) => (await models.product.findOne({ id }))!.stockCoverStatus;
+
+    test('grades cover against the brand lead time (60d = 2 months)', async () => {
+        // 1mo < 2 → insufficient ; 3mo in [2,4) → low ; 5mo ≥ 4 → good
+        expect(await statusOf((await makeProduct('ST-1', 1)).product.id)).toBe(StockCoverStatus.InsufficientSupply);
+        expect(await statusOf((await makeProduct('ST-2', 3)).product.id)).toBe(StockCoverStatus.LowSupply);
+        expect(await statusOf((await makeProduct('ST-3', 5)).product.id)).toBe(StockCoverStatus.GoodSupply);
+    });
+
+    test('negative cover is insufficient; unknown cover is null', async () => {
+        expect(await statusOf((await makeProduct('ST-4', -1.5)).product.id)).toBe(StockCoverStatus.InsufficientSupply);
+        expect(await statusOf((await makeProduct('ST-5', null)).product.id)).toBeNull();
+    });
+
+    test('re-grades when the brand lead time changes', async () => {
+        const { product, brand } = await makeProduct('ST-6', 1, 60); // 1mo cover, 2mo lead → insufficient
+        expect(await statusOf(product.id)).toBe(StockCoverStatus.InsufficientSupply);
+        // Shorten lead time to 15 days (0.5mo): 1mo cover now clears 2×0.5 → good
+        await models.brand.update({ id: brand.id }, { leadTimeInDays: 15 });
+        expect(await statusOf(product.id)).toBe(StockCoverStatus.GoodSupply);
     });
 });
