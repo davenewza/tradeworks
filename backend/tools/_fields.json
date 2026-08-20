@@ -1,96 +1,229 @@
 [
   {
-    "id": "Product.weightedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.weightedFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.weightedLandedCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.averageSalePrice",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.totalSalesValue",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Sale.netAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Sale.taxAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
-    "id": "Sale.discountAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
-  },
-  {
     "id": "ProductPrice.priceInclVat",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.price",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.unitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.unitFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.landedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.channelFees",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.grossProfit",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB", "colourise": "NORMAL" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB",
+        "colourise": "NORMAL"
+      }
+    }
   },
   {
     "id": "ProductPrice.grossProfitMargin",
-    "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.estimatedMonthlySale",
-    "display_name": "Est. monthly sales",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.currentStockCover",
-    "display_name": "Current cover",
-    "format": { "number_config": { "mode": "UNIT", "suffix": " months", "locale": "en-GB" } }
-  },
-  {
-    "id": "Product.totalStockCover",
-    "display_name": "Total cover",
-    "format": { "number_config": { "mode": "UNIT", "suffix": " months", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "PERCENTAGE",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Brand.leadTimeInDays",
-    "display_name": "Lead time",
-    "format": { "number_config": { "mode": "UNIT", "suffix": " days", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "suffix": " days",
+        "mode": "UNIT",
+        "locale": "en-GB"
+      }
+    },
+    "display_name": "Lead time"
+  },
+  {
+    "id": "Product.weightedUnitCost",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Product.weightedFreightIn",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Product.weightedLandedCost",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Product.totalSalesValue",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Product.averageSalePrice",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Product.estimatedMonthlySale",
+    "format": {
+      "number_config": {
+        "locale": "en-GB"
+      }
+    },
+    "display_name": "Est. monthly sales"
+  },
+  {
+    "id": "Product.currentStockCover",
+    "format": {
+      "number_config": {
+        "suffix": " months",
+        "mode": "UNIT",
+        "locale": "en-GB"
+      }
+    },
+    "display_name": "Current cover"
+  },
+  {
+    "id": "Product.totalStockCover",
+    "format": {
+      "number_config": {
+        "suffix": " months",
+        "mode": "UNIT",
+        "locale": "en-GB"
+      }
+    },
+    "display_name": "Total cover"
+  },
+  {
+    "id": "Sale.netAmount",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Sale.taxAmount",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
+  },
+  {
+    "id": "Sale.discountAmount",
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "StockCoverStatus",
     "format": {
       "enum_config": {
         "values": [
-          { "value": "GoodSupply", "display_value": "Good supply", "colour": "green", "display_order": 1 },
-          { "value": "LowSupply", "display_value": "Low supply", "colour": "yellow", "display_order": 2 },
-          { "value": "InsufficientSupply", "display_value": "Insufficient supply", "colour": "red", "display_order": 3 }
+          {
+            "value": "GoodSupply",
+            "display_value": "Good supply",
+            "colour": "green",
+            "display_order": 1
+          },
+          {
+            "value": "LowSupply",
+            "display_value": "Low supply",
+            "colour": "sunshine",
+            "display_order": 2
+          },
+          {
+            "value": "InsufficientSupply",
+            "display_value": "Insufficient supply",
+            "colour": "red",
+            "display_order": 3
+          }
         ]
       }
     }
