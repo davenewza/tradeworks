@@ -18,9 +18,15 @@
       "display_order": 1
     },
     {
+      "tool_id": "update-brand-lead-time",
+      "title": "Edit lead time",
+      "as_dialog": true,
+      "display_order": 2
+    },
+    {
       "tool_id": "update-brand-logo",
       "title": "Update logo",
-      "display_order": 2
+      "display_order": 3
     }
   ],
   "embedded_tools": [
