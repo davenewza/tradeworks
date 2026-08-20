@@ -34,6 +34,29 @@ export function estimatedMonthlySale(agg: SaleAggregate, now: Date): number {
     return agg.unitsLast365 / monthsActive(agg.firstSaleDate, now);
 }
 
+// Round to one decimal place — cover is shown to 1 dp.
+export function round1(value: number): number {
+    return Math.round(value * 10) / 10;
+}
+
+// Months of cover from stock and the (already whole-number) monthly estimate,
+// each to 1 dp. Null when the estimate is 0/unknown or stock is unknown — the
+// ratio is undefined and shown blank, matching the sheet. Total cover folds in
+// the units on the way.
+export function computeStockCover(
+    stockAvailable: number | null,
+    stockOnWay: number,
+    estimate: number | null,
+): { current: number | null; total: number | null } {
+    if (estimate === null || estimate <= 0 || stockAvailable === null) {
+        return { current: null, total: null };
+    }
+    return {
+        current: round1(stockAvailable / estimate),
+        total: round1((stockAvailable + stockOnWay) / estimate),
+    };
+}
+
 // One grouped pass over the Sale table: trailing-window units and first-ever sale
 // date per product. Aggregation isn't expressible via the generated models API,
 // so we drop to Kysely (raw SQL) per the project's DB-query convention.

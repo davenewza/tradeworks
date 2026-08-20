@@ -70,12 +70,12 @@
   },
   {
     "id": "Product.currentStockCover",
-    "display_name": "Current cover (months)",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "display_name": "Current cover",
+    "format": { "number_config": { "mode": "UNIT", "suffix": " months", "locale": "en-GB" } }
   },
   {
     "id": "Product.totalStockCover",
-    "display_name": "Total cover (months)",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "display_name": "Total cover",
+    "format": { "number_config": { "mode": "UNIT", "suffix": " months", "locale": "en-GB" } }
   }
 ]

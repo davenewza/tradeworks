@@ -1,6 +1,6 @@
 import { models, resetDatabase } from '@teamkeel/testing';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { estimatedMonthlySale, loadSaleAggregates, monthsActive } from './stockCoverHelpers';
+import { computeStockCover, estimatedMonthlySale, loadSaleAggregates, monthsActive, round1 } from './stockCoverHelpers';
 
 const num = (v: unknown) => Number(v);
 const NOW = new Date('2026-08-19T00:00:00Z');
@@ -76,42 +76,30 @@ describe('loadSaleAggregates', () => {
     });
 });
 
-describe('Product stock cover (computed schema fields)', () => {
-    beforeEach(resetDatabase);
+describe('round1', () => {
+    test('rounds to one decimal place', () => {
+        expect(round1(12.6667)).toBe(12.7);
+        expect(round1(14.64)).toBe(14.6);
+        expect(round1(22)).toBe(22);
+    });
+});
 
-    test('current cover = available ÷ estimate; total cover adds stock on way', async () => {
-        const brand = await models.brand.create({ name: 'B' });
-        const product = await models.product.create({
-            name: 'P', sku: 'SC-1', brandId: brand.id,
-            stockAvailable: 76, estimatedMonthlySale: 6, stockOnWay: 12,
-        });
-
-        const p = await models.product.findOne({ id: product.id });
-        expect(num(p!.currentStockCover)).toBeCloseTo(76 / 6, 4);
-        expect(num(p!.totalStockCover)).toBeCloseTo((76 + 12) / 6, 4);
+describe('computeStockCover', () => {
+    test('cover = stock ÷ whole estimate to 1 dp; total cover adds stock on way', () => {
+        // 76 / 6 = 12.6667 → 12.7 ; (76 + 12) / 6 = 14.6667 → 14.7
+        expect(computeStockCover(76, 12, 6)).toEqual({ current: 12.7, total: 14.7 });
+        // exact division stays clean, and with no stock on way total equals current
+        expect(computeStockCover(22, 0, 1)).toEqual({ current: 22, total: 22 });
     });
 
-    test('a zero monthly estimate yields null cover (no divide-by-zero)', async () => {
-        const brand = await models.brand.create({ name: 'B' });
-        const product = await models.product.create({
-            name: 'P', sku: 'SC-2', brandId: brand.id,
-            stockAvailable: 20, estimatedMonthlySale: 0,
-        });
-
-        const p = await models.product.findOne({ id: product.id });
-        expect(p!.currentStockCover).toBeNull();
-        expect(p!.totalStockCover).toBeNull();
+    test('null cover when the estimate is 0/unknown or stock is unknown (blank, like the sheet)', () => {
+        expect(computeStockCover(20, 0, 0)).toEqual({ current: null, total: null });
+        expect(computeStockCover(20, 0, null)).toEqual({ current: null, total: null });
+        expect(computeStockCover(null, 0, 5)).toEqual({ current: null, total: null });
     });
 
-    test('unknown stock leaves cover null even with an estimate', async () => {
-        const brand = await models.brand.create({ name: 'B' });
-        const product = await models.product.create({
-            name: 'P', sku: 'SC-3', brandId: brand.id,
-            estimatedMonthlySale: 5,
-        });
-
-        const p = await models.product.findOne({ id: product.id });
-        expect(p!.currentStockCover).toBeNull();
-        expect(p!.totalStockCover).toBeNull();
+    test('negative stock (billed ahead of stock) yields negative cover', () => {
+        // -3 / 2 = -1.5
+        expect(computeStockCover(-3, 0, 2)).toEqual({ current: -1.5, total: -1.5 });
     });
 });
