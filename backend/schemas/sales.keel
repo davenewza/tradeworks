@@ -85,6 +85,15 @@ flow ScheduledSyncSales {
 // series has a value at that day; a sparse table would silently drop the
 // carried-forward total of any pair that happened not to sell that day.
 //
+// Only ever put this on a dashboard whose filters resolve against THIS cube —
+// its own fields, or channel/brand, which it joins many-to-one and so can be
+// filtered on without adding rows. The "Cumulative sales" dashboard is built
+// that way. Do NOT add it to a dashboard carrying a sale.* filter (both the
+// existing ones do): dashboard filters are appended to every chart's query
+// unconditionally, and Cube would resolve sale.date over the one-to-many path
+// brand → product → sale, fanning each row out across every sale of that brand
+// and inflating the totals. It reads as plausible numbers, not as an error.
+//
 // Rebuilt wholesale per month by RebuildCumulativeSales — never incrementally
 // updated, so a re-run always converges on the current Sale data.
 model CumulativeSales {
