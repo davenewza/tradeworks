@@ -28,6 +28,7 @@ enum StockCoverStatus {
     GoodSupply
     LowSupply
     InsufficientSupply
+    Oversupply
 }
 
 model Product {
@@ -80,11 +81,11 @@ model Product {
         // cover must stay consistent with the rounded estimate it's shown beside.
         currentStockCover Decimal?
         totalStockCover Decimal?
-        // Reorder signal: current cover vs the brand's lead time (days → months
-        // as /30). Red when cover can't outlast a reorder, amber when thin, green
-        // when comfortable; null when cover is unknown. @computed, so it re-grades
-        // the moment cover or the brand's lead time changes.
-        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2, StockCoverStatus.LowSupply, StockCoverStatus.GoodSupply))))
+        // Reorder signal: current cover vs the brand's lead time (L = days / 30):
+        //   Shortfall (<L) · Low (L–1.25L) · Good (1.25L–2L) · Oversupply (≥2L).
+        // Null when cover is unknown. @computed, so it re-grades the moment cover
+        // or the brand's lead time changes.
+        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 1.25, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
     }
 
     actions {
