@@ -3,6 +3,7 @@
   "action_name": "listProducts",
   "name": "Stock & cover",
   "icon": "emoji:📦",
+  "help_text": "**Stock & cover** — how many months of stock each product has left at its current sales rate, graded against the brand's supplier lead time.\n\n**Columns**\n- **Est. monthly sales** — units sold in the last 12 months ÷ months active (rounded to a whole number).\n- **Current cover** — stock available ÷ est. monthly sales, in months. **Total cover** also counts stock on the way.\n\n**Status** compares current cover to the brand's lead time *L* (= lead-time days ÷ 30):\n- 🔴 **Shortfall** — cover below L: you'll run out before a reorder can arrive.\n- 🟡 **Low** — L to 1.25×L: at the reorder point — order soon.\n- 🟢 **Good** — 1.25×L to 2×L: comfortable.\n- 🟣 **Oversupply** — above 2×L: more stock than needed.\n\nSet a brand's lead time from its page (**Edit lead time**). Figures refresh once a day.",
   "inputs": {
     "$.where.brand": { "visible": false },
     "$.where.brand.id": { "visible": false },
