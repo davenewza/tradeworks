@@ -129,6 +129,12 @@
         "chart_id": "chart_3I1tbdW7gvem4Wkx8QKjGP0iGLQ",
         "display_order": 0,
         "hidden": false
+      },
+      {
+        "id": "chart-attach-cumulative-sales-worm",
+        "chart_id": "chart_3I2QmXbT9nKvFdR4sLwZpHc7Yj2",
+        "display_order": 1,
+        "hidden": false
       }
     ]
   }

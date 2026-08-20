@@ -94,5 +94,20 @@
         ]
       }
     }
+  },
+  {
+    "id": "CumulativeSales.dailySales",
+    "display_name": "Sales on day",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "CumulativeSales.cumulativeSales",
+    "display_name": "Cumulative sales",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "CumulativeSales.dayOfMonth",
+    "display_name": "Day of month",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
   }
 ]
