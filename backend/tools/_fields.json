@@ -71,17 +71,17 @@
   {
     "id": "Product.currentStockCover",
     "display_name": "Current cover",
-    "format": { "number_config": { "mode": "UNIT", "suffix": " months", "locale": "en-GB" } }
+    "format": { "number_config": { "mode": "DECIMAL", "suffix": " months", "locale": "en-GB" } }
   },
   {
     "id": "Product.totalStockCover",
     "display_name": "Total cover",
-    "format": { "number_config": { "mode": "UNIT", "suffix": " months", "locale": "en-GB" } }
+    "format": { "number_config": { "mode": "DECIMAL", "suffix": " months", "locale": "en-GB" } }
   },
   {
     "id": "Brand.leadTimeInDays",
     "display_name": "Lead time",
-    "format": { "number_config": { "mode": "UNIT", "suffix": " days", "locale": "en-GB" } }
+    "format": { "number_config": { "mode": "DECIMAL", "suffix": " days", "locale": "en-GB" } }
   },
   {
     "id": "StockCoverStatus",
