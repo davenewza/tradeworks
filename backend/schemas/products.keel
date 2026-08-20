@@ -59,20 +59,32 @@ model Product {
         // bills — Phase 2, so it stays 0 until that sync lands.
         stockAvailable Number?
         stockOnWay Number @default(0)
-        // Trailing run-rate: units sold in the last 365 days ÷ months active
-        // (capped at 12). Written by the daily job; null when never sold.
+        // Trailing run-rate, rounded to a whole number: units sold in the last
+        // 365 days ÷ months active (capped at 12). Written by the daily job.
         estimatedMonthlySale Decimal?
         stockSynchronisedAt Timestamp?
-        // Months of cover. Guarded like the sheet: with a 0/unknown monthly
-        // estimate the ratio is undefined, so cover is null (shown blank).
-        currentStockCover Decimal? @computed(IF(product.estimatedMonthlySale > 0, product.stockAvailable / product.estimatedMonthlySale, null))
-        totalStockCover Decimal? @computed(IF(product.estimatedMonthlySale > 0, (product.stockAvailable + product.stockOnWay) / product.estimatedMonthlySale, null))
+        // Months of cover = stock ÷ (whole-number) estimate, rounded to 1 dp and
+        // written by the daily job. Null when the estimate is 0/unknown (shown
+        // blank, like the sheet). Not @computed — the engine can't round, and
+        // cover must stay consistent with the rounded estimate it's shown beside.
+        currentStockCover Decimal?
+        totalStockCover Decimal?
     }
 
     actions {
         get getProduct(id)
         list listProducts(name?, sku?, brand.id?) {
             @where(product.isEnabled)
+            @sortable(
+                name,
+                sku,
+                totalUnitsSold,
+                stockAvailable,
+                stockOnWay,
+                estimatedMonthlySale,
+                currentStockCover,
+                totalStockCover
+            )
             @orderBy(name: asc)
         }
         update updateProductDimensions(id) with (

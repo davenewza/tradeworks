@@ -18,12 +18,12 @@
       "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
     },
     "$.currentStockCover": {
-      "display_name": "Current cover (months)",
+      "display_name": "Current cover",
       "display_order": 4,
       "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
     },
     "$.totalStockCover": {
-      "display_name": "Total cover (months)",
+      "display_name": "Total cover",
       "display_order": 5,
       "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
     },
