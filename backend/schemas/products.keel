@@ -4,6 +4,10 @@ model Brand {
         logo File?
         products Product[]
         totalProducts Number @computed(COUNTIF(brand.products, brand.products.isEnabled))
+        // How long (in days) new stock takes to arrive from this brand's
+        // supplier — used to grade each product's stock-cover status. Editable on
+        // the brand page; hidden from the brands list.
+        leadTimeInDays Number @default(60)
     }
 
     actions {
@@ -11,12 +15,19 @@ model Brand {
         list listBrands()
         update updateBrandName(id) with (name)
         update updateBrandLogo(id) with (logo)
+        update updateBrandLeadTime(id) with (leadTimeInDays)
     }
 
     @permission(
         roles: [Operator],
         actions: [get, list, update, delete]
     )
+}
+
+enum StockCoverStatus {
+    GoodSupply
+    LowSupply
+    InsufficientSupply
 }
 
 model Product {
@@ -69,6 +80,11 @@ model Product {
         // cover must stay consistent with the rounded estimate it's shown beside.
         currentStockCover Decimal?
         totalStockCover Decimal?
+        // Reorder signal: current cover vs the brand's lead time (days → months
+        // as /30). Red when cover can't outlast a reorder, amber when thin, green
+        // when comfortable; null when cover is unknown. @computed, so it re-grades
+        // the moment cover or the brand's lead time changes.
+        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2, StockCoverStatus.LowSupply, StockCoverStatus.GoodSupply))))
     }
 
     actions {

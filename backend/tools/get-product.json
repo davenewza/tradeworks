@@ -2,6 +2,11 @@
   "id": "get-product",
   "action_name": "getProduct",
   "response": {
+    "$.stockCoverStatus": {
+      "display_name": "Cover status",
+      "display_order": 0,
+      "section_name": "a1b2c3d4-0000-4000-8000-stockcoverxx"
+    },
     "$.stockAvailable": {
       "display_name": "Stock available",
       "display_order": 1,
