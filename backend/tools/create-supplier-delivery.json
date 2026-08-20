@@ -1,0 +1,54 @@
+{
+  "id": "create-supplier-delivery",
+  "action_name": "createSupplierDelivery",
+  "name": "Track a delivery",
+  "icon": "emoji:➕",
+  "title": "Track a new supplier delivery",
+  "help_text": "Air courier: pick the carrier and enter the tracking number. Sea freight: enter the vessel name as the forwarder gave it.",
+  "inputs": {
+    "$.mode": {
+      "display_name": "Mode",
+      "display_order": 1
+    },
+    "$.carrier": {
+      "display_name": "Carrier (air courier)",
+      "display_order": 2
+    },
+    "$.trackingNumber": {
+      "display_name": "Tracking number (air courier)",
+      "display_order": 3
+    },
+    "$.vesselName": {
+      "display_name": "Vessel name (sea freight)",
+      "display_order": 4
+    },
+    "$.reference": {
+      "display_name": "Our reference",
+      "display_order": 5
+    },
+    "$.supplierName": {
+      "display_name": "Supplier",
+      "display_order": 6
+    },
+    "$.notes": {
+      "display_name": "Notes",
+      "display_order": 7
+    }
+  },
+  "response": {
+    "$.id": {
+      "link": {
+        "tool_id": "get-supplier-delivery",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.id"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

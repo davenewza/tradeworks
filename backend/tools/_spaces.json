@@ -137,5 +137,38 @@
         "hidden": false
       }
     ]
+  },
+  {
+    "id": "space-logistics",
+    "name": "Logistics",
+    "icon": "truck",
+    "display_order": 1,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-supplier-deliveries",
+        "link": {
+          "tool_id": "list-supplier-deliveries",
+          "title": "Supplier deliveries",
+          "description": "Inbound courier and sea freight deliveries, with live status and ETA",
+          "display_order": 0
+        },
+        "hidden": false
+      },
+      {
+        "id": "action-create-supplier-delivery",
+        "link": {
+          "tool_id": "create-supplier-delivery",
+          "title": "Track a delivery",
+          "display_order": 1
+        },
+        "hidden": false
+      }
+    ],
+    "groups": null,
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": null
   }
 ]
