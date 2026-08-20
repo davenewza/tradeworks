@@ -89,8 +89,8 @@
       "enum_config": {
         "values": [
           { "value": "GoodSupply", "display_value": "Good supply", "colour": "green", "display_order": 1 },
-          { "value": "LowSupply", "display_value": "Low supply", "colour": "yellow", "display_order": 2 },
-          { "value": "InsufficientSupply", "display_value": "Insufficient supply", "colour": "red", "display_order": 3 }
+          { "value": "LowSupply", "display_value": "Low supply", "colour": "sunshine", "display_order": 2 },
+          { "value": "InsufficientSupply", "display_value": "Shortfall", "colour": "red", "display_order": 3 }
         ]
       }
     }
