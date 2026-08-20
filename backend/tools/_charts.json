@@ -33,5 +33,12 @@
     "config": "{\"query\":{\"limit\":500,\"filters\":[{\"member\":\"sale.date\",\"operator\":\"inDateRange\",\"values\":[\"2026-08-01T00:00:00.000Z\",\"2026-08-17T23:59:59.999Z\"]}],\"dimensions\":[],\"measures\":[\"sale.total_excl_vat_sum\"]},\"settings\":{\"chartType\":\"kpi\",\"valueField\":\"sale_total_excl_vat_sum\",\"label\":\"\",\"format\":\"\",\"sparkline\":null},\"version\":3}",
     "createdAt": "2026-08-17T05:19:34.328468Z",
     "updatedAt": "2026-08-17T05:19:34.328468Z"
+  },
+  {
+    "id": "chart_3I2QmXbT9nKvFdR4sLwZpHc7Yj2",
+    "name": "Cumulative Sales Worm",
+    "config": "{\"query\":{\"measures\":[\"cumulative_sales.cumulative_sales_sum\"],\"dimensions\":[\"cumulative_sales.day_of_month\"],\"timeDimensions\":[{\"dimension\":\"cumulative_sales.month_start\",\"granularity\":\"month\"}],\"limit\":5000},\"settings\":{\"chartType\":\"line\",\"xField\":\"cumulative_sales_day_of_month\",\"yField\":\"cumulative_sales_cumulative_sales_sum\",\"pivotField\":\"cumulative_sales_month_start_month\",\"xAxis\":{\"title\":\"Day of Month\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"Cumulative Sales Total\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-08-20T09:00:00.000000Z",
+    "updatedAt": "2026-08-20T10:00:00.000000Z"
   }
 ]

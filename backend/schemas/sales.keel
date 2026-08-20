@@ -68,3 +68,92 @@ flow ScheduledSyncSales {
     @schedule("every 6 hours")
     @permission(roles: [Operator])
 }
+
+// Daily running total of realized sales — one row per channel × brand × day.
+//
+// This is materialised rather than reported live because Keel's reporting layer
+// can't express it: the only cumulative measure Cube offers (`runningTotal`)
+// accumulates monotonically along a single time dimension, so it can't restart
+// at each month boundary or overlay several months on a shared day-of-month
+// axis. The worm chart needs both.
+//
+// Rows are DENSE within a month: once a (channel, brand) pair has sold anything
+// in a month, EVERY day of that month carries a row — including zero-sale days,
+// which just repeat the previous day's running total. That density is what makes
+// the chart filterable. Summing `cumulativeSales` across channels or brands at a
+// given day only yields the right combined running total if every contributing
+// series has a value at that day; a sparse table would silently drop the
+// carried-forward total of any pair that happened not to sell that day.
+//
+// Only ever put this on a dashboard whose filters resolve against THIS cube —
+// its own fields, or channel/brand, which it joins many-to-one and so can be
+// filtered on without adding rows. The "Cumulative sales" dashboard is built
+// that way. Do NOT add it to a dashboard carrying a sale.* filter (both the
+// existing ones do): dashboard filters are appended to every chart's query
+// unconditionally, and Cube would resolve sale.date over the one-to-many path
+// brand → product → sale, fanning each row out across every sale of that brand
+// and inflating the totals. It reads as plausible numbers, not as an error.
+//
+// Rebuilt wholesale per month by RebuildCumulativeSales — never incrementally
+// updated, so a re-run always converges on the current Sale data.
+model CumulativeSales {
+    fields {
+        channel Channel
+        brand Brand
+        date Date
+        // First day of this row's month. The chart's series key: pivoting on a
+        // Date keeps the legend in chronological order, which a text label
+        // ("Apr 2026" < "Aug 2026") would not.
+        monthStart Date
+        // Human-readable series label ("Aug 2026"), for charts that pivot on a
+        // plain dimension instead of a time dimension.
+        monthLabel Text
+        // 1–31. The chart's x-axis, so each month's line overlays the others.
+        dayOfMonth Number
+        // Realized revenue for this pair on this day: net of discount and excl
+        // VAT (Sale.netAmount, falling back to totalExclVat for rows synced
+        // before netAmount existed). Zero on carried-forward days.
+        dailySales Decimal
+        // Running total of dailySales from day 1 of the month up to this day.
+        cumulativeSales Decimal
+        // When this row was last derived. Deliberately not `synchronisedAt` —
+        // in this codebase that name means "last pulled from Zoho", and nothing
+        // here comes from Zoho; it's derived from local Sale rows.
+        rebuiltAt Timestamp
+    }
+
+    actions {
+        list listCumulativeSales(channel.id?, brand.id?, monthStart?, date?) {
+            @orderBy(date: asc)
+        }
+    }
+
+    // One row per pair per day. Keyed on the month label and day rather than the
+    // date itself because @unique rejects Date fields — the two identify exactly
+    // the same day, since monthLabel is one-to-one with monthStart.
+    @unique([channel, brand, monthLabel, dayOfMonth])
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}
+
+// Manual rebuild over an arbitrary range — for backfilling history, or after a
+// correction in Zoho lands outside the window the scheduled job covers.
+// Cheap: pure local SQL over the Sale table, no Zoho API calls, so it doesn't
+// touch the shared daily quota.
+flow RebuildCumulativeSales {
+    inputs {
+        start Date
+        end Date
+    }
+    @permission(roles: [Operator])
+}
+
+// Runs 30 minutes past every 6th hour, so it lands after ScheduledSyncSales
+// (every 6 hours) has had time to write the sales it derives from.
+flow ScheduledRebuildCumulativeSales {
+    @schedule("30 */6 * * *")
+    @permission(roles: [Operator])
+}
