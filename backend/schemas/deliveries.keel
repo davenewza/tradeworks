@@ -1,0 +1,176 @@
+// Inbound deliveries from our suppliers, tracked against the carrier's own API.
+//
+// Two shapes of delivery, distinguished by `mode`:
+//   - AirCourier — FedEx, DHL or UPS, identified by a tracking number. Status, ETA
+//     and the scan history come from EasyPost, which fronts all three carriers
+//     behind one API (see docs/supplier-deliveries.md).
+//   - SeaFreight — identified by a vessel name. We track the vessel itself via
+//     AIS (VesselAPI): its reported destination port and ETA, which is what we
+//     want to know for a sea leg. See docs/supplier-deliveries.md.
+//
+// ScheduledRefreshDeliveries re-polls open deliveries every 3 hours.
+
+enum DeliveryMode {
+    AirCourier
+    SeaFreight
+}
+
+// The courier carrying the consignment. Only meaningful for AirCourier — sea
+// freight always resolves through the AIS provider. Mapped to EasyPost's carrier
+// codes in easypostTrackingHelpers.
+enum DeliveryCarrier {
+    Fedex
+    Dhl
+    Ups
+}
+
+// Carrier-neutral status. Each provider's own vocabulary is mapped onto this so
+// the Console shows one column regardless of mode; the carrier's own wording is
+// kept alongside in `statusDescription`.
+enum DeliveryStatus {
+    // Created here, but the carrier has nothing on it yet.
+    Pending
+    // Carrier has the shipment details but has not picked it up.
+    InfoReceived
+    InTransit
+    OutForDelivery
+    // Arrived, but not yet in our hands. Sea freight: the vessel's reported ETA
+    // has passed, so it should be at its reported destination port — not latched,
+    // so it returns to InTransit if the vessel reports a new destination.
+    // Couriers: the parcel is at a pickup point awaiting collection.
+    Arrived
+    Delivered
+    // Customs hold, damage, a failed delivery attempt, a return to sender.
+    Exception
+    Cancelled
+    // The carrier does not recognise the number. Common for the first few hours
+    // after a booking, so it is not terminal — it just backs off.
+    NotFound
+    Unknown
+}
+
+model SupplierDelivery {
+    fields {
+        // Our own reference for the consignment (PO number, supplier invoice, or
+        // whatever the team writes on it). Free text — deliveries are logged
+        // before the paperwork catches up.
+        reference Text?
+        supplierName Text?
+        mode DeliveryMode
+        // Required for AirCourier, unused for SeaFreight. Enforced in
+        // createSupplierDelivery — the schema can't express "required when mode
+        // is X", so both identifier sets stay optional here.
+        carrier DeliveryCarrier?
+        trackingNumber Text?
+        // Required for SeaFreight. The name is what the forwarder gives us, but
+        // names are not unique across ships, so the first successful refresh
+        // resolves it to an IMO/MMSI and every later poll uses that stable id.
+        vesselName Text?
+        vesselImo Text?
+        vesselMmsi Text?
+        // EasyPost's tracker id for a courier consignment, stored on first
+        // contact. EasyPost bills per tracker created and dedupes by tracking
+        // code, so later polls read this id back rather than re-creating.
+        easypostTrackerId Text?
+        status DeliveryStatus @default(DeliveryStatus.Pending)
+        // The carrier's own words for the current status, kept verbatim.
+        statusDescription Text?
+        // Courier: the carrier's estimated delivery date. Sea: the vessel's
+        // AIS-reported ETA at its destination port.
+        estimatedArrival Timestamp?
+        deliveredAt Timestamp?
+        // Courier: destination city/locality. Sea: reported destination port.
+        destination Text?
+        // ─── Refresh bookkeeping ────────────────────────────────────────────
+        lastCheckedAt Timestamp?
+        lastEventAt Timestamp?
+        lastEventLocation Text?
+        // Last failure reason, cleared on the next success. Surfaced in the
+        // Console so a bad tracking number is visible rather than silent.
+        refreshError Text?
+        // Drives the retry backoff — see dueForRefresh in deliveryTrackingHelpers.
+        consecutiveFailures Number @default(0)
+        // Set to stop polling a delivery without deleting it (wrong number,
+        // abandoned shipment). Delivered and Cancelled stop being polled anyway.
+        isArchived Boolean @default(false)
+        events DeliveryEvent[]
+        totalEvents Number @computed(COUNT(supplierDelivery.events.id))
+        notes Text?
+    }
+
+    actions {
+        get getSupplierDelivery(id)
+        list listSupplierDeliveries(mode?, carrier?, status?, reference?, isArchived?) {
+            @sortable(status, estimatedArrival, lastCheckedAt)
+            @orderBy(createdAt: desc)
+        }
+        // A function so the mode/identifier pairing can be validated and the
+        // tracking number normalised before the row is written.
+        create createSupplierDelivery() with (
+            mode,
+            carrier?,
+            trackingNumber?,
+            vesselName?,
+            reference?,
+            supplierName?,
+            notes?,
+        ) @function
+        update updateSupplierDelivery(id) with (reference?, supplierName?, notes?)
+        // Close a delivery by hand. Couriers report Delivered themselves; sea
+        // freight is tracked to the vessel, so this is how a sea delivery is
+        // finished off once the team is done with it.
+        update markDeliveryDelivered(id) {
+            @set(supplierDelivery.status = DeliveryStatus.Delivered)
+            @set(supplierDelivery.deliveredAt = ctx.now)
+        }
+        update archiveDelivery(id) {
+            @set(supplierDelivery.isArchived = true)
+        }
+        delete deleteSupplierDelivery(id)
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, create, update, delete]
+    )
+}
+
+// One carrier scan / AIS report against a delivery, so the team can see the
+// history rather than just the latest state. Written only by the refresh flow.
+model DeliveryEvent {
+    fields {
+        delivery SupplierDelivery
+        occurredAt Timestamp
+        description Text
+        location Text?
+        // The normalised status this event represents, where the provider says.
+        status DeliveryStatus?
+        // Dedup identity: providers replay their whole history on every poll, so
+        // events are keyed on (delivery, timestamp + description) and re-seen
+        // events are skipped instead of duplicated.
+        eventKey Text
+    }
+
+    actions {
+        list listDeliveryEvents(delivery.id?) {
+            @orderBy(occurredAt: desc)
+        }
+    }
+
+    @unique([delivery, eventKey])
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}
+
+// Re-polls every open delivery every 3 hours: FedEx and DHL for couriers, the AIS
+// provider for vessels. Providers whose credentials are unset are skipped, so
+// this is safe to deploy before the keys exist. Per-provider volume is capped and
+// failures back off exponentially — DHL's developer tier allows only 250 calls a
+// day at one call every 5 seconds.
+flow ScheduledRefreshDeliveries {
+    @schedule("0 */3 * * *")
+    @permission(roles: [Operator])
+}

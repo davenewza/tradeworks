@@ -1,0 +1,21 @@
+{
+  "id": "list-delivery-events",
+  "action_name": "listDeliveryEvents",
+  "name": "Tracking history",
+  "icon": "emoji:📍",
+  "response": {
+    "$.results[*].occurredAt": { "display_name": "When", "display_order": 1 },
+    "$.results[*].description": { "display_name": "Event", "display_order": 2 },
+    "$.results[*].location": { "display_name": "Location", "display_order": 3 },
+    "$.results[*].status": { "display_name": "Status", "display_order": 4 },
+    "$.results[*].eventKey": { "visible": false },
+    "$.results[*].id": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false }
+  },
+  "pagination": {
+    "page_size": {
+      "default_value": 50
+    }
+  }
+}

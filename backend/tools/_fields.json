@@ -110,5 +110,52 @@
     "id": "CumulativeSales.dayOfMonth",
     "display_name": "Day of month",
     "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+  },
+  {
+    "id": "DeliveryStatus",
+    "format": {
+      "enum_config": {
+        "values": [
+          { "value": "Pending", "display_value": "Pending", "colour": "grey", "display_order": 1 },
+          { "value": "InfoReceived", "display_value": "Info received", "colour": "blue", "display_order": 2 },
+          { "value": "InTransit", "display_value": "In transit", "colour": "blue", "display_order": 3 },
+          { "value": "OutForDelivery", "display_value": "Out for delivery", "colour": "sunshine", "display_order": 4 },
+          { "value": "Arrived", "display_value": "Arrived at port", "colour": "sunshine", "display_order": 5 },
+          { "value": "Delivered", "display_value": "Delivered", "colour": "green", "display_order": 6 },
+          { "value": "Exception", "display_value": "Exception", "colour": "red", "display_order": 7 },
+          { "value": "Cancelled", "display_value": "Cancelled", "colour": "grey", "display_order": 8 },
+          { "value": "NotFound", "display_value": "Not found yet", "colour": "purple", "display_order": 9 },
+          { "value": "Unknown", "display_value": "Unknown", "colour": "grey", "display_order": 10 }
+        ]
+      }
+    }
+  },
+  {
+    "id": "DeliveryMode",
+    "format": {
+      "enum_config": {
+        "values": [
+          { "value": "AirCourier", "display_value": "Air courier", "colour": "blue", "display_order": 1 },
+          { "value": "SeaFreight", "display_value": "Sea freight", "colour": "purple", "display_order": 2 }
+        ]
+      }
+    }
+  },
+  {
+    "id": "DeliveryCarrier",
+    "format": {
+      "enum_config": {
+        "values": [
+          { "value": "Fedex", "display_value": "FedEx", "display_order": 1 },
+          { "value": "Dhl", "display_value": "DHL", "display_order": 2 },
+          { "value": "Ups", "display_value": "UPS", "display_order": 3 }
+        ]
+      }
+    }
+  },
+  {
+    "id": "SupplierDelivery.totalEvents",
+    "display_name": "Tracking events",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
   }
 ]

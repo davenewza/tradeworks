@@ -1,0 +1,134 @@
+{
+  "id": "list-supplier-deliveries",
+  "action_name": "listSupplierDeliveries",
+  "name": "Deliveries",
+  "icon": "emoji:🚚",
+  "title": "Supplier deliveries",
+  "response": {
+    "$.results[*].reference": {
+      "display_name": "Reference",
+      "display_order": 1
+    },
+    "$.results[*].supplierName": {
+      "display_name": "Supplier",
+      "display_order": 2
+    },
+    "$.results[*].mode": {
+      "display_name": "Mode",
+      "display_order": 3
+    },
+    "$.results[*].carrier": {
+      "display_name": "Carrier",
+      "display_order": 4
+    },
+    "$.results[*].trackingNumber": {
+      "display_name": "Tracking number",
+      "display_order": 5
+    },
+    "$.results[*].vesselName": {
+      "display_name": "Vessel",
+      "display_order": 6
+    },
+    "$.results[*].status": {
+      "display_name": "Status",
+      "display_order": 7
+    },
+    "$.results[*].estimatedArrival": {
+      "display_name": "ETA",
+      "display_order": 8
+    },
+    "$.results[*].destination": {
+      "display_name": "Destination",
+      "display_order": 9
+    },
+    "$.results[*].lastCheckedAt": {
+      "display_name": "Last checked",
+      "display_order": 10
+    },
+    "$.results[*].refreshError": {
+      "display_name": "Tracking problem",
+      "display_order": 11
+    },
+    "$.results[*].id": {
+      "display_order": 20,
+      "link": {
+        "tool_id": "get-supplier-delivery",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].statusDescription": {
+      "visible": false
+    },
+    "$.results[*].deliveredAt": {
+      "visible": false
+    },
+    "$.results[*].lastEventAt": {
+      "visible": false
+    },
+    "$.results[*].lastEventLocation": {
+      "visible": false
+    },
+    "$.results[*].vesselImo": {
+      "visible": false
+    },
+    "$.results[*].vesselMmsi": {
+      "visible": false
+    },
+    "$.results[*].consecutiveFailures": {
+      "visible": false
+    },
+    "$.results[*].isArchived": {
+      "visible": false
+    },
+    "$.results[*].events": {
+      "visible": false
+    },
+    "$.results[*].totalEvents": {
+      "visible": false
+    },
+    "$.results[*].notes": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  },
+  "pagination": {
+    "page_size": {
+      "default_value": 100
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "get-supplier-delivery",
+      "title": "View delivery",
+      "display_order": 0
+    },
+    {
+      "tool_id": "mark-delivery-delivered",
+      "title": "Mark delivered",
+      "as_dialog": true,
+      "display_order": 1
+    },
+    {
+      "tool_id": "archive-delivery",
+      "title": "Stop tracking",
+      "as_dialog": true,
+      "display_order": 2
+    }
+  ],
+  "filter_config": {
+    "quick_search_field": "$.where.reference.contains"
+  }
+}
