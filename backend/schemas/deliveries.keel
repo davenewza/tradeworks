@@ -126,6 +126,12 @@ model SupplierDelivery {
         update archiveDelivery(id) {
             @set(supplierDelivery.isArchived = true)
         }
+        // "Check now" for a single delivery, from its page in the Console. Ignores
+        // the scheduled interval and the failure backoff — someone asked, so we
+        // ask the carrier — but is otherwise the same refresh the flow performs.
+        write refreshSupplierDelivery(RefreshDeliveryInput) returns (RefreshDeliveryResponse) {
+            @permission(roles: [Operator])
+        }
         delete deleteSupplierDelivery(id)
     }
 
@@ -135,8 +141,28 @@ model SupplierDelivery {
     )
 }
 
+message RefreshDeliveryInput {
+    id ID
+}
+
+// `refreshed` is false both for a delivery we could not ask about (no provider
+// credentials, no usable identifier) and for one whose provider call failed —
+// `message` says which. The remaining fields echo the delivery's state after the
+// refresh, so the Console can show the outcome without a second round trip.
+message RefreshDeliveryResponse {
+    refreshed Boolean
+    message Text
+    status DeliveryStatus?
+    statusDescription Text?
+    estimatedArrival Timestamp?
+    destination Text?
+    newEvents Number
+    lastCheckedAt Timestamp?
+}
+
 // One carrier scan / AIS report against a delivery, so the team can see the
-// history rather than just the latest state. Written only by the refresh flow.
+// history rather than just the latest state. Written by the refresh flow, the
+// per-delivery refresh action, and the first check on create.
 model DeliveryEvent {
     fields {
         delivery SupplierDelivery

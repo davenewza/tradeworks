@@ -11,9 +11,13 @@ The **Logistics** space in the Console:
 
 - **Supplier deliveries** — the list of everything inbound, with status, ETA and
   when it was last checked.
-- **Track a delivery** — create a new entry.
+- **Track a delivery** — create a new entry. The carrier is checked
+  **immediately**, so a new delivery lands with a real status and ETA rather than
+  sitting on *Pending* until the next scheduled run.
 - Opening a delivery shows its full detail plus the **tracking history**: every
   carrier scan or AIS report we have seen.
+- **Check now** — on a delivery's page (and from the grid) to re-check that one
+  delivery against its carrier straight away, without waiting for the schedule.
 
 ## The two kinds of delivery
 
@@ -118,6 +122,33 @@ tracking problem rather than being matched to the wrong ship; set the IMO direct
 to resolve it.
 
 ## Refresh
+
+A delivery is refreshed from three places, all running the same code
+(`lib/deliveryRefresh.ts`) so they cannot drift apart:
+
+| Trigger | When | Scope |
+| --- | --- | --- |
+| **On create** | The moment a delivery is logged | Just that delivery |
+| **Check now** | Someone clicks it on the delivery page | Just that delivery |
+| **Scheduled** | Every 3 hours (sea freight: daily) | Everything due |
+
+The two manual paths deliberately **ignore the interval and the failure backoff**
+— those exist to ration automatic polling, and a person asking is an explicit
+instruction to go and look. **Check now** also works on archived and
+already-delivered deliveries, since re-reading a stored tracker costs nothing.
+
+Neither can break anything it is attached to. A first check that fails does not
+fail the create: the delivery is already saved and is perfectly valid without a
+reading, so the failure is recorded on the row and the scheduled run retries. A
+failed **Check now** returns `refreshed: false` with the reason rather than an
+error page.
+
+A skipped check — no provider credentials, or no usable identifier — is treated as
+distinct from a failure: it does **not** move `lastCheckedAt` and does **not**
+advance the backoff, so the delivery stays due for the next scheduled run rather
+than appearing freshly checked.
+
+### The scheduled run
 
 The `ScheduledRefreshDeliveries` flow runs **every 3 hours** (`0 */3 * * *`). On
 each run it re-polls the open deliveries that are due — not archived, not already
@@ -236,7 +267,9 @@ existed purely to ration polling. One provider with free reads deletes that.
 | Path | What it holds |
 | --- | --- |
 | `backend/schemas/deliveries.keel` | `SupplierDelivery`, `DeliveryEvent`, the enums, actions and the flow declaration |
-| `backend/flows/scheduledRefreshDeliveries.ts` | The 3-hourly refresh: selection, per-provider fan-out, persistence |
+| `backend/flows/scheduledRefreshDeliveries.ts` | The 3-hourly run: which deliveries are due, in what order, and per-run caps |
+| `backend/lib/deliveryRefresh.ts` | What one refresh *does* — provider dispatch and persistence, shared by all three triggers |
+| `backend/functions/refreshSupplierDelivery.ts` | The **Check now** action for a single delivery |
 | `backend/lib/deliveryTrackingHelpers.ts` | Provider-neutral logic — backoff, due-for-refresh, event dedup |
 | `backend/lib/easypostTrackingHelpers.ts` | EasyPost tracker create/read, carrier codes, status + status_detail mapping |
 | `backend/lib/vesselTrackingHelpers.ts` | Vessel name resolution, ETA, sea-freight status derivation |
