@@ -1,0 +1,47 @@
+{
+  "id": "refresh-supplier-delivery",
+  "action_name": "refreshSupplierDelivery",
+  "name": "Check now",
+  "icon": "emoji:🔄",
+  "title": "Check with the carrier now",
+  "help_text": "Asks the carrier for this delivery's current status and ETA straight away, instead of waiting for the next scheduled refresh.",
+  "inputs": {
+    "$.id": {
+      "visible": false
+    }
+  },
+  "response": {
+    "$.refreshed": {
+      "display_name": "Refreshed",
+      "display_order": 1
+    },
+    "$.message": {
+      "display_name": "Outcome",
+      "display_order": 2
+    },
+    "$.status": {
+      "display_name": "Status",
+      "display_order": 3
+    },
+    "$.statusDescription": {
+      "display_name": "Carrier's wording",
+      "display_order": 4
+    },
+    "$.estimatedArrival": {
+      "display_name": "ETA",
+      "display_order": 5
+    },
+    "$.destination": {
+      "display_name": "Destination",
+      "display_order": 6
+    },
+    "$.newEvents": {
+      "display_name": "New tracking events",
+      "display_order": 7
+    },
+    "$.lastCheckedAt": {
+      "display_name": "Last checked",
+      "display_order": 8
+    }
+  }
+}

@@ -4,36 +4,138 @@
   "name": "Delivery",
   "icon": "emoji:🚚",
   "response": {
-    "$.reference": { "display_name": "Reference", "display_order": 1 },
-    "$.supplierName": { "display_name": "Supplier", "display_order": 2 },
-    "$.mode": { "display_name": "Mode", "display_order": 3 },
-    "$.carrier": { "display_name": "Carrier", "display_order": 4 },
-    "$.trackingNumber": { "display_name": "Tracking number", "display_order": 5 },
-    "$.vesselName": { "display_name": "Vessel", "display_order": 6 },
-    "$.vesselImo": { "display_name": "Vessel IMO", "display_order": 7 },
-    "$.status": { "display_name": "Status", "display_order": 8 },
-    "$.statusDescription": { "display_name": "Carrier's wording", "display_order": 9 },
-    "$.estimatedArrival": { "display_name": "ETA", "display_order": 10 },
-    "$.deliveredAt": { "display_name": "Delivered", "display_order": 11 },
-    "$.destination": { "display_name": "Destination", "display_order": 12 },
-    "$.lastEventAt": { "display_name": "Last event", "display_order": 13 },
-    "$.lastEventLocation": { "display_name": "Last seen at", "display_order": 14 },
-    "$.totalEvents": { "display_name": "Tracking events", "display_order": 15 },
-    "$.lastCheckedAt": { "display_name": "Last checked", "display_order": 16 },
-    "$.refreshError": { "display_name": "Tracking problem", "display_order": 17 },
-    "$.notes": { "display_name": "Notes", "display_order": 18 },
-    "$.isArchived": { "display_name": "Tracking stopped", "display_order": 19 },
-    "$.vesselMmsi": { "visible": false },
-    "$.consecutiveFailures": { "visible": false },
-    "$.events": { "visible": false },
-    "$.createdAt": { "visible": false },
-    "$.updatedAt": { "visible": false }
+    "$.reference": {
+      "display_name": "Reference",
+      "display_order": 1
+    },
+    "$.supplierName": {
+      "display_name": "Supplier",
+      "display_order": 2
+    },
+    "$.mode": {
+      "display_name": "Mode",
+      "display_order": 3
+    },
+    "$.carrier": {
+      "display_name": "Carrier",
+      "display_order": 4
+    },
+    "$.trackingNumber": {
+      "display_name": "Tracking number",
+      "display_order": 5
+    },
+    "$.vesselName": {
+      "display_name": "Vessel",
+      "display_order": 6
+    },
+    "$.vesselImo": {
+      "display_name": "Vessel IMO",
+      "display_order": 7
+    },
+    "$.status": {
+      "display_name": "Status",
+      "display_order": 8
+    },
+    "$.statusDescription": {
+      "display_name": "Carrier's wording",
+      "display_order": 9
+    },
+    "$.estimatedArrival": {
+      "display_name": "ETA",
+      "display_order": 10
+    },
+    "$.deliveredAt": {
+      "display_name": "Delivered",
+      "display_order": 11
+    },
+    "$.destination": {
+      "display_name": "Destination",
+      "display_order": 12
+    },
+    "$.lastEventAt": {
+      "display_name": "Last event",
+      "display_order": 13
+    },
+    "$.lastEventLocation": {
+      "display_name": "Last seen at",
+      "display_order": 14
+    },
+    "$.totalEvents": {
+      "display_name": "Tracking events",
+      "display_order": 15
+    },
+    "$.lastCheckedAt": {
+      "display_name": "Last checked",
+      "display_order": 16
+    },
+    "$.refreshError": {
+      "display_name": "Tracking problem",
+      "display_order": 17
+    },
+    "$.notes": {
+      "display_name": "Notes",
+      "display_order": 18
+    },
+    "$.isArchived": {
+      "display_name": "Tracking stopped",
+      "display_order": 19
+    },
+    "$.vesselMmsi": {
+      "visible": false
+    },
+    "$.consecutiveFailures": {
+      "visible": false
+    },
+    "$.events": {
+      "visible": false
+    },
+    "$.createdAt": {
+      "visible": false
+    },
+    "$.updatedAt": {
+      "visible": false
+    }
   },
   "entry_activity_actions": [
-    { "tool_id": "mark-delivery-delivered", "title": "Mark delivered", "as_dialog": true, "emphasize": true, "display_order": 0 },
-    { "tool_id": "update-supplier-delivery", "title": "Edit details", "as_dialog": true, "display_order": 1 },
-    { "tool_id": "archive-delivery", "title": "Stop tracking", "as_dialog": true, "display_order": 2 },
-    { "tool_id": "delete-supplier-delivery", "title": "Delete", "as_dialog": true, "display_order": 3 }
+    {
+      "tool_id": "refresh-supplier-delivery",
+      "title": "Check now",
+      "as_dialog": true,
+      "emphasize": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": "mark-delivery-delivered",
+      "title": "Mark delivered",
+      "as_dialog": true,
+      "display_order": 1
+    },
+    {
+      "tool_id": "update-supplier-delivery",
+      "title": "Edit details",
+      "as_dialog": true,
+      "display_order": 2
+    },
+    {
+      "tool_id": "archive-delivery",
+      "title": "Stop tracking",
+      "as_dialog": true,
+      "display_order": 3
+    },
+    {
+      "tool_id": "delete-supplier-delivery",
+      "title": "Delete",
+      "as_dialog": true,
+      "display_order": 4
+    }
   ],
   "embedded_tools": [
     {
@@ -43,7 +145,12 @@
           "action_link": {
             "tool_id": "list-delivery-events",
             "data_mapping": [
-              { "key": "$.where.delivery.id.equals", "path": { "path": "$.id" } }
+              {
+                "key": "$.where.delivery.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
             ]
           },
           "response_overrides": {

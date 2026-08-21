@@ -111,21 +111,36 @@
   },
   "entry_activity_actions": [
     {
+      "tool_id": "refresh-supplier-delivery",
+      "title": "Check now",
+      "as_dialog": true,
+      "emphasize": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.id",
+          "path": {
+            "path": "$.results[*].id"
+          }
+        }
+      ]
+    },
+    {
       "tool_id": "get-supplier-delivery",
       "title": "View delivery",
-      "display_order": 0
+      "display_order": 1
     },
     {
       "tool_id": "mark-delivery-delivered",
       "title": "Mark delivered",
       "as_dialog": true,
-      "display_order": 1
+      "display_order": 2
     },
     {
       "tool_id": "archive-delivery",
       "title": "Stop tracking",
       "as_dialog": true,
-      "display_order": 2
+      "display_order": 3
     }
   ],
   "filter_config": {
