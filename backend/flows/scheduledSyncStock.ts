@@ -14,7 +14,9 @@ type ProductRow = Awaited<ReturnType<typeof models.product.findMany>>[number];
 //     whole number (matches the sheet, and keeps cover consistent with it).
 //   - stockAvailable: stock_on_hand from the Zoho items feed.
 //   - currentStockCover / totalStockCover: stock ÷ estimate, rounded to 1 dp.
-//   - abcClass: Pareto cut over every product's trailing-365-day revenue.
+//   - abcClass: Pareto cut over every product's monthly revenue run-rate
+//     (window revenue ÷ months active, so a recently launched product is
+//     graded on its rate, not penalised for missing most of the window).
 // Cover isn't a @computed field — the engine can't round — so the job derives and
 // stores all of these together. Stock On Way is Phase 2 (stays 0 → Total = Current).
 // A Zoho rate-limit degrades to a clean pause: estimates, cover and ABC classes
@@ -46,7 +48,7 @@ export default ScheduledSyncStock({}, async (ctx) => {
         // once over every product with sales, not per product. Every product in
         // this map is also in estByProductId, so it's guaranteed to be loaded
         // and written below; products absent here get null (unclassified).
-        const abcByProductId = classifyAbc(aggregates);
+        const abcByProductId = classifyAbc(aggregates, now);
 
         // Products to (re)compute: those with a fresh stock reading, plus those
         // with sales in the window. Loaded by SKU and by id, then merged.
