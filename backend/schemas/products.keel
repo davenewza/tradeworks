@@ -31,6 +31,15 @@ enum StockCoverStatus {
     Oversupply
 }
 
+// Revenue-based ABC classification (Pareto cut over the whole catalogue):
+// A = the products making up the top ~80% of trailing-12-month revenue,
+// B = the next ~15%, C = the tail. Assigned daily by ScheduledSyncStock.
+enum AbcClass {
+    A
+    B
+    C
+}
+
 model Product {
     fields {
         name Text
@@ -87,11 +96,17 @@ model Product {
         // Null when cover is unknown. @computed, so it re-grades the moment cover
         // or the brand's lead time changes.
         stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 1.25, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
+        // Revenue-importance grade, written by the daily job: products ranked by
+        // trailing-365-day realized revenue (net of discount, excl VAT), then cut
+        // at 80% / 95% of cumulative revenue → A / B / C. Null when nothing sold
+        // in the window (blank, like cover). Not @computed — it needs a ranking
+        // across all products, which per-row expressions can't express.
+        abcClass AbcClass?
     }
 
     actions {
         get getProduct(id)
-        list listProducts(name?, sku?, brand.id?) {
+        list listProducts(name?, sku?, brand.id?, abcClass?) {
             @where(product.isEnabled)
             @sortable(
                 name,
@@ -101,7 +116,8 @@ model Product {
                 stockOnWay,
                 estimatedMonthlySale,
                 currentStockCover,
-                totalStockCover
+                totalStockCover,
+                abcClass
             )
             @orderBy(name: asc)
         }
@@ -133,8 +149,9 @@ flow SyncProducts {
 }
 
 // Daily refresh of stock levels and cover. Pulls stock_on_hand from Zoho items
-// and derives the trailing monthly sales estimate from local Sale history — a
-// handful of Zoho calls, run off-peak to stay clear of the shared daily quota.
+// and derives the trailing monthly sales estimate and revenue-based ABC class
+// from local Sale history — a handful of Zoho calls, run off-peak to stay clear
+// of the shared daily quota.
 flow ScheduledSyncStock {
     @schedule("every day at 2am")
     @permission(roles: [Operator])

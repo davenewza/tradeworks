@@ -1,11 +1,15 @@
-import { useDatabase } from '@teamkeel/sdk';
+import { AbcClass, useDatabase } from '@teamkeel/sdk';
 import { sql } from 'kysely';
 
-// Per-product sales rollup that feeds the monthly estimate.
+// Per-product sales rollup that feeds the monthly estimate and the ABC class.
 export interface SaleAggregate {
     productId: string;
     // Units sold in the trailing cover window (last 365 days).
     unitsLast365: number;
+    // Realized revenue in the same window — netAmount (net of discount, excl
+    // VAT), falling back to totalExclVat for rows synced before netAmount
+    // existed. Feeds the ABC class.
+    revenueLast365: number;
     // Earliest sale ever for this product, used to work out months active. Null
     // only defensively — a product in this list has at least one sale.
     firstSaleDate: Date | null;
@@ -57,9 +61,10 @@ export function computeStockCover(
     };
 }
 
-// One grouped pass over the Sale table: trailing-window units and first-ever sale
-// date per product. Aggregation isn't expressible via the generated models API,
-// so we drop to Kysely (raw SQL) per the project's DB-query convention.
+// One grouped pass over the Sale table: trailing-window units, trailing-window
+// revenue, and first-ever sale date per product. Aggregation isn't expressible
+// via the generated models API, so we drop to Kysely (raw SQL) per the
+// project's DB-query convention.
 export async function loadSaleAggregates(windowStart: Date): Promise<SaleAggregate[]> {
     const db = useDatabase();
     // Query the DB's snake_case columns, but read camelCase result keys: Keel's
@@ -68,11 +73,13 @@ export async function loadSaleAggregates(windowStart: Date): Promise<SaleAggrega
     const result = await sql<{
         productId: string;
         unitsLast365: string | number | null;
+        revenueLast365: string | number | null;
         firstSaleDate: string | Date | null;
     }>`
         select
             product_id,
             coalesce(sum(quantity) filter (where date >= ${windowStart}), 0) as units_last_365,
+            coalesce(sum(coalesce(net_amount, total_excl_vat)) filter (where date >= ${windowStart}), 0) as revenue_last_365,
             min(date) as first_sale_date
         from sale
         group by product_id
@@ -81,6 +88,39 @@ export async function loadSaleAggregates(windowStart: Date): Promise<SaleAggrega
     return result.rows.map((row) => ({
         productId: row.productId,
         unitsLast365: Number(row.unitsLast365 ?? 0),
+        revenueLast365: Number(row.revenueLast365 ?? 0),
         firstSaleDate: row.firstSaleDate ? new Date(row.firstSaleDate) : null,
     }));
+}
+
+// Cumulative-revenue shares at which the ABC classes cut over: A while the
+// share of revenue ranked above a product is under 80%, B until 95%, then C —
+// the same 80/15/5 defaults Zoho's ABC Classification report uses.
+export const ABC_REVENUE_SHARE = { a: 0.8, b: 0.95 };
+
+// Revenue-based ABC classification over the whole catalogue — a Pareto cut on
+// trailing-window realized revenue. Products are ranked by revenue (ties broken
+// by id, so equal-revenue runs classify deterministically) and graded by the
+// cumulative share of revenue ranked *before* them. Grading on the share before
+// — not including — each product keeps the product that crosses a boundary in
+// the higher class: a single product carrying 85% of all revenue is A, not B.
+// Products with no positive revenue in the window are left out of the map and
+// end up unclassified (null), mirroring blank cover for dormant products.
+export function classifyAbc(revenues: Array<{ productId: string; revenueLast365: number }>): Map<string, AbcClass> {
+    const ranked = revenues
+        .filter((r) => r.revenueLast365 > 0)
+        .sort((x, y) => y.revenueLast365 - x.revenueLast365 || x.productId.localeCompare(y.productId));
+    const total = ranked.reduce((sum, r) => sum + r.revenueLast365, 0);
+
+    const classes = new Map<string, AbcClass>();
+    let cumulative = 0;
+    for (const r of ranked) {
+        const shareBefore = cumulative / total;
+        classes.set(
+            r.productId,
+            shareBefore < ABC_REVENUE_SHARE.a ? AbcClass.A : shareBefore < ABC_REVENUE_SHARE.b ? AbcClass.B : AbcClass.C,
+        );
+        cumulative += r.revenueLast365;
+    }
+    return classes;
 }

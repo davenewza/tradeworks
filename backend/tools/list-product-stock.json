@@ -18,33 +18,37 @@
     "$.results[*].name": {
       "display_order": 2
     },
+    "$.results[*].abcClass": {
+      "display_name": "ABC class",
+      "display_order": 3
+    },
     "$.results[*].totalUnitsSold": {
       "display_name": "Total sales",
-      "display_order": 3
+      "display_order": 4
     },
     "$.results[*].stockAvailable": {
       "display_name": "Stock available",
-      "display_order": 4
+      "display_order": 5
     },
     "$.results[*].stockOnWay": {
       "display_name": "Stock on way",
-      "display_order": 5
+      "display_order": 6
     },
     "$.results[*].estimatedMonthlySale": {
       "display_name": "Est. monthly sales",
-      "display_order": 6
+      "display_order": 7
     },
     "$.results[*].currentStockCover": {
       "display_name": "Current cover",
-      "display_order": 7
+      "display_order": 8
     },
     "$.results[*].totalStockCover": {
       "display_name": "Total cover",
-      "display_order": 8
+      "display_order": 9
     },
     "$.results[*].stockCoverStatus": {
       "display_name": "Status",
-      "display_order": 9
+      "display_order": 10
     },
     "$.results[*].id": {
       "display_order": 20,

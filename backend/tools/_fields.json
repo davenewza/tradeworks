@@ -97,6 +97,18 @@
     }
   },
   {
+    "id": "AbcClass",
+    "format": {
+      "enum_config": {
+        "values": [
+          { "value": "A", "display_value": "A", "colour": "green", "display_order": 1 },
+          { "value": "B", "display_value": "B", "colour": "blue", "display_order": 2 },
+          { "value": "C", "display_value": "C", "colour": "grey", "display_order": 3 }
+        ]
+      }
+    }
+  },
+  {
     "id": "CumulativeSales.dailySales",
     "display_name": "Sales on day",
     "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }

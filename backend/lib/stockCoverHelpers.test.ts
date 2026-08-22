@@ -1,7 +1,7 @@
 import { models, resetDatabase } from '@teamkeel/testing';
-import { StockCoverStatus } from '@teamkeel/sdk';
+import { AbcClass, StockCoverStatus } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { computeStockCover, estimatedMonthlySale, loadSaleAggregates, monthsActive, round1 } from './stockCoverHelpers';
+import { classifyAbc, computeStockCover, estimatedMonthlySale, loadSaleAggregates, monthsActive, round1 } from './stockCoverHelpers';
 
 const num = (v: unknown) => Number(v);
 const NOW = new Date('2026-08-19T00:00:00Z');
@@ -25,25 +25,25 @@ describe('monthsActive', () => {
 describe('estimatedMonthlySale', () => {
     test('established product: window units ÷ 12', () => {
         expect(
-            estimatedMonthlySale({ productId: 'x', unitsLast365: 120, firstSaleDate: new Date('2020-01-01T00:00:00Z') }, NOW),
+            estimatedMonthlySale({ productId: 'x', unitsLast365: 120, revenueLast365: 0, firstSaleDate: new Date('2020-01-01T00:00:00Z') }, NOW),
         ).toBeCloseTo(10, 6);
     });
 
     test('new product: window units ÷ its shorter active span (not understated)', () => {
         const firstSale = new Date('2026-05-19T00:00:00Z');
-        expect(estimatedMonthlySale({ productId: 'x', unitsLast365: 60, firstSaleDate: firstSale }, NOW)).toBeCloseTo(
+        expect(estimatedMonthlySale({ productId: 'x', unitsLast365: 60, revenueLast365: 0, firstSaleDate: firstSale }, NOW)).toBeCloseTo(
             60 / monthsActive(firstSale, NOW),
             6,
         );
         // Sold only a few days → floored to 1 month, so the estimate is the raw units.
         expect(
-            estimatedMonthlySale({ productId: 'x', unitsLast365: 20, firstSaleDate: new Date('2026-08-15T00:00:00Z') }, NOW),
+            estimatedMonthlySale({ productId: 'x', unitsLast365: 20, revenueLast365: 0, firstSaleDate: new Date('2026-08-15T00:00:00Z') }, NOW),
         ).toBe(20);
     });
 
     test('nothing sold in the window → 0 (drives cover to blank)', () => {
         expect(
-            estimatedMonthlySale({ productId: 'x', unitsLast365: 0, firstSaleDate: new Date('2020-01-01T00:00:00Z') }, NOW),
+            estimatedMonthlySale({ productId: 'x', unitsLast365: 0, revenueLast365: 0, firstSaleDate: new Date('2020-01-01T00:00:00Z') }, NOW),
         ).toBe(0);
     });
 });
@@ -51,7 +51,7 @@ describe('estimatedMonthlySale', () => {
 describe('loadSaleAggregates', () => {
     beforeEach(resetDatabase);
 
-    test('sums only in-window units and finds the earliest sale per product', async () => {
+    test('sums only in-window units and revenue, and finds the earliest sale per product', async () => {
         const brand = await models.brand.create({ name: 'B' });
         const p1 = await models.product.create({ name: 'P1', sku: 'AGG-1', brandId: brand.id });
         const p2 = await models.product.create({ name: 'P2', sku: 'AGG-2', brandId: brand.id });
@@ -60,20 +60,71 @@ describe('loadSaleAggregates', () => {
         const windowStart = new Date(NOW.getTime() - 365 * 24 * 60 * 60 * 1000); // ~2025-08-19
 
         // p1: an old sale (outside the window) plus one inside it.
-        await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: new Date('2023-01-01'), productId: p1.id, quantity: 100, price: 1 });
-        await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: new Date('2026-06-01'), productId: p1.id, quantity: 5, price: 1 });
-        // p2: two sales, both inside the window.
+        await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: new Date('2023-01-01'), productId: p1.id, quantity: 100, price: 1, netAmount: 999 });
+        await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: new Date('2026-06-01'), productId: p1.id, quantity: 5, price: 1, netAmount: 40 });
+        // p2: two sales, both inside the window. I3 has no netAmount (synced
+        // before the field existed) → revenue falls back to its totalExclVat,
+        // which is computed as 85% of price × quantity: 2 × 1 × 0.85 = 1.7.
         await models.sale.create({ invoiceNumber: 'I3', lineItemId: 'L3', lineKey: 'L3', channelId: channel.id, date: new Date('2026-01-10'), productId: p2.id, quantity: 2, price: 1 });
-        await models.sale.create({ invoiceNumber: 'I4', lineItemId: 'L4', lineKey: 'L4', channelId: channel.id, date: new Date('2026-03-10'), productId: p2.id, quantity: 3, price: 1 });
+        await models.sale.create({ invoiceNumber: 'I4', lineItemId: 'L4', lineKey: 'L4', channelId: channel.id, date: new Date('2026-03-10'), productId: p2.id, quantity: 3, price: 1, netAmount: 25 });
 
         const byId = new Map((await loadSaleAggregates(windowStart)).map((a) => [a.productId, a]));
 
-        // p1: the 100-unit sale predates the window and is excluded; first sale is still the old date.
+        // p1: the 100-unit sale predates the window and is excluded from units
+        // AND revenue; first sale is still the old date.
         expect(num(byId.get(p1.id)!.unitsLast365)).toBe(5);
+        expect(num(byId.get(p1.id)!.revenueLast365)).toBe(40);
         expect(byId.get(p1.id)!.firstSaleDate!.getTime()).toBeLessThan(windowStart.getTime());
-        // p2: both sales counted; first sale falls inside the window.
+        // p2: both sales counted; revenue = totalExclVat fallback + netAmount.
         expect(num(byId.get(p2.id)!.unitsLast365)).toBe(5);
+        expect(num(byId.get(p2.id)!.revenueLast365)).toBeCloseTo(26.7, 6);
         expect(byId.get(p2.id)!.firstSaleDate!.getTime()).toBeGreaterThanOrEqual(windowStart.getTime());
+    });
+});
+
+describe('classifyAbc', () => {
+    const revs = (...pairs: Array<[string, number]>) =>
+        pairs.map(([productId, revenueLast365]) => ({ productId, revenueLast365 }));
+
+    test('cuts A/B/C at 80% and 95% of cumulative revenue', () => {
+        const classes = classifyAbc(revs(['a', 800], ['b', 150], ['c', 50]));
+        expect(classes.get('a')).toBe(AbcClass.A);
+        expect(classes.get('b')).toBe(AbcClass.B);
+        expect(classes.get('c')).toBe(AbcClass.C);
+    });
+
+    test('the product crossing a boundary keeps the higher class', () => {
+        // The top product alone is 85% of revenue — still A, not demoted to B
+        // for crossing the 80% line. The next starts at 85% → B; last at 95% → C.
+        const classes = classifyAbc(revs(['big', 850], ['mid', 100], ['tail', 50]));
+        expect(classes.get('big')).toBe(AbcClass.A);
+        expect(classes.get('mid')).toBe(AbcClass.B);
+        expect(classes.get('tail')).toBe(AbcClass.C);
+    });
+
+    test('a single selling product is A', () => {
+        expect(classifyAbc(revs(['only', 10])).get('only')).toBe(AbcClass.A);
+    });
+
+    test('equal revenues split deterministically at the boundaries', () => {
+        // 10 equal products: the first 8 fill 0–80% → A; the 9th and 10th start
+        // at 80% and 90% → B. Ties rank by product id, so reruns agree.
+        const classes = classifyAbc(revs(...Array.from({ length: 10 }, (_, i) => [`p${i}`, 100] as [string, number])));
+        expect([...classes.values()].filter((c) => c === AbcClass.A)).toHaveLength(8);
+        expect(classes.get('p8')).toBe(AbcClass.B);
+        expect(classes.get('p9')).toBe(AbcClass.B);
+    });
+
+    test('products with zero or negative window revenue are left unclassified', () => {
+        const classes = classifyAbc(revs(['sold', 100], ['dormant', 0], ['refunded', -50]));
+        expect(classes.get('sold')).toBe(AbcClass.A);
+        expect(classes.has('dormant')).toBe(false);
+        expect(classes.has('refunded')).toBe(false);
+    });
+
+    test('no positive revenue at all → nothing classified', () => {
+        expect(classifyAbc(revs(['x', 0])).size).toBe(0);
+        expect(classifyAbc([]).size).toBe(0);
     });
 });
 
