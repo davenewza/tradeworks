@@ -18,6 +18,12 @@ environment:
   - name: VESSEL_API_BASE_URL
     value: "https://api.vesselapi.com"
 
+  # Takealot Marketplace API (docs/takealot-barcodes.md). Offers hold the
+  # barcode printed on channel unit labels; the sync reads it into
+  # ProductChannelCode.
+  - name: TAKEALOT_API_BASE_URL
+    value: "https://marketplace-api.takealot.com"
+
 secrets:
   # Outbound delivery to customers: SHIPLOGIC_API_KEY calls ShipLogic for live
   # courier rates; DELIVERY_API_KEY is the X-API-KEY partners must send to our own
@@ -30,6 +36,10 @@ secrets:
   # username; no per-carrier credentials are needed on top of it.
   - name: EASYPOST_API_KEY
   - name: VESSEL_API_KEY
+  # Takealot Marketplace API key (Seller Portal → API Access), sent as
+  # X-API-Key. Only one key can be active per seller account — regenerating it
+  # invalidates the old one everywhere it is used.
+  - name: TAKEALOT_API_KEY
 
 auth:
   userProvisioning: auto

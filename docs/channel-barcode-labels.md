@@ -54,6 +54,11 @@ Products whose code fails validation are left out of the picker, and the flow
 shows a banner counting them, so a bad code is visible rather than the product
 just being silently absent.
 
+**Takealot codes fill themselves in** — they are synced from the barcode the
+Marketplace API holds against each offer, on product create / SKU change and via
+the *Sync Takealot Barcodes* flow (see [takealot-barcodes.md](takealot-barcodes.md)).
+Manual capture remains for channels without an API sync, such as Amazon's FNSKUs.
+
 ## Label stock, and why the symbology changes the answer
 
 This is the one real constraint. ZPL's `^BY` only takes **whole dots**, so on a
@@ -143,11 +148,12 @@ Console.
 
 ## Known gaps
 
-- **Bulk code capture.** Codes are entered one product-channel pair at a time in
-  the Console. With ~674 products, populating a large range would want a CSV
-  import off the channel's own offer export — the same shape as the existing
-  `ImportProductViews` flow. Not built yet, and it is the main thing standing
-  between this and labelling a full catalogue.
+- **Bulk code capture for non-Takealot channels.** Takealot codes are now synced
+  from the Marketplace API ([takealot-barcodes.md](takealot-barcodes.md)), which
+  covers the catalogue for that channel. Other channels' codes — Amazon FNSKUs in
+  particular — are still entered one product-channel pair at a time; a bulk path
+  would want a CSV import off the channel's own offer export, the same shape as
+  the existing `ImportProductViews` flow.
 - **No print preview in the Console.** The label is generated as native ZPL and
   rendered by the printer, so there is no on-screen proof before it prints. A
   preview would mean rasterising server-side (the approach klira takes for its

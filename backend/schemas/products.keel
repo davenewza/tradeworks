@@ -117,6 +117,11 @@ model Product {
         }
     }
 
+    // Keeps the product's Takealot channel code in step with the barcode
+    // Takealot holds against its offer. The handler only calls out when the
+    // SKU is new or changed — the SKU is what identifies the offer.
+    @on([create, update], syncTakealotBarcode)
+
     @permission(
         roles: [Operator],
         actions: [get, list, update, delete]
