@@ -1,0 +1,13 @@
+{
+  "id": "create-product-channel-code",
+  "action_name": "createProductChannelCode",
+  "name": "Add channel code",
+  "icon": "emoji:🔢",
+  "title": "Add a channel code for this product",
+  "help_text": "The code printed on this product's label for that channel: the 13-digit EAN-13 Takealot holds against the offer, or the FNSKU Amazon assigns. Grouping and spaces are stripped for EAN-13, and its check digit is verified — paste rather than retype.",
+  "inputs": {
+    "$.product.id": { "display_name": "Product", "display_order": 1 },
+    "$.channel.id": { "display_name": "Channel", "display_order": 2 },
+    "$.code": { "display_name": "Code", "display_order": 3 }
+  }
+}

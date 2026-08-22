@@ -38,3 +38,11 @@ auth:
     - type: google
       name: google_client
       clientId: 197248210825-lmlmjjo4hkvaqslk79colj1c15l001mu.apps.googleusercontent.com
+
+# Label printers driven from flows via ctx.ui.interactive.print. Channel unit
+# barcodes (PrintChannelBarcodes) go out as ZPL — see
+# docs/channel-barcode-labels.md. The name is what the flow references; the
+# physical device it resolves to is bound in the Console.
+hardware:
+  printers:
+    - name: Barcode labels

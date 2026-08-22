@@ -1,0 +1,130 @@
+// Unit barcode labels for stock going into a channel's fulfilment centre,
+// printed on the warehouse Zebra as ZPL. See docs/channel-barcode-labels.md.
+//
+// Channels differ in every part of the label, so none of it is hardcoded:
+//   - Takealot wants the product's EAN-13 with an "MP" marker stacked at the
+//     left of the symbol.
+//   - Amazon FBA wants the FNSKU as Code 128, plus the item condition ("New"),
+//     which Amazon requires on every unit label.
+// A channel is printable once it has a ChannelLabelSpec; adding another is a
+// row, not a code change.
+
+enum BarcodeSymbology {
+    // Fixed 95-module symbol, digits only, 13th digit a check digit. Used where
+    // the channel prints the product's GTIN.
+    Ean13
+    // Variable-width (11 modules per character), full printable ASCII. Used for
+    // channel-assigned codes like Amazon's FNSKU, which are alphanumeric and so
+    // cannot be expressed as an EAN.
+    Code128
+}
+
+// Roll sizes the warehouse stocks. Held as an enum rather than free-form
+// millimetres so the Console offers a dropdown and the renderer's geometry table
+// cannot drift from what is selectable.
+enum LabelStockSize {
+    Size40x25
+    Size50x25
+    // 66.7 × 25.4 mm — 2⅝" × 1", the common Amazon FBA thermal size.
+    Size67x25
+    Size100x50
+}
+
+// Where the channel's fixed annotation sits. Takealot stacks "MP" vertically
+// beside the symbol; Amazon's condition reads as a normal line under the title.
+enum LabelAnnotationPlacement {
+    StackedLeft
+    BelowTitle
+}
+
+// How one channel's unit label is built. One row per channel we label for.
+model ChannelLabelSpec {
+    fields {
+        channel Channel @unique
+        symbology BarcodeSymbology
+        // Fixed text printed on every label for this channel — Takealot's "MP",
+        // Amazon's item condition. Not per-product.
+        annotation Text?
+        annotationPlacement LabelAnnotationPlacement @default(LabelAnnotationPlacement.BelowTitle)
+        // Pre-selected in the print flow; the operator can still override it per
+        // run if a different roll is loaded.
+        defaultStock LabelStockSize @default(LabelStockSize.Size50x25)
+        isEnabled Boolean @default(true)
+    }
+
+    actions {
+        get getChannelLabelSpec(id)
+        list listChannelLabelSpecs(channel.id?, isEnabled?) {
+            @orderBy(createdAt: asc)
+        }
+        create createChannelLabelSpec() with (
+            channel.id,
+            symbology,
+            annotation?,
+            annotationPlacement?,
+            defaultStock?,
+        )
+        update updateChannelLabelSpec(id) with (
+            symbology,
+            annotation?,
+            annotationPlacement?,
+            defaultStock?,
+            isEnabled?,
+        )
+        delete deleteChannelLabelSpec(id)
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, create, update, delete]
+    )
+}
+
+// The code printed on a product's label for one channel: the EAN-13 Takealot
+// holds against the offer, the FNSKU Amazon assigns, and so on.
+//
+// Deliberately one row per channel rather than a single code on Product. The
+// codes are not interchangeable — an FNSKU is Amazon's own fulfilment
+// identifier, meaningless anywhere else — so collapsing them onto the product
+// would only work for the EAN case. The cost is that a product sold on two
+// EAN-13 channels carries the same digits twice; that is explicit and visible,
+// which beats a single field the flow has to guess the meaning of.
+model ProductChannelCode {
+    fields {
+        product Product
+        channel Channel
+        code Text
+        // Display copy so a product's codes read in one table without following
+        // each lookup, matching how ProductChannelFee does it.
+        channelName Text @computed(productChannelCode.channel.name)
+    }
+
+    actions {
+        get getProductChannelCode(id)
+        list listProductChannelCodes(product.id?, channel.id?) {
+            @orderBy(channelName: asc)
+        }
+        create createProductChannelCode() with (product.id, channel.id, code)
+        update updateProductChannelCode(id) with (code)
+        delete deleteProductChannelCode(id)
+    }
+
+    // One code per product per channel.
+    @unique([product, channel])
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, create, update, delete]
+    )
+}
+
+// Prints unit labels for a channel. Launched two ways:
+//   - from the Products space with no input, picking products from a table;
+//   - from a product page as an entry action, which passes productId and skips
+//     straight to that product's label count.
+flow PrintChannelBarcodes {
+    inputs {
+        productId ID?
+    }
+    @permission(roles: [Operator])
+}
