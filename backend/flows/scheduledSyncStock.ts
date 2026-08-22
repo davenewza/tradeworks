@@ -1,7 +1,7 @@
 import { ScheduledSyncStock, models } from '@teamkeel/sdk';
 import { getZohoAccessToken } from '../lib/zohoProductHelpers';
 import { fetchProductStock } from '../lib/zohoStockHelpers';
-import { loadSaleAggregates, estimatedMonthlySale, computeStockCover } from '../lib/stockCoverHelpers';
+import { loadSaleAggregates, estimatedMonthlySale, computeStockCover, classifyAbc } from '../lib/stockCoverHelpers';
 
 const COVER_WINDOW_DAYS = 365;
 const LOAD_CHUNK = 200;
@@ -14,10 +14,12 @@ type ProductRow = Awaited<ReturnType<typeof models.product.findMany>>[number];
 //     whole number (matches the sheet, and keeps cover consistent with it).
 //   - stockAvailable: stock_on_hand from the Zoho items feed.
 //   - currentStockCover / totalStockCover: stock ÷ estimate, rounded to 1 dp.
+//   - abcClass: Pareto cut over every product's trailing-365-day revenue.
 // Cover isn't a @computed field — the engine can't round — so the job derives and
-// stores all three together. Stock On Way is Phase 2 (stays 0 → Total = Current).
-// A Zoho rate-limit degrades to a clean pause: estimates and cover still refresh
-// from local sales (against last-known stock), and stock catches up next run.
+// stores all of these together. Stock On Way is Phase 2 (stays 0 → Total = Current).
+// A Zoho rate-limit degrades to a clean pause: estimates, cover and ABC classes
+// still refresh from local sales (against last-known stock), and stock catches up
+// next run.
 export default ScheduledSyncStock({}, async (ctx) => {
     const now = new Date();
     const windowStart = new Date(now.getTime() - COVER_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -39,6 +41,12 @@ export default ScheduledSyncStock({}, async (ctx) => {
         const estByProductId = new Map(
             aggregates.map((a) => [a.productId, Math.round(estimatedMonthlySale(a, now))]),
         );
+
+        // ABC class from the same aggregates — a global cut, so it's computed
+        // once over every product with sales, not per product. Every product in
+        // this map is also in estByProductId, so it's guaranteed to be loaded
+        // and written below; products absent here get null (unclassified).
+        const abcByProductId = classifyAbc(aggregates);
 
         // Products to (re)compute: those with a fresh stock reading, plus those
         // with sales in the window. Loaded by SKU and by id, then merged.
@@ -82,6 +90,7 @@ export default ScheduledSyncStock({}, async (ctx) => {
                     estimatedMonthlySale: estimate,
                     currentStockCover: cover.current,
                     totalStockCover: cover.total,
+                    abcClass: abcByProductId.get(p.id) ?? null,
                 },
             );
 
@@ -89,7 +98,10 @@ export default ScheduledSyncStock({}, async (ctx) => {
             if (hasEstimate) estimatesUpdated++;
         }
 
-        return { zohoItems: stockBySku.size, productsTouched: products.size, stockUpdated, estimatesUpdated };
+        const abcCounts = { A: 0, B: 0, C: 0 };
+        for (const cls of abcByProductId.values()) abcCounts[cls]++;
+
+        return { zohoItems: stockBySku.size, productsTouched: products.size, stockUpdated, estimatesUpdated, abcCounts };
     });
 
     const rateLimited = fetched.rateLimited;
@@ -108,6 +120,10 @@ export default ScheduledSyncStock({}, async (ctx) => {
                     { key: 'Products updated', value: summary.productsTouched },
                     { key: 'Stock levels updated', value: summary.stockUpdated },
                     { key: 'Monthly estimates updated', value: summary.estimatesUpdated },
+                    {
+                        key: 'ABC classes (A · B · C)',
+                        value: `${summary.abcCounts.A} · ${summary.abcCounts.B} · ${summary.abcCounts.C}`,
+                    },
                 ],
             }),
         ],

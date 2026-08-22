@@ -31,6 +31,7 @@
     "$.results[*].totalUnitsSold": { "visible": false },
     "$.results[*].totalSalesValue": { "visible": false },
     "$.results[*].averageSalePrice": { "visible": false },
+    "$.results[*].abcClass": { "visible": false },
     "$.results[*].stockAvailable": { "visible": false },
     "$.results[*].stockOnWay": { "visible": false },
     "$.results[*].estimatedMonthlySale": { "visible": false },
