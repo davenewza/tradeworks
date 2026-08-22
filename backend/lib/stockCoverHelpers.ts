@@ -93,24 +93,35 @@ export async function loadSaleAggregates(windowStart: Date): Promise<SaleAggrega
     }));
 }
 
-// Cumulative-revenue shares at which the ABC classes cut over: A while the
-// share of revenue ranked above a product is under 80%, B until 95%, then C —
+// Cumulative shares at which the ABC classes cut over: A while the share of
+// revenue run-rate ranked above a product is under 80%, B until 95%, then C —
 // the same 80/15/5 defaults Zoho's ABC Classification report uses.
 export const ABC_REVENUE_SHARE = { a: 0.8, b: 0.95 };
 
 // Revenue-based ABC classification over the whole catalogue — a Pareto cut on
-// trailing-window realized revenue. Products are ranked by revenue (ties broken
-// by id, so equal-revenue runs classify deterministically) and graded by the
-// cumulative share of revenue ranked *before* them. Grading on the share before
-// — not including — each product keeps the product that crosses a boundary in
-// the higher class: a single product carrying 85% of all revenue is A, not B.
+// the monthly revenue RUN-RATE: trailing-window revenue ÷ months active, the
+// same launch-aware divisor (first sale → now, floored at 1, capped at 12) the
+// sales estimate uses. Normalising by months active grades a recently launched
+// product on its rate, not its short history — 3 strong months isn't
+// out-ranked by 12 slow ones. Products are ranked by run-rate (ties broken by
+// id, so equal runs classify deterministically) and graded by the cumulative
+// share of run-rate ranked *before* them. Grading on the share before — not
+// including — each product keeps the product that crosses a boundary in the
+// higher class: a single product carrying 85% of the run-rate is A, not B.
 // Products with no positive revenue in the window are left out of the map and
 // end up unclassified (null), mirroring blank cover for dormant products.
-export function classifyAbc(revenues: Array<{ productId: string; revenueLast365: number }>): Map<string, AbcClass> {
-    const ranked = revenues
-        .filter((r) => r.revenueLast365 > 0)
-        .sort((x, y) => y.revenueLast365 - x.revenueLast365 || x.productId.localeCompare(y.productId));
-    const total = ranked.reduce((sum, r) => sum + r.revenueLast365, 0);
+export function classifyAbc(
+    aggregates: Array<Pick<SaleAggregate, 'productId' | 'revenueLast365' | 'firstSaleDate'>>,
+    now: Date,
+): Map<string, AbcClass> {
+    const ranked = aggregates
+        .filter((a) => a.revenueLast365 > 0)
+        .map((a) => ({
+            productId: a.productId,
+            monthlyRevenue: a.revenueLast365 / monthsActive(a.firstSaleDate, now),
+        }))
+        .sort((x, y) => y.monthlyRevenue - x.monthlyRevenue || x.productId.localeCompare(y.productId));
+    const total = ranked.reduce((sum, r) => sum + r.monthlyRevenue, 0);
 
     const classes = new Map<string, AbcClass>();
     let cumulative = 0;
@@ -120,7 +131,7 @@ export function classifyAbc(revenues: Array<{ productId: string; revenueLast365:
             r.productId,
             shareBefore < ABC_REVENUE_SHARE.a ? AbcClass.A : shareBefore < ABC_REVENUE_SHARE.b ? AbcClass.B : AbcClass.C,
         );
-        cumulative += r.revenueLast365;
+        cumulative += r.monthlyRevenue;
     }
     return classes;
 }
