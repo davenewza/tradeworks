@@ -21,8 +21,16 @@ const ctx: TakealotCtx = {
     secrets: { TAKEALOT_API_KEY: 'test-key' },
 };
 
-function offer(sku: string, barcode: string | null): TakealotOffer {
-    return { sku, barcode };
+// The label barcode lives in product_label; the merchant `barcode` field is a
+// distractor the sync must ignore (see mptalOffer).
+function offer(sku: string, label: string | null): TakealotOffer {
+    return { sku, product_label: label };
+}
+
+// An offer as Takealot actually returns it for placeholder-barcoded stock: the
+// real label EAN in product_label, an MPTAL placeholder in barcode.
+function mptalOffer(sku: string, label: string | null): TakealotOffer {
+    return { sku, product_label: label, barcode: 'MPTAL75747951' };
 }
 
 async function createProduct(sku: string, name = `Product ${sku}`, isEnabled = true) {
@@ -57,7 +65,7 @@ describe('fetchOfferBySku', () => {
 
         const result = await fetchOfferBySku(ctx, 'SKU 1');
 
-        expect(result).toEqual({ sku: 'SKU 1', barcode: '6001234567893' });
+        expect(result).toEqual({ sku: 'SKU 1', product_label: '6001234567893' });
         expect(impl).toHaveBeenCalledWith(
             'https://takealot.test/v1/offers/by_sku/SKU%201',
             expect.objectContaining({ headers: expect.objectContaining({ 'X-API-Key': 'test-key' }) })
@@ -165,17 +173,41 @@ describe('computeBarcodeSyncPlan', () => {
         expect(plan.offersWithoutProduct).toEqual(['UNKNOWN']);
     });
 
-    test('leaves the stored code alone when the offer has no barcode, and surfaces it', async () => {
+    test('leaves the stored code alone when the offer has no label barcode, and surfaces it', async () => {
         const product = await createProduct('SKU-1');
         const channel = await createTakealotChannel();
         await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'KEEP-ME' });
 
-        const plan = await computeBarcodeSyncPlan([offer('SKU-1', ''), offer('SKU-1', null)]);
+        const plan = await computeBarcodeSyncPlan([mptalOffer('SKU-1', ''), offer('SKU-1', null)]);
 
         expect(plan.changes).toHaveLength(0);
         expect(plan.offersWithoutBarcode).toEqual(['SKU-1']);
         const rows = await codesForProduct(product.id);
         expect(rows.map((r) => r.code)).toEqual(['KEEP-ME']);
+    });
+
+    test('stores the product_label, never the MPTAL merchant barcode', async () => {
+        const product = await createProduct('SKU-1');
+
+        const plan = await computeBarcodeSyncPlan([mptalOffer('SKU-1', '9901043896425')]);
+
+        expect(plan.changes).toHaveLength(1);
+        expect(plan.changes[0]).toMatchObject({ productId: product.id, barcode: '9901043896425' });
+    });
+
+    test('a stored MPTAL placeholder is planned for replacement by the label barcode', async () => {
+        const product = await createProduct('SKU-1');
+        const channel = await createTakealotChannel();
+        await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'MPTAL75747951' });
+
+        const plan = await computeBarcodeSyncPlan([mptalOffer('SKU-1', '9901043896425')]);
+
+        expect(plan.changes).toHaveLength(1);
+        expect(plan.changes[0]).toMatchObject({
+            change: 'Update',
+            barcode: '9901043896425',
+            replaces: 'MPTAL75747951',
+        });
     });
 
     test('duplicate offer SKUs warn and the last occurrence wins', async () => {
@@ -249,16 +281,16 @@ describe('applyBarcodeSync', () => {
 // ─── syncProductBarcodeFromTakealot ─────────────────────────────────────────
 
 describe('syncProductBarcodeFromTakealot', () => {
-    test('creates the channel code from the offer barcode', async () => {
+    test('creates the channel code from the offer product_label, ignoring the MPTAL barcode', async () => {
         const product = await createProduct('SKU-1');
-        stubFetch(() => ({ status: 200, body: offer('SKU-1', ' 6001234567893 ') }));
+        stubFetch(() => ({ status: 200, body: mptalOffer('SKU-1', ' 9901043896425 ') }));
 
         const result = await syncProductBarcodeFromTakealot(ctx, product);
 
-        expect(result).toEqual({ outcome: 'created', barcode: '6001234567893' });
+        expect(result).toEqual({ outcome: 'created', barcode: '9901043896425' });
         const rows = await codesForProduct(product.id);
         expect(rows).toHaveLength(1);
-        expect(rows[0].code).toBe('6001234567893');
+        expect(rows[0].code).toBe('9901043896425');
     });
 
     test('updates when the stored code differs and reports unchanged when it matches', async () => {
@@ -286,11 +318,11 @@ describe('syncProductBarcodeFromTakealot', () => {
         expect(await codesForProduct(product.id)).toHaveLength(0);
     });
 
-    test('reports no_barcode when the offer carries none, keeping any stored code', async () => {
+    test('reports no_barcode when the offer has no product_label — an MPTAL barcode does not count', async () => {
         const product = await createProduct('SKU-1');
         const channel = await createTakealotChannel();
         await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'KEEP-ME' });
-        stubFetch(() => ({ status: 200, body: offer('SKU-1', '') }));
+        stubFetch(() => ({ status: 200, body: mptalOffer('SKU-1', '') }));
 
         expect(await syncProductBarcodeFromTakealot(ctx, product)).toEqual({ outcome: 'no_barcode' });
         const rows = await codesForProduct(product.id);
