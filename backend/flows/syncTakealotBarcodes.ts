@@ -41,7 +41,7 @@ function buildNotes(plan: BarcodeSyncPlan): string[] {
 
     if (plan.offersWithoutBarcode.length > 0) {
         notes.push(
-            `**Note:** ${plan.offersWithoutBarcode.length} offer(s) carry no barcode on Takealot, so their products were left untouched: ${capped(plan.offersWithoutBarcode)}`
+            `**Note:** ${plan.offersWithoutBarcode.length} offer(s) carry no label barcode on Takealot, so their products were left untouched: ${capped(plan.offersWithoutBarcode)}`
         );
     }
 
@@ -66,14 +66,14 @@ export default SyncTakealotBarcodes(config, async (ctx) => {
         content: [
             ctx.ui.display.markdown({
                 content: [
-                    'This will pull **every offer** from the Takealot Marketplace API and compare each offer\'s barcode against the product\'s **Takealot channel code** here (matched by SKU).',
+                    "This will pull **every offer** from the Takealot Marketplace API and compare each offer's **label barcode** — the `product_label` EAN printed on Takealot's own unit-label sheets, not the merchant `barcode` field — against the product's **Takealot channel code** here (matched by SKU).",
                     '',
                     "On the next screen you'll review the changes before they are applied. Syncing will:",
                     '',
                     '- **Add** a Takealot channel code to products that have none.',
-                    "- **Update** codes that differ from the offer's barcode.",
+                    "- **Update** codes that differ from the offer's label barcode.",
                     '',
-                    'Codes for other channels are **not** touched, and nothing is deleted — a product whose offer is missing or has no barcode keeps whatever code it has.',
+                    'Codes for other channels are **not** touched, and nothing is deleted — a product whose offer is missing or has no label barcode keeps whatever code it has.',
                 ].join('\n'),
             }),
         ],

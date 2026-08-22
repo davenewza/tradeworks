@@ -18,9 +18,9 @@ environment:
   - name: VESSEL_API_BASE_URL
     value: "https://api.vesselapi.com"
 
-  # Takealot Marketplace API (docs/takealot-barcodes.md). Offers hold the
-  # barcode printed on channel unit labels; the sync reads it into
-  # ProductChannelCode.
+  # Takealot Marketplace API (docs/takealot-barcodes.md). An offer's
+  # product_label holds the EAN printed on channel unit labels; the sync reads
+  # it into ProductChannelCode.
   - name: TAKEALOT_API_BASE_URL
     value: "https://marketplace-api.takealot.com"
 

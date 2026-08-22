@@ -54,10 +54,12 @@ Products whose code fails validation are left out of the picker, and the flow
 shows a banner counting them, so a bad code is visible rather than the product
 just being silently absent.
 
-**Takealot codes fill themselves in** — they are synced from the barcode the
-Marketplace API holds against each offer, on product create / SKU change and via
-the *Sync Takealot Barcodes* flow (see [takealot-barcodes.md](takealot-barcodes.md)).
-Manual capture remains for channels without an API sync, such as Amazon's FNSKUs.
+**Takealot codes fill themselves in** — they are synced from each offer's
+`product_label` (the EAN on Takealot's own label sheets; *not* the merchant
+`barcode` field, which is often an `MPTAL…` placeholder), on product create /
+SKU change and via the *Sync Takealot Barcodes* flow (see
+[takealot-barcodes.md](takealot-barcodes.md)). Manual capture remains for
+channels without an API sync, such as Amazon's FNSKUs.
 
 ## Label stock, and why the symbology changes the answer
 

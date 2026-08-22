@@ -3,7 +3,7 @@ import { getOrCreateChannel } from './zohoSalesHelpers';
 import { TAKEALOT_CHANNEL_NAME } from './zohoChannelFeeHelpers';
 import { ProgressReporter } from './progress';
 
-// Reads each offer's barcode from the Takealot Marketplace API into the
+// Reads each offer's label barcode from the Takealot Marketplace API into the
 // product's Takealot ProductChannelCode row (docs/takealot-barcodes.md).
 // Offers are matched to products by SKU. Two entry points share this module:
 // the syncTakealotBarcode subscriber (one product, on create / SKU change) and
@@ -18,9 +18,17 @@ export interface TakealotCtx {
     secrets: { TAKEALOT_API_KEY: string };
 }
 
-// The slice of a Marketplace API offer the barcode sync reads.
+// The slice of a Marketplace API offer the barcode sync reads. An offer
+// carries two barcode-like fields and they are not interchangeable.
 export interface TakealotOffer {
     sku?: string | null;
+    // The EAN-13 Takealot prints on its own Seller Portal unit-label sheets
+    // (990-prefixed when Takealot minted it) — the code the fulfilment centre
+    // scans, and the one this sync stores.
+    product_label?: string | null;
+    // The merchant-provided barcode. Takealot backfills offers listed without
+    // one with an `MPTAL…`/`MPTALX…` placeholder, so it is deliberately never
+    // stored: it is not what Takealot's own labels carry.
     barcode?: string | null;
 }
 
@@ -42,6 +50,11 @@ function apiHeaders(ctx: TakealotCtx): Record<string, string> {
     };
 }
 
+// The barcode the sync stores for an offer: product_label, never barcode.
+function labelBarcode(offer: TakealotOffer): string {
+    return offer.product_label?.trim() ?? '';
+}
+
 // Look up the seller's offer for one SKU. Returns null on a 404 — the normal
 // answer for a product not listed on Takealot, not an error.
 export async function fetchOfferBySku(ctx: TakealotCtx, sku: string): Promise<TakealotOffer | null> {
@@ -58,14 +71,16 @@ export async function fetchOfferBySku(ctx: TakealotCtx, sku: string): Promise<Ta
     return (await response.json()) as TakealotOffer;
 }
 
-// Pull every offer via the paginated listing. fields= trims each offer to the
-// two fields the sync reads; continuation_token walks the pages.
+// Pull every offer via the paginated listing; continuation_token walks the
+// pages. Full offer objects are requested — no fields= trimming — because
+// product_label must be present and full payloads are only a few MB at this
+// catalogue's scale.
 export async function fetchAllOffers(ctx: TakealotCtx, progress?: ProgressReporter): Promise<TakealotOffer[]> {
     const offers: TakealotOffer[] = [];
     let continuationToken: string | null = null;
 
     do {
-        let url = `${apiBase(ctx)}/v1/offers?limit=1000&fields=sku,barcode`;
+        let url = `${apiBase(ctx)}/v1/offers?limit=1000`;
         if (continuationToken) url += `&continuation_token=${encodeURIComponent(continuationToken)}`;
 
         const response = await fetch(url, { method: 'GET', headers: apiHeaders(ctx) });
@@ -103,18 +118,19 @@ export interface BarcodeSyncPlan {
     unchanged: number;
     // Offer SKUs with no matching product (run Sync Products first).
     offersWithoutProduct: string[];
-    // Offers that matched a product but carry no barcode on Takealot.
+    // Offers that matched a product but carry no product_label on Takealot.
     offersWithoutBarcode: string[];
     // Enabled products Takealot has no offer for — informational only.
     productsWithoutOffer: string[];
     warnings: string[];
 }
 
-// Read-only diff of Takealot's offer barcodes against the stored Takealot
-// channel codes. Codes on other channels are never considered — an FNSKU on
-// the Amazon channel is a different identifier, not a stale Takealot code —
-// and nothing is ever deleted: an offer with no barcode, or a product with no
-// offer, leaves any stored code alone and is surfaced in the plan instead.
+// Read-only diff of Takealot's offer label barcodes against the stored
+// Takealot channel codes. Codes on other channels are never considered — an
+// FNSKU on the Amazon channel is a different identifier, not a stale Takealot
+// code — and nothing is ever deleted: an offer with no label barcode, or a
+// product with no offer, leaves any stored code alone and is surfaced in the
+// plan instead.
 export async function computeBarcodeSyncPlan(offers: TakealotOffer[]): Promise<BarcodeSyncPlan> {
     const warnings: string[] = [];
 
@@ -127,7 +143,7 @@ export async function computeBarcodeSyncPlan(offers: TakealotOffer[]): Promise<B
         if (offerBySku.has(sku)) {
             warnings.push(`Duplicate SKU on Takealot: ${sku} — using the last occurrence`);
         }
-        offerBySku.set(sku, offer.barcode?.trim() ?? '');
+        offerBySku.set(sku, labelBarcode(offer));
     }
 
     const products = await models.product.findMany();
@@ -250,7 +266,7 @@ export async function syncProductBarcodeFromTakealot(
     const offer = await fetchOfferBySku(ctx, product.sku);
     if (!offer) return { outcome: 'no_offer' };
 
-    const barcode = offer.barcode?.trim();
+    const barcode = labelBarcode(offer);
     if (!barcode) return { outcome: 'no_barcode' };
 
     const channel = await getOrCreateChannel(TAKEALOT_CHANNEL_NAME, new Map());
