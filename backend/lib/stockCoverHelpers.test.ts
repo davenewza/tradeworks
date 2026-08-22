@@ -83,48 +83,70 @@ describe('loadSaleAggregates', () => {
 });
 
 describe('classifyAbc', () => {
+    // All long-established (months active capped at 12), so raw revenues map
+    // straight onto run-rate shares and the expected cuts are easy to read.
+    const LONG_AGO = new Date('2020-01-01T00:00:00Z');
     const revs = (...pairs: Array<[string, number]>) =>
-        pairs.map(([productId, revenueLast365]) => ({ productId, revenueLast365 }));
+        pairs.map(([productId, revenueLast365]) => ({ productId, revenueLast365, firstSaleDate: LONG_AGO }));
 
-    test('cuts A/B/C at 80% and 95% of cumulative revenue', () => {
-        const classes = classifyAbc(revs(['a', 800], ['b', 150], ['c', 50]));
+    test('cuts A/B/C at 80% and 95% of the cumulative run-rate', () => {
+        // Shares sit clear of the exact cut points (b starts at 82%, c at 96%)
+        // — ÷ months active makes the shares float-derived, so exact-boundary
+        // behaviour is pinned by the equal-run-rates test below instead.
+        const classes = classifyAbc(revs(['a', 820], ['b', 140], ['c', 40]), NOW);
         expect(classes.get('a')).toBe(AbcClass.A);
         expect(classes.get('b')).toBe(AbcClass.B);
         expect(classes.get('c')).toBe(AbcClass.C);
     });
 
+    test('a recently launched product is graded on its run-rate, not raw window revenue', () => {
+        // "old" took 1200 over a full year → 100/month. "fresh" launched two
+        // months ago and took 900 → ~450/month. Raw window revenue would rank
+        // old first; run-rate puts fresh on top (~82% share → old starts in B).
+        const twoMonthsAgo = new Date(NOW.getTime() - 61 * 24 * 60 * 60 * 1000);
+        const classes = classifyAbc(
+            [
+                { productId: 'old', revenueLast365: 1200, firstSaleDate: LONG_AGO },
+                { productId: 'fresh', revenueLast365: 900, firstSaleDate: twoMonthsAgo },
+            ],
+            NOW,
+        );
+        expect(classes.get('fresh')).toBe(AbcClass.A);
+        expect(classes.get('old')).toBe(AbcClass.B);
+    });
+
     test('the product crossing a boundary keeps the higher class', () => {
-        // The top product alone is 85% of revenue — still A, not demoted to B
-        // for crossing the 80% line. The next starts at 85% → B; last at 95% → C.
-        const classes = classifyAbc(revs(['big', 850], ['mid', 100], ['tail', 50]));
+        // The top product alone is 85% of the run-rate — still A, not demoted to
+        // B for crossing the 80% line. The next starts at 85% → B; last at 96% → C.
+        const classes = classifyAbc(revs(['big', 850], ['mid', 110], ['tail', 40]), NOW);
         expect(classes.get('big')).toBe(AbcClass.A);
         expect(classes.get('mid')).toBe(AbcClass.B);
         expect(classes.get('tail')).toBe(AbcClass.C);
     });
 
     test('a single selling product is A', () => {
-        expect(classifyAbc(revs(['only', 10])).get('only')).toBe(AbcClass.A);
+        expect(classifyAbc(revs(['only', 10]), NOW).get('only')).toBe(AbcClass.A);
     });
 
-    test('equal revenues split deterministically at the boundaries', () => {
+    test('equal run-rates split deterministically at the boundaries', () => {
         // 10 equal products: the first 8 fill 0–80% → A; the 9th and 10th start
         // at 80% and 90% → B. Ties rank by product id, so reruns agree.
-        const classes = classifyAbc(revs(...Array.from({ length: 10 }, (_, i) => [`p${i}`, 100] as [string, number])));
+        const classes = classifyAbc(revs(...Array.from({ length: 10 }, (_, i) => [`p${i}`, 100] as [string, number])), NOW);
         expect([...classes.values()].filter((c) => c === AbcClass.A)).toHaveLength(8);
         expect(classes.get('p8')).toBe(AbcClass.B);
         expect(classes.get('p9')).toBe(AbcClass.B);
     });
 
     test('products with zero or negative window revenue are left unclassified', () => {
-        const classes = classifyAbc(revs(['sold', 100], ['dormant', 0], ['refunded', -50]));
+        const classes = classifyAbc(revs(['sold', 100], ['dormant', 0], ['refunded', -50]), NOW);
         expect(classes.get('sold')).toBe(AbcClass.A);
         expect(classes.has('dormant')).toBe(false);
         expect(classes.has('refunded')).toBe(false);
     });
 
     test('no positive revenue at all → nothing classified', () => {
-        expect(classifyAbc(revs(['x', 0])).size).toBe(0);
-        expect(classifyAbc([]).size).toBe(0);
+        expect(classifyAbc(revs(['x', 0]), NOW).size).toBe(0);
+        expect(classifyAbc([], NOW).size).toBe(0);
     });
 });
 
