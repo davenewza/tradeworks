@@ -128,3 +128,11 @@ flow PrintChannelBarcodes {
     }
     @permission(roles: [Operator])
 }
+
+// Pulls every offer from the Takealot Marketplace API and sets each matched
+// product's Takealot channel code to the barcode held against the offer
+// (matched by SKU). Bulk backfill and repair; day-to-day changes are handled
+// by the syncTakealotBarcode subscriber on Product.
+flow SyncTakealotBarcodes {
+    @permission(roles: [Operator])
+}
