@@ -1,0 +1,20 @@
+{
+  "id": "list-product-channel-codes",
+  "action_name": "listProductChannelCodes",
+  "name": "Channel codes",
+  "response": {
+    "$.results[*].channelName": { "display_name": "Channel", "display_order": 1 },
+    "$.results[*].code": { "display_name": "Code", "display_order": 2 },
+    "$.results[*].channelId": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": {
+      "display_order": 9,
+      "link": {
+        "tool_id": "update-product-channel-code",
+        "display_order": 0,
+        "data_mapping": [{ "key": "$.id", "path": { "path": "$.results[*].id" } }]
+      }
+    }
+  }
+}

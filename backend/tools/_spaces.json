@@ -89,6 +89,35 @@
             "hidden": true
           }
         ]
+      },
+      {
+        "id": "group-barcode-labels",
+        "name": "Barcode labels",
+        "description": "Print unit barcodes for stock going into a channel’s fulfilment centre",
+        "display_order": 3,
+        "hidden": false,
+        "actions": [
+          {
+            "id": "action-print-channel-barcodes",
+            "link": {
+              "tool_id": "print-channel-barcodes",
+              "title": "Print barcodes",
+              "description": "Pick a channel and products, set label counts, print",
+              "display_order": 0
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-list-channel-label-specs",
+            "link": {
+              "tool_id": "list-channel-label-specs",
+              "title": "Label specs",
+              "description": "How each channel’s label is built — symbology, annotation, stock",
+              "display_order": 1
+            },
+            "hidden": false
+          }
+        ]
       }
     ],
     "links": null,

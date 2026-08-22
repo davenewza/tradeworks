@@ -204,9 +204,50 @@
     {
       "tool_id": "disable-product",
       "display_order": 2
+    },
+    {
+      "tool_id": "print-channel-barcodes",
+      "title": "Print barcode label",
+      "display_order": 3,
+      "data_mapping": [
+        {
+          "key": "$.productId",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": "create-product-channel-code",
+      "title": "Add channel code",
+      "display_order": 4,
+      "data_mapping": [
+        {
+          "key": "$.product.id",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
     }
   ],
   "embedded_tools": [
+    {
+      "id": "channelCodes",
+      "display_order": 1,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-product-channel-codes",
+            "title": "Channel codes"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false
+          }
+        }
+      ]
+    },
     {
       "id": "prices",
       "display_order": 0,

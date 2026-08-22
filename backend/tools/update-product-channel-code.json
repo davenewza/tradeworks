@@ -1,0 +1,7 @@
+{
+  "id": "update-product-channel-code",
+  "action_name": "updateProductChannelCode",
+  "name": "Edit code",
+  "title": "Edit this channel code",
+  "inputs": { "$.values.code": { "display_name": "Code", "display_order": 1 } }
+}
