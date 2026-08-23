@@ -17,7 +17,7 @@ matters, not just how close it is to running out.
 
 | Column | What it is |
 | --- | --- |
-| **ABC class** | Revenue-importance grade over the last 12 months — see [ABC class](#abc-class). |
+| **ABC class** | Revenue-importance grade from the trailing revenue run-rate — see [ABC class](#abc-class). |
 | **Total sales** | Lifetime units sold, from synced invoices. |
 | **Stock available** | On-hand units — Zoho's `stock_on_hand`, refreshed daily. Can be negative when sales are billed ahead of stock. |
 | **Stock on way** | Units on future-dated supplier bills. _Phase 2 — currently always 0, so Total cover equals Current cover._ |
@@ -44,13 +44,15 @@ brand's lead time changes.
 
 ## ABC class
 
-A Pareto cut over the **whole catalogue's** trailing-12-month realized revenue
-(net of discount, excl VAT — the same `netAmount` basis as the sales figures).
-Products are ranked by revenue and graded by cumulative share:
+A Pareto cut over the **whole catalogue's monthly revenue run-rate**:
+trailing-12-month realized revenue (net of discount, excl VAT — the same
+`netAmount` basis as the sales figures) **÷ months active** — the same
+launch-aware divisor the monthly sales estimate uses. Products are ranked by
+run-rate and graded by cumulative share:
 
 | Class | Colour | Meaning |
 | --- | --- | --- |
-| **A** | 🟢 green | The products making up the top **80%** of revenue — protect these from stockouts first. |
+| **A** | 🟢 green | The products making up the top **80%** of the revenue run-rate — protect these from stockouts first. |
 | **B** | 🔵 blue | The next **15%**. |
 | **C** | ⚪ grey | The tail **5%**. |
 
@@ -60,6 +62,10 @@ Books/Inventory never stores a class we could pull, so this is our own.
 
 Details worth knowing:
 
+- The grading is **launch-aware**: revenue is divided by months since the
+  product's earliest sale (floored at 1, capped at 12), so a product launched
+  3 months ago is graded on its run-rate, not penalised for missing most of
+  the window.
 - The classification is **catalogue-wide, not per brand** — an "A" means top
   revenue for the business, so small brands can legitimately have no A products.
 - The class is **blank** when the product sold nothing in the last 12 months
