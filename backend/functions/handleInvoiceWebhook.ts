@@ -1,7 +1,7 @@
 import { HandleInvoiceWebhook } from '@teamkeel/sdk';
 import { ZohoInvoice, processInvoiceLineItems } from '../lib/zohoSalesHelpers';
 
-export default HandleInvoiceWebhook(async (ctx, inputs) => {
+const fn = HandleInvoiceWebhook(async (ctx, inputs) => {
     const payload = inputs as any;
 
     // Zoho may wrap the invoice in an { invoice: {...} } envelope or send it directly
@@ -40,4 +40,15 @@ export default HandleInvoiceWebhook(async (ctx, inputs) => {
         skipped: result.skipped,
         errors: result.errors,
     };
-});
+}) as any;
+
+// Run without the write-action transaction wrapper. Inside it, the concurrent-
+// delivery recovery in processInvoiceLineItems cannot work: the raced INSERT
+// aborts the transaction (Postgres 25P02), so the recovery SELECT/UPDATE fails
+// and the losing delivery's writes are all rolled back at commit. With the
+// wrapper off, each statement commits on its own and the recovery lands —
+// the same semantics this helper already has under the sync flow and in tests.
+// The config must sit on the default export; the runtime reads it from there.
+fn.config = { dbTransaction: false };
+
+export default fn;
