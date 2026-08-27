@@ -94,10 +94,10 @@ model Product {
         currentStockCover Decimal?
         totalStockCover Decimal?
         // Reorder signal: current cover vs the brand's lead time (L = days / 30):
-        //   Shortfall (<L) · Low (L–1.25L) · Good (1.25L–2L) · Oversupply (≥2L).
+        //   Shortfall (<L) · Low (L–1.5L) · Good (1.5L–2.5L) · Oversupply (≥2.5L).
         // Null when cover is unknown. @computed, so it re-grades the moment cover
         // or the brand's lead time changes.
-        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 1.25, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
+        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 1.5, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2.5, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
         // Revenue-importance grade, written by the daily job: products ranked by
         // monthly revenue run-rate — trailing-365-day realized revenue (net of
         // discount, excl VAT) ÷ months since first sale — then cut at 80% / 95%

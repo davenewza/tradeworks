@@ -34,9 +34,9 @@ time** — how long new stock takes to arrive from the supplier. With
 | Status | Colour | Cover | Meaning |
 | --- | --- | --- | --- |
 | **Shortfall** | 🔴 red | `< L` | You'll run out before a reorder can arrive. |
-| **Low** | 🟡 yellow | `L` to `1.25 × L` | At the reorder point — order soon. |
-| **Good** | 🟢 green | `1.25 × L` to `2 × L` | Comfortable. |
-| **Oversupply** | 🟣 purple | `≥ 2 × L` | More stock than needed. |
+| **Low** | 🟡 yellow | `L` to `1.5 × L` | At the reorder point — order soon. |
+| **Good** | 🟢 green | `1.5 × L` to `2.5 × L` | Comfortable. |
+| **Oversupply** | 🟣 purple | `≥ 2.5 × L` | More stock than needed. |
 
 The status is **blank** when cover is unknown (no sales estimate). It is a
 computed field, so it re-grades automatically the moment either the cover or the
