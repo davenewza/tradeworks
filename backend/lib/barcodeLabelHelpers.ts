@@ -147,6 +147,7 @@ export interface LabelStock {
 export const LABEL_STOCKS: Record<LabelStockSize, LabelStock> = {
     [LabelStockSize.Size40x25]: { label: '40 × 25 mm', widthMm: 40, heightMm: 25, dpi: 203 },
     [LabelStockSize.Size50x25]: { label: '50 × 25 mm', widthMm: 50, heightMm: 25, dpi: 203 },
+    [LabelStockSize.Size50x30]: { label: '50 × 30 mm', widthMm: 50, heightMm: 30, dpi: 203 },
     [LabelStockSize.Size67x25]: {
         label: '66.7 × 25.4 mm (2⅝" × 1")',
         widthMm: 66.7,
@@ -238,6 +239,15 @@ export interface LabelLayout {
 
 const MARGIN_DOTS = 8;
 
+// The top margin is deliberately larger than the sides. A direct-thermal printer
+// cannot reliably place ink in the first millimetre after the label gap, and
+// die-cut stock has rounded corners exactly there — an 8-dot (1mm) top margin
+// sliced the tops off the title on real 50 × 30 mm labels. 3mm clears both the
+// feed tolerance and the corner radius. Only the leading edge has this problem,
+// so the sides stay tight; on EAN-13 the width is the scarce dimension and
+// widening the side margins would cost a module.
+const TOP_MARGIN_DOTS = 24;
+
 const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
 
 /**
@@ -261,6 +271,11 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
     // A stacked annotation needs a column at the left, outside the barcode's
     // quiet zone, so it comes off the width available to the symbol. An
     // annotation below the title costs a line of height instead.
+    //
+    // Only the *symbol* loses that width: the stacked characters sit beside the
+    // bars, well below the title block, so the title still runs the full width
+    // of the label. Indenting it to clear a column it never reaches would throw
+    // away characters on a long product name for nothing.
     const stackedLeft =
         hasAnnotation && annotationPlacement === LabelAnnotationPlacement.StackedLeft;
     const markerColDots = stackedLeft ? annotationFontDots + 6 : 0;
@@ -289,9 +304,9 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
         hasAnnotation && annotationPlacement === LabelAnnotationPlacement.BelowTitle;
     const titleLines = belowTitle && heightDots < 300 ? 1 : 2;
     const titleBlockDots = titleLines * (titleFontDots + 2);
-    const annotationYDots = MARGIN_DOTS + titleBlockDots;
+    const annotationYDots = TOP_MARGIN_DOTS + titleBlockDots;
     const barcodeYDots =
-        MARGIN_DOTS + titleBlockDots + (belowTitle ? annotationFontDots + 2 : 0) + 4;
+        TOP_MARGIN_DOTS + titleBlockDots + (belowTitle ? annotationFontDots + 2 : 0) + 4;
 
     // The symbology prints its interpretation line below the bars, so it needs
     // reserving out of the remaining height.
@@ -309,12 +324,101 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
         barHeightDots,
         symbolXDots,
         titleFontDots,
-        titleWidthDots: widthDots - MARGIN_DOTS * 2 - markerColDots,
+        titleWidthDots: widthDots - MARGIN_DOTS * 2,
         titleLines,
         annotationFontDots,
         barcodeYDots,
         annotationYDots,
     };
+}
+
+// Font 0 is proportional, so there is no exact character width to divide by.
+// Measured off printed 50 × 30 mm labels: 30 characters of mixed-case text span
+// ~349 dots at a 26-dot font, about 0.45 × the font height per character.
+// Rounded up to 0.5 so the estimate errs toward truncating early — overshooting
+// is unreadable, undershooting merely shortens the name.
+const AVG_CHAR_WIDTH_RATIO = 0.5;
+
+// Appended when a name is cut. Plain ASCII rather than "…": the ellipsis is
+// outside the printer's resident font on some firmware and would print as a box.
+const TRUNCATION_SUFFIX = '...';
+
+/**
+ * Shorten a product name to what actually fits the title block.
+ *
+ * `^FB`'s max-lines parameter is documented as truncating, but the ZD220 prints
+ * the overflow **on top of the last line** instead — a 76-character name came
+ * out as two lines of text superimposed and unreadable. So the wrap is done here
+ * and `^FB` only ever receives text that fits, with its own limit left in as a
+ * backstop.
+ *
+ * @example
+ * fitTitle('Arduino-Compatible UNO R3 ATmega328P, Acrylic Case, and USB Cable - 2 Pieces', 384, 26, 2)
+ * // 'Arduino-Compatible UNO R3 ATmega328P, Acrylic Case, and...'
+ */
+export function fitTitle(
+    title: string,
+    widthDots: number,
+    fontDots: number,
+    maxLines: number
+): string {
+    const perLine = Math.max(1, Math.floor(widthDots / (fontDots * AVG_CHAR_WIDTH_RATIO)));
+    const words = title.split(' ').filter((w) => w.length > 0);
+
+    const lines: string[] = [];
+    let current = '';
+    // Whether any text was actually lost. Tracked explicitly rather than by
+    // comparing lengths: hard-breaking a long word inserts a space, so the
+    // rebuilt string can be *longer* than the original while still being
+    // complete.
+    let dropped = false;
+
+    for (const word of words) {
+        if (lines.length >= maxLines) {
+            dropped = true;
+            break;
+        }
+        const candidate = current ? `${current} ${word}` : word;
+        if (candidate.length <= perLine) {
+            current = candidate;
+            continue;
+        }
+        if (current) {
+            lines.push(current);
+            current = '';
+            if (lines.length >= maxLines) {
+                dropped = true;
+                break;
+            }
+        }
+        // A single word wider than the line has to be hard-broken; a long part
+        // number with no spaces would otherwise overflow on its own. The pieces
+        // rejoin with a space so ^FB wraps at the break.
+        let rest = word;
+        while (rest.length > perLine && lines.length < maxLines) {
+            lines.push(rest.slice(0, perLine));
+            rest = rest.slice(perLine);
+        }
+        current = rest;
+    }
+
+    if (current) {
+        if (lines.length < maxLines) lines.push(current);
+        else dropped = true;
+    }
+
+    if (!dropped) return lines.join(' ');
+
+    // Something was lost — say so, rather than ending mid-phrase as if that were
+    // the whole product name. The suffix has to fit *within* the last line's
+    // budget: appending it afterwards could push that line over the width and
+    // let ^FB wrap it onto a third line, which is the overflow this exists to
+    // prevent.
+    const lastIndex = Math.max(0, lines.length - 1);
+    const last = lines[lastIndex] ?? '';
+    const room = Math.max(0, perLine - TRUNCATION_SUFFIX.length);
+    lines[lastIndex] = `${last.length > room ? last.slice(0, room).trimEnd() : last}${TRUNCATION_SUFFIX}`;
+    return lines.join(' ');
 }
 
 export interface LabelSpec {
@@ -348,11 +452,13 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
     const layout = computeLayout(format, check.code);
     const { titleFontDots, annotationFontDots, barcodeYDots } = layout;
     const annotation = sanitiseZplText(format.annotation ?? '');
-    const title = sanitiseZplText(spec.title);
+    const title = fitTitle(
+        sanitiseZplText(spec.title),
+        layout.titleWidthDots,
+        layout.titleFontDots,
+        layout.titleLines
+    );
     const stackedLeft = format.annotationPlacement === LabelAnnotationPlacement.StackedLeft;
-    // A stacked annotation sits beside the barcode, so the title starts at the
-    // margin either way; only the title's usable width differs.
-    const titleXDots = MARGIN_DOTS;
 
     const lines: string[] = [
         '^XA',
@@ -365,9 +471,11 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
         `^CF0,${annotationFontDots}`,
     ];
 
-    // Title, word-wrapped by ^FB and truncated past titleLines.
+    // Title, word-wrapped by ^FB and truncated past titleLines. Always flush to
+    // the left margin and the full width of the label — a stacked annotation is
+    // below it, not beside it.
     lines.push(
-        `^FO${titleXDots + (stackedLeft ? annotationFontDots + 6 : 0)},${MARGIN_DOTS}`,
+        `^FO${MARGIN_DOTS},${TOP_MARGIN_DOTS}`,
         `^A0N,${titleFontDots},${titleFontDots}`,
         `^FB${layout.titleWidthDots},${layout.titleLines},2,L,0`,
         `^FD${title}^FS`
@@ -406,6 +514,29 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
 
     lines.push(`^PQ${spec.quantity}`, '^XZ');
     return lines.join('\n');
+}
+
+/**
+ * One ZPL stream for a whole run — every product's format concatenated.
+ *
+ * Sent as a **single** print job on purpose. One job per product meant one CUPS
+ * job and one printer end-of-job cycle (feed to the tear bar, then backfeed)
+ * per product: measured at roughly six seconds of dead time between products,
+ * while the copies *inside* a product streamed back-to-back. Concatenating the
+ * formats collapses that to one boundary for the whole run.
+ *
+ * The ordering of `specs` is the order the labels come out, so callers keep them
+ * in the order the operator saw on screen.
+ *
+ * @example
+ * buildBatchZpl([{ code, title: 'A', quantity: 2 }, { code, title: 'B', quantity: 1 }], format)
+ * // '^XA…^XZ\n^XA…^XZ'  → 3 labels, one job
+ */
+export function buildBatchZpl(specs: LabelSpec[], format: LabelFormat): string {
+    if (specs.length === 0) {
+        throw new Error('Cannot build a print job with no labels');
+    }
+    return specs.map((spec) => buildLabelZpl(spec, format)).join('\n');
 }
 
 // ─── Selection rows ─────────────────────────────────────────────────────────
@@ -470,5 +601,33 @@ export function buildQuantityRows(
         name: candidate.name,
         onHand: Math.max(0, stockBySku[candidate.sku] ?? 0),
         labels: 1,
+    }));
+}
+
+// A shipment line that can be labelled: a candidate plus how many units the
+// consignment is actually sending.
+export interface ShipmentLabelCandidate extends LabelCandidate {
+    quantity: number;
+}
+
+/**
+ * Seed the quantity grid from a shipment's lines.
+ *
+ * Unlike the product-picker path, the count is *not* 1: a consignment already
+ * states how many units of each product are going into the fulfilment centre,
+ * and that is exactly how many unit labels are needed. The operator can still
+ * edit the grid before printing.
+ */
+export function buildShipmentQuantityRows(
+    selected: ShipmentLabelCandidate[],
+    stockBySku: Record<string, number | null> = {}
+): LabelQuantityRow[] {
+    return selected.map((candidate) => ({
+        productId: candidate.productId,
+        code: candidate.code,
+        sku: candidate.sku,
+        name: candidate.name,
+        onHand: Math.max(0, stockBySku[candidate.sku] ?? 0),
+        labels: candidate.quantity,
     }));
 }

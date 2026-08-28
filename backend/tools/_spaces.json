@@ -116,6 +116,16 @@
               "display_order": 1
             },
             "hidden": false
+          },
+          {
+            "id": "action-create-channel-label-spec",
+            "link": {
+              "tool_id": "create-channel-label-spec",
+              "title": "Add a label spec",
+              "description": "Make a channel printable — symbology, annotation, label stock",
+              "display_order": 2
+            },
+            "hidden": false
           }
         ]
       }
@@ -194,7 +204,37 @@
         "hidden": false
       }
     ],
-    "groups": null,
+    "groups": [
+      {
+        "id": "group-channel-shipments",
+        "name": "Channel shipments",
+        "description": "Consignments of our stock going into a channel’s fulfilment centre",
+        "display_order": 1,
+        "hidden": false,
+        "actions": [
+          {
+            "id": "action-list-channel-shipments",
+            "link": {
+              "tool_id": "list-channel-shipments",
+              "title": "Shipments",
+              "description": "Open a shipment to print its unit barcode labels",
+              "display_order": 0
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-sync-channel-shipments",
+            "link": {
+              "tool_id": "sync-channel-shipments",
+              "title": "Sync shipments",
+              "description": "Pull the latest consignments from the channel",
+              "display_order": 1
+            },
+            "hidden": false
+          }
+        ]
+      }
+    ],
     "links": null,
     "metrics": null,
     "topics": null,

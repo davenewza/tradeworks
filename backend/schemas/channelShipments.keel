@@ -1,0 +1,139 @@
+// Consignments of our stock going into a channel's fulfilment centre, pulled
+// from that channel's own API. See docs/channel-shipments.md.
+//
+// The models here are channel-generic on purpose: nothing in them names
+// Takealot. A shipment carries the channel's own identifiers verbatim
+// (`externalId`, the line's `listingRef`) and a status mapped onto one shared
+// vocabulary, so a second platform is a new *adapter* — a function that turns
+// that platform's payload into the shape in lib/channelShipmentHelpers — rather
+// than a second set of tables.
+//
+// Lines are matched to our catalogue by SKU, the same rule the barcode sync
+// uses. A line we cannot match keeps its channel identifiers and shows up
+// unmatched rather than being dropped, so the gap is visible.
+
+// Where a shipment is in the channel's inbound process. Each platform's own
+// vocabulary is mapped onto this so the Console shows one column; the platform's
+// own wording is kept alongside in `statusDescription`.
+enum ChannelShipmentStatus {
+    // Created on the channel, not yet handed over.
+    Open
+    // Handed to the channel / in transit to the fulfilment centre.
+    Shipped
+    // Unloaded and checked in at the fulfilment centre.
+    Received
+    Cancelled
+}
+
+model ChannelShipment {
+    fields {
+        channel Channel
+        // The channel's own id for the shipment (Takealot's `shipment_id`).
+        // Text rather than Number: platforms differ, and it is an opaque key
+        // here, never arithmetic.
+        externalId Text
+        // The channel's human reference for the consignment, as shown in its
+        // seller portal.
+        reference Text?
+        status ChannelShipmentStatus @default(ChannelShipmentStatus.Open)
+        // The platform's own words for the current state, kept verbatim
+        // (Takealot's `purchase_order_state`).
+        statusDescription Text?
+        // The fulfilment centre the stock is going to.
+        destination Text?
+        // When the channel created the shipment. Ordering key for the list —
+        // our own createdAt is identical across everything a first bulk sync
+        // brings in, so it says nothing about the consignments themselves.
+        placedAt Timestamp?
+        dueDate Date?
+        // When the fulfilment centre unloaded the stock.
+        receivedAt Timestamp?
+        trackingInfo Text?
+        // The channel's own archive flag — old consignments it no longer shows
+        // by default. Kept so the list can hide them without deleting history.
+        isArchived Boolean @default(false)
+        items ChannelShipmentItem[]
+        totalLines Number @computed(COUNT(channelShipment.items.id))
+        // Units across the shipment's lines. SUM is null-able in the engine, so
+        // the field is optional — a shipment with no lines shows blank.
+        totalUnits Decimal? @computed(SUM(channelShipment.items.quantitySending))
+        // Lines that resolved to a product here. Fewer than totalLines means the
+        // shipment cannot be fully labelled — visible in the list without opening
+        // it. Counted the positive way round because a COUNTIF over a nullable
+        // relation joins through the product, so rows with no product are not
+        // there to be counted.
+        matchedLines Number @computed(COUNTIF(channelShipment.items, channelShipment.items.product.id != null))
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getChannelShipment(id)
+        list listChannelShipments(channel.id?, status?, reference?, isArchived?) {
+            @sortable(status, placedAt, dueDate, totalUnits)
+            @orderBy(placedAt: desc)
+        }
+        delete deleteChannelShipment(id)
+    }
+
+    // One row per shipment per channel — the channel's id is only unique within
+    // that channel, so the pair is the identity. Lets the sync upsert.
+    @unique([channel, externalId])
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, delete]
+    )
+}
+
+// One line of a shipment: how many units of one product are going in.
+model ChannelShipmentItem {
+    fields {
+        shipment ChannelShipment
+        // Null when the channel's line does not match anything in our
+        // catalogue — a listing we have not imported, or a SKU that has since
+        // been renamed. The line is kept either way.
+        product Product?
+        // The channel's own id for the line (Takealot's `shipment_item_id`).
+        externalId Text
+        // The channel's identifier for the *listing* the line refers to
+        // (Takealot's `offer_id`). Kept even when the product matched, so an
+        // unmatched line can still be traced back in the seller portal.
+        listingRef Text?
+        // The SKU the line resolved to, copied at sync time. Kept alongside the
+        // product link so an unmatched line still says which SKU was looked for.
+        sku Text?
+        // Display copies, so a shipment's lines read in one table without
+        // following each lookup — matching how ProductChannelFee does it.
+        productName Text? @computed(channelShipmentItem.product.name)
+        quantityRequired Number @default(0)
+        // What we are actually sending — the count the unit labels are printed
+        // against.
+        quantitySending Number @default(0)
+        cancelled Boolean @default(false)
+    }
+
+    actions {
+        get getChannelShipmentItem(id)
+        list listChannelShipmentItems(shipment.id?, product.id?) {
+            // By product name, matching the order the channel shows the
+            // consignment in and the order the labels come off the printer, so
+            // the operator can check the stack against the screen. Unmatched
+            // lines have no name and sort last.
+            @orderBy(productName: asc)
+        }
+    }
+
+    @unique([shipment, externalId])
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}
+
+// Pulls shipments from each channel that has an adapter (Takealot today) and
+// upserts them here, then matches each line to a product by SKU. Read-only
+// against the channel: nothing is ever pushed back.
+flow SyncChannelShipments {
+    @permission(roles: [Operator])
+}

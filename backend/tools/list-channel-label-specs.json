@@ -9,7 +9,7 @@
     "$.results[*].symbology": { "display_name": "Symbology", "display_order": 2 },
     "$.results[*].annotation": { "display_name": "Annotation", "display_order": 3 },
     "$.results[*].annotationPlacement": { "display_name": "Placement", "display_order": 4 },
-    "$.results[*].defaultStock": { "display_name": "Default stock", "display_order": 5 },
+    "$.results[*].defaultStock": { "display_name": "Label stock", "display_order": 5 },
     "$.results[*].isEnabled": { "display_name": "Enabled", "display_order": 6 },
     "$.results[*].createdAt": { "visible": false },
     "$.results[*].updatedAt": { "visible": false },

@@ -4,13 +4,13 @@
   "name": "Add a label spec",
   "icon": "emoji:➕",
   "title": "Set up labels for a channel",
-  "help_text": "Takealot: EAN-13, annotation \"MP\", stacked left, 50 × 25 mm. Amazon FBA: Code 128 (the FNSKU), annotation \"New\" below the title, 66.7 × 25.4 mm.",
+  "help_text": "Takealot: EAN-13, annotation \"MP\", stacked left, 50 × 30 mm. Amazon FBA: Code 128 (the FNSKU), annotation \"New\" below the title, 66.7 × 25.4 mm. The label stock is used for every print run on this channel — the flow never asks.",
   "inputs": {
     "$.channel.id": { "display_name": "Channel", "display_order": 1 },
     "$.symbology": { "display_name": "Symbology", "display_order": 2 },
     "$.annotation": { "display_name": "Fixed annotation", "display_order": 3 },
     "$.annotationPlacement": { "display_name": "Annotation placement", "display_order": 4 },
-    "$.defaultStock": { "display_name": "Default label stock", "display_order": 5 }
+    "$.defaultStock": { "display_name": "Label stock", "display_order": 5 }
   },
   "response": {
     "$.id": {
