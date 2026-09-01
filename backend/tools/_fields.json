@@ -56,12 +56,32 @@
     "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
   {
+    "id": "ProductPrice.adSpend",
+    "display_name": "Ad spend",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "ProductPrice.totalCosts",
+    "display_name": "Total costs",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
     "id": "ProductPrice.grossProfit",
     "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB", "colourise": "NORMAL" } }
   },
   {
     "id": "ProductPrice.grossProfitMargin",
     "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-GB" } }
+  },
+  {
+    "id": "PriceList.targetAdvertisingRoi",
+    "display_name": "Target ad ROI",
+    "format": { "number_config": { "mode": "DECIMAL", "suffix": ":1", "locale": "en-GB" } }
+  },
+  {
+    "id": "ProductPrice.targetAdvertisingRoi",
+    "display_name": "Target ad ROI",
+    "format": { "number_config": { "mode": "DECIMAL", "suffix": ":1", "locale": "en-GB" } }
   },
   {
     "id": "Product.estimatedMonthlySale",
