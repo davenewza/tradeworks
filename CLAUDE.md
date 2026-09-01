@@ -38,7 +38,7 @@ re-fetches, and expect any Zoho call to fail with a daily rate-limit error.
 
 ## Commands
 
-This schema requires an up-to-date Keel CLI (0.465+). Older CLIs fail validation with misleading errors such as `'User' is not a model and cannot be extended` (they predate `extend model` support) or `Additional property userProvisioning is not allowed`. Upgrade with `npm install -g keel@latest`. (The keel npm package only works as a global install - its installer cannot run as a project dependency.)
+This schema requires an up-to-date Keel CLI (0.474+). Older CLIs fail validation with misleading errors such as `'User' is not a model and cannot be extended` (they predate `extend model` support), `Additional property userProvisioning is not allowed`, or `cannot use operator 'IF' with types bool, Decimal and Number` (pre-0.474 CLIs require both `IF` branches to be the identical type, so a literal else branch like `IF(x > 0, a / x, 0)` is rejected). Upgrade with `npm install -g keel@latest`. (The keel npm package only works as a global install - its installer cannot run as a project dependency.)
 
 ### Backend Development
 ```bash

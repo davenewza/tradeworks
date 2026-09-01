@@ -76,8 +76,10 @@ model ProductPrice {
         // Advertising cost per unit implied by the price list's target ROI. ROI is
         // measured on the incl-VAT sales price, so at a 6:1 target a R690 sale
         // carries R115 of ad spend. Ad spend is billed VAT-inclusive, so — as with
-        // channel fees — strip VAT to get the deductible cost. No target → zero.
-        adSpend Decimal? @computed(IF(productPrice.targetAdvertisingRoi > 0, productPrice.priceInclVat / productPrice.targetAdvertisingRoi / 115 * 100, productPrice.priceInclVat * 0))
+        // channel fees — strip VAT to get the deductible cost. No target → zero
+        // (not null, which would NULL-poison totalCosts and gross profit on every
+        // price list we don't advertise).
+        adSpend Decimal? @computed(IF(productPrice.targetAdvertisingRoi > 0, productPrice.priceInclVat / productPrice.targetAdvertisingRoi / 115 * 100, 0))
         // Everything gross profit is measured against: cost of goods + freight-in
         // + channel fees + ad spend, all net of VAT.
         totalCosts Decimal? @computed(productPrice.landedUnitCost + productPrice.channelFees + productPrice.adSpend)
