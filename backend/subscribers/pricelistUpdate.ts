@@ -54,6 +54,18 @@ export default PricelistUpdate(async (ctx, event) => {
                     userId: user!.id,
                 });
             }
+            // The ROI target re-prices ad spend on every product in the list, so
+            // it belongs in the log alongside the individual price changes.
+            if (event.target.data.targetAdvertisingRoi != event.target.previousData.targetAdvertisingRoi) {
+                const roi = event.target.data.targetAdvertisingRoi;
+                await models.priceListChangeLog.create({
+                    priceListId: event.target.id,
+                    description: roi == null
+                        ? 'Target advertising ROI cleared; ad spend no longer costed into margins.'
+                        : `Target advertising ROI updated to ${roi}:1.`,
+                    userId: user!.id,
+                });
+            }
             break;
     }
 });

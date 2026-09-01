@@ -6,6 +6,10 @@ model PriceList {
         // apply to each product's pricing. Optional for migration safety, but it
         // should be set — with no channel, channel fees resolve to zero.
         channel Channel?
+        // Target return on ad spend, as a ratio: 6 means we aim for R6 of sales
+        // (incl VAT) for every R1 of advertising. Optional — leave it unset on
+        // price lists we don't advertise on and their ad spend resolves to zero.
+        targetAdvertisingRoi Decimal?
         numberOfProducts Number @computed(COUNT(priceList.products.id))
         products ProductPrice[]
         discounts DiscountTier[]
@@ -13,9 +17,9 @@ model PriceList {
 
     actions {
         get getPriceList(id)
-        create createPriceList() with (name, description?, channel.id?)
+        create createPriceList() with (name, description?, channel.id?, targetAdvertisingRoi?)
         list listPriceLists()
-        update updatePriceList(id) with (name, description?)
+        update updatePriceList(id) with (name, description?, targetAdvertisingRoi?)
     }
 
     @on(
@@ -48,6 +52,9 @@ model ProductPrice {
         // lists a product's price across every price list). Optional so adding it
         // to a populated table is migration-safe; populated on next write.
         priceListName Text? @computed(productPrice.priceList.name)
+        // The price list's target return on ad spend, hoisted for the ad spend
+        // calculation below and so the view can show what drove it.
+        targetAdvertisingRoi Decimal? @computed(productPrice.priceList.targetAdvertisingRoi)
         // Landed cost, split into cost of goods and freight-in (weighted averages
         // across the product's bills). landedUnitCost is their sum.
         unitCost Decimal? @computed(productPrice.product.weightedUnitCost)
@@ -66,7 +73,15 @@ model ProductPrice {
         // (deductible) cost gross profit is measured against. Combines per-product
         // fees with the channel's always-applied fees.
         channelFees Decimal? @computed(((productPrice.flatFeeTotal + productPrice.alwaysFlatTotal) + (productPrice.successFeePercentage + productPrice.alwaysCommissionPercentage) / 100 * productPrice.priceInclVat) / 115 * 100)
-        grossProfit Decimal? @computed(productPrice.price - productPrice.landedUnitCost - productPrice.channelFees)
+        // Advertising cost per unit implied by the price list's target ROI. ROI is
+        // measured on the incl-VAT sales price, so at a 6:1 target a R690 sale
+        // carries R115 of ad spend. Ad spend is billed VAT-inclusive, so — as with
+        // channel fees — strip VAT to get the deductible cost. No target → zero.
+        adSpend Decimal? @computed(IF(productPrice.targetAdvertisingRoi > 0, productPrice.priceInclVat / productPrice.targetAdvertisingRoi / 115 * 100, productPrice.priceInclVat * 0))
+        // Everything gross profit is measured against: cost of goods + freight-in
+        // + channel fees + ad spend, all net of VAT.
+        totalCosts Decimal? @computed(productPrice.landedUnitCost + productPrice.channelFees + productPrice.adSpend)
+        grossProfit Decimal? @computed(productPrice.price - productPrice.totalCosts)
         // Stored as a 0–1 ratio; the Console formats it as a percentage (rounded
         // to a whole number). The engine has no ROUND function, so display-time
         // percent formatting is how we round.

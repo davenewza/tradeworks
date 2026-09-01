@@ -47,9 +47,69 @@ describe('ProductPrice computed pricing', () => {
         // (42 + 11% of 716.76) VAT-inclusive = 120.84, net of VAT = 105.08.
         expect(num(pp!.channelFees)).toBeCloseTo(105.08, 2);
         expect(num(pp!.price)).toBeCloseTo(623.27, 2);
+        // No ROI target on this price list, so ad spend is zero and total costs
+        // are just landed cost + channel fees.
+        expect(num(pp!.adSpend)).toBe(0);
+        expect(num(pp!.totalCosts)).toBeCloseTo(253.12 + 105.08, 2);
         expect(num(pp!.grossProfit)).toBeCloseTo(265.07, 2);
         // Stored as a 0–1 ratio; the Console renders it as a rounded percentage.
         expect(num(pp!.grossProfitMargin)).toBeCloseTo(0.425, 3);
+    });
+
+    test('costs ad spend from the price list ROI target, off the incl-VAT price', async () => {
+        const { product, takealot } = await seed();
+        const priceList = await models.priceList.create({ name: 'Takealot', channelId: takealot.id, targetAdvertisingRoi: 6 });
+        const created = await models.productPrice.create({ productId: product.id, priceListId: priceList.id, priceInclVat: 716.76 });
+
+        const pp = await models.productPrice.findOne({ id: created.id });
+        expect(num(pp!.targetAdvertisingRoi)).toBeCloseTo(6, 6);
+        // 6:1 on the incl-VAT price = 716.76 / 6 = 119.46 of ad spend, which is
+        // billed incl VAT, so 103.88 net of VAT.
+        expect(num(pp!.adSpend)).toBeCloseTo(103.88, 2);
+        // Cost of goods + freight-in + channel fees + ad spend.
+        expect(num(pp!.totalCosts)).toBeCloseTo(253.12 + 105.08 + 103.88, 2);
+        expect(num(pp!.grossProfit)).toBeCloseTo(623.27 - (253.12 + 105.08 + 103.88), 2);
+        // Margin drops from 42.5% once ad spend is costed in.
+        expect(num(pp!.grossProfitMargin)).toBeCloseTo(0.259, 3);
+    });
+
+    test('a decimal ROI target is honoured', async () => {
+        const { product, takealot } = await seed();
+        const priceList = await models.priceList.create({ name: 'Takealot', channelId: takealot.id, targetAdvertisingRoi: 4.5 });
+        const created = await models.productPrice.create({ productId: product.id, priceListId: priceList.id, priceInclVat: 1150 });
+
+        const pp = await models.productPrice.findOne({ id: created.id });
+        // 1150 / 4.5 = 255.56 incl VAT = 222.22 net of VAT.
+        expect(num(pp!.adSpend)).toBeCloseTo(222.22, 2);
+    });
+
+    test('setting the ROI target re-prices existing rows via triggers', async () => {
+        const { product, takealot } = await seed();
+        const priceList = await models.priceList.create({ name: 'Takealot', channelId: takealot.id });
+        const created = await models.productPrice.create({ productId: product.id, priceListId: priceList.id, priceInclVat: 716.76 });
+        expect(num((await models.productPrice.findOne({ id: created.id }))!.adSpend)).toBe(0);
+
+        // Set the target on the price list only — the product price row isn't touched.
+        await models.priceList.update({ id: priceList.id }, { targetAdvertisingRoi: 6 });
+
+        const pp = await models.productPrice.findOne({ id: created.id });
+        expect(num(pp!.adSpend)).toBeCloseTo(103.88, 2);
+
+        // Clearing it again takes ad spend back out of the margin.
+        await models.priceList.update({ id: priceList.id }, { targetAdvertisingRoi: null });
+        const cleared = await models.productPrice.findOne({ id: created.id });
+        expect(num(cleared!.adSpend)).toBe(0);
+        expect(num(cleared!.grossProfit)).toBeCloseTo(265.07, 2);
+    });
+
+    test('a zero ROI target costs no ad spend (no divide-by-zero)', async () => {
+        const { product, takealot } = await seed();
+        const priceList = await models.priceList.create({ name: 'Takealot', channelId: takealot.id, targetAdvertisingRoi: 0 });
+        const created = await models.productPrice.create({ productId: product.id, priceListId: priceList.id, priceInclVat: 716.76 });
+
+        const pp = await models.productPrice.findOne({ id: created.id });
+        expect(num(pp!.adSpend)).toBe(0);
+        expect(num(pp!.grossProfit)).toBeCloseTo(265.07, 2);
     });
 
     test('a price list with no channel resolves fees to zero', async () => {
@@ -59,6 +119,7 @@ describe('ProductPrice computed pricing', () => {
 
         const pp = await models.productPrice.findOne({ id: created.id });
         expect(num(pp!.channelFees)).toBe(0);
+        expect(num(pp!.totalCosts)).toBeCloseTo(253.12, 2);
         expect(num(pp!.grossProfit)).toBeCloseTo(623.27 - 253.12, 2);
     });
 
