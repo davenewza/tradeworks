@@ -12,21 +12,29 @@
       "display_order": 0
     },
     {
+      "tool_id": "plan-purchase",
+      "title": "Plan a purchase",
+      "data_mapping": [
+        { "key": "$.brandId", "path": { "path": "$.id" } }
+      ],
+      "display_order": 1
+    },
+    {
       "tool_id": "update-brand-name",
       "title": "Update name",
       "as_dialog": false,
-      "display_order": 1
+      "display_order": 2
     },
     {
       "tool_id": "update-brand-lead-time",
       "title": "Edit lead time",
       "as_dialog": true,
-      "display_order": 2
+      "display_order": 3
     },
     {
       "tool_id": "update-brand-logo",
       "title": "Update logo",
-      "display_order": 3
+      "display_order": 4
     }
   ],
   "embedded_tools": [

@@ -79,7 +79,15 @@ Details worth knowing:
 
 Each **brand** carries a **lead time** (`leadTimeInDays`, default **60**). Set it
 from the brand page via **Edit lead time**; it drives the status bands for all of
-that brand's products.
+that brand's products, and is the default lead time when
+[planning a purchase](purchase-planning.md).
+
+## Reordering
+
+Cover tells you *when* to reorder; **Plan a purchase** (on the brand page, or
+under Products → Purchasing) works out *how many* of each product to order so
+the whole brand lands with the same months of cover. See
+[purchase-planning.md](purchase-planning.md).
 
 ## Refresh
 
