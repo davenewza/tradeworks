@@ -128,6 +128,25 @@
             "hidden": false
           }
         ]
+      },
+      {
+        "id": "group-purchasing",
+        "name": "Purchasing",
+        "description": "What to reorder from a brand, and how many, so every product lands with the same months of cover",
+        "display_order": 4,
+        "hidden": false,
+        "actions": [
+          {
+            "id": "action-plan-purchase",
+            "link": {
+              "tool_id": "plan-purchase",
+              "title": "Plan a purchase",
+              "description": "Pick a brand, set the purchase date and lead time, review the suggested quantities",
+              "display_order": 0
+            },
+            "hidden": false
+          }
+        ]
       }
     ],
     "links": null,

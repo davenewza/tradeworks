@@ -17,6 +17,11 @@ export interface SaleAggregate {
 
 const MS_PER_MONTH = (365.25 / 12) * 24 * 60 * 60 * 1000;
 
+// The trailing sales window every run-rate is measured over — the daily stock
+// sync's estimate and the purchase planner's demand both read this many days
+// back, so the two never disagree about what "monthly sales" means.
+export const COVER_WINDOW_DAYS = 365;
+
 // How long a product has been selling, first sale → now, in months. Floored at 1
 // (so a brand-new product isn't annualised off a few days of data) and capped at
 // 12 (the trailing window). This is the divisor agreed for "trailing 12 months ÷
@@ -64,8 +69,11 @@ export function computeStockCover(
 // One grouped pass over the Sale table: trailing-window units, trailing-window
 // revenue, and first-ever sale date per product. Aggregation isn't expressible
 // via the generated models API, so we drop to Kysely (raw SQL) per the
-// project's DB-query convention.
-export async function loadSaleAggregates(windowStart: Date): Promise<SaleAggregate[]> {
+// project's DB-query convention. `productIds` narrows the pass to those
+// products (the purchase planner wants one brand); omitted, it covers every
+// product that has ever sold.
+export async function loadSaleAggregates(windowStart: Date, productIds?: string[]): Promise<SaleAggregate[]> {
+    if (productIds && productIds.length === 0) return [];
     const db = useDatabase();
     // Query the DB's snake_case columns, but read camelCase result keys: Keel's
     // Kysely instance runs the CamelCasePlugin, which rewrites result columns
@@ -82,6 +90,7 @@ export async function loadSaleAggregates(windowStart: Date): Promise<SaleAggrega
             coalesce(sum(coalesce(net_amount, total_excl_vat)) filter (where date >= ${windowStart}), 0) as revenue_last_365,
             min(date) as first_sale_date
         from sale
+        ${productIds ? sql`where product_id = any(${productIds})` : sql``}
         group by product_id
     `.execute(db);
 

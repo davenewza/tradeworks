@@ -1,9 +1,8 @@
 import { ScheduledSyncStock, models } from '@teamkeel/sdk';
 import { getZohoAccessToken } from '../lib/zohoProductHelpers';
 import { fetchProductStock } from '../lib/zohoStockHelpers';
-import { loadSaleAggregates, estimatedMonthlySale, computeStockCover, classifyAbc } from '../lib/stockCoverHelpers';
+import { COVER_WINDOW_DAYS, loadSaleAggregates, estimatedMonthlySale, computeStockCover, classifyAbc } from '../lib/stockCoverHelpers';
 
-const COVER_WINDOW_DAYS = 365;
 const LOAD_CHUNK = 200;
 const LONG_STEP_TIMEOUT = 10 * 60 * 1000;
 

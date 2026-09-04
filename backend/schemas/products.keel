@@ -160,6 +160,22 @@ flow ScheduledSyncStock {
     @permission(roles: [Operator])
 }
 
+// Suggests a purchase order for one brand: which products to reorder and how
+// many units, so that every product lands with the same months of cover and
+// the next order can wait until they all run down together — no top-up orders
+// for the one SKU that ran out early. Projects each product's stock forward at
+// its sales run-rate through the purchase date and lead time, then orders the
+// difference to a target cover. Pure local arithmetic over the stock-cover
+// figures; no Zoho calls. See docs/purchase-planning.md.
+//
+// brandId is set when launched from a brand's page; without it the flow asks.
+flow PlanPurchase {
+    inputs {
+        brandId ID?
+    }
+    @permission(roles: [Operator])
+}
+
 model EquipmentBox {
     fields {
         name Text
