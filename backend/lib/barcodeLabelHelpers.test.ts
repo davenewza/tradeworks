@@ -9,6 +9,8 @@ import {
     computeLayout,
     buildLabelZpl,
     buildQuantityRows,
+    buildBatchZpl,
+    fitTitle,
     mmToDots,
     LABEL_STOCKS,
     LabelCandidate,
@@ -38,6 +40,122 @@ const amazonFormat: LabelFormat = {
     annotationPlacement: LabelAnnotationPlacement.BelowTitle,
     stock: LABEL_STOCKS[LabelStockSize.Size67x25],
 };
+
+describe('fitTitle — the title block is a hard boundary', () => {
+    // The 50 × 30 mm Takealot shape: 384 dots of width at a 26-dot font over two
+    // lines, which works out at 29 characters per line.
+    const WIDTH = 384;
+    const FONT = 26;
+    const LINES = 2;
+    const PER_LINE = 29;
+
+    // Greedy re-wrap at the same budget, to assert what ^FB will do with it.
+    const wrap = (text: string): string[] => {
+        const out: string[] = [];
+        let current = '';
+        for (const word of text.split(' ')) {
+            const candidate = current ? `${current} ${word}` : word;
+            if (candidate.length <= PER_LINE) current = candidate;
+            else {
+                if (current) out.push(current);
+                current = word;
+            }
+        }
+        if (current) out.push(current);
+        return out;
+    };
+
+    const fit = (t: string) => fitTitle(t, WIDTH, FONT, LINES);
+
+    test('leaves a name that already fits completely alone', () => {
+        const name = 'Makerzoid Robot Master Premium';
+        expect(fit(name)).toBe(name);
+    });
+
+    test('truncates the name that overprinted on a real label', () => {
+        // 76 characters — ^FB with maxLines=2 stacked the third line on top of
+        // the second on the ZD220 rather than dropping it.
+        const name = 'Arduino-Compatible UNO R3 ATmega328P, Acrylic Case, and USB Cable - 2 Pieces';
+        const fitted = fit(name);
+
+        expect(fitted).toBe('Arduino-Compatible UNO R3 ATmega328P, Acrylic Case,...');
+        expect(fitted.endsWith('...')).toBe(true);
+        expect(wrap(fitted)).toHaveLength(LINES);
+    });
+
+    test('hard-breaks a single word too long for one line instead of dropping it', () => {
+        const name = 'SuperlongUnbrokenPartNumberWithNoSpacesAtAllXYZ123456789';
+        const fitted = fit(name);
+
+        // Every character survives — only a space is inserted at the break.
+        expect(fitted.replace(/ /g, '')).toBe(name);
+        expect(wrap(fitted)).toHaveLength(LINES);
+    });
+
+    test('never lets any line exceed the width, suffix included', () => {
+        const names = [
+            'Makerzoid Robot Master Premium',
+            'Arduino-Compatible UNO R3 ATmega328P, Acrylic Case, and USB Cable - 2 Pieces',
+            'A'.repeat(200),
+            'Word '.repeat(60).trim(),
+            // A name whose natural break lands exactly on the budget, so the
+            // suffix has to displace real characters rather than be appended.
+            `${'x'.repeat(PER_LINE)} ${'y'.repeat(PER_LINE)} tail`,
+        ];
+        for (const name of names) {
+            const lines = wrap(fit(name));
+            expect(lines.length).toBeLessThanOrEqual(LINES);
+            for (const line of lines) expect(line.length).toBeLessThanOrEqual(PER_LINE);
+        }
+    });
+
+    test('handles an empty or single-character name without throwing', () => {
+        expect(fit('')).toBe('');
+        expect(fit('W')).toBe('W');
+    });
+});
+
+describe('buildBatchZpl — the whole run is one job', () => {
+    const specs = [
+        { code: TAKEALOT_CODE, title: 'Alpha', quantity: 2 },
+        { code: '6001234567899', title: 'Bravo', quantity: 1 },
+    ];
+
+    test('concatenates one complete format per product', () => {
+        const zpl = buildBatchZpl(specs, takealotFormat);
+
+        // Two formats, each a complete ^XA…^XZ — the printer treats them as one
+        // stream, so there is a single job boundary for the run rather than one
+        // per product (each boundary costs seconds of feed and backfeed).
+        expect(zpl.match(/\^XA/g)).toHaveLength(2);
+        expect(zpl.match(/\^XZ/g)).toHaveLength(2);
+        expect(zpl).toContain('^PQ2');
+        expect(zpl).toContain('^PQ1');
+    });
+
+    test('prints in the order given, so the stack matches the screen', () => {
+        const forward = buildBatchZpl(specs, takealotFormat);
+        const reversed = buildBatchZpl([...specs].reverse(), takealotFormat);
+
+        expect(forward.indexOf('Alpha')).toBeLessThan(forward.indexOf('Bravo'));
+        expect(reversed.indexOf('Bravo')).toBeLessThan(reversed.indexOf('Alpha'));
+    });
+
+    test('is identical to the single-label output for one product', () => {
+        expect(buildBatchZpl([specs[0]], takealotFormat)).toBe(
+            buildLabelZpl(specs[0], takealotFormat)
+        );
+    });
+
+    test('refuses an empty run rather than sending a job that prints nothing', () => {
+        expect(() => buildBatchZpl([], takealotFormat)).toThrow(/no labels/);
+    });
+
+    test('still rejects an unprintable code anywhere in the run', () => {
+        const withBad = [...specs, { code: '9901043896424', title: 'Charlie', quantity: 1 }];
+        expect(() => buildBatchZpl(withBad, takealotFormat)).toThrow(/check digit/);
+    });
+});
 
 describe('computeEan13CheckDigit', () => {
     test('reproduces the check digit on the reference label', () => {
@@ -192,6 +310,24 @@ describe('computeLayout — Takealot shape (EAN-13, stacked marker)', () => {
         expect(quietZoneStart).toBeGreaterThanOrEqual(8 + layout.annotationFontDots);
     });
 
+    test('50 × 30 mm — the warehouse roll — prints an in-spec EAN-13', () => {
+        const layout = computeLayout(
+            { ...takealotFormat, stock: LABEL_STOCKS[LabelStockSize.Size50x30] },
+            TAKEALOT_CODE
+        );
+        // Same 50mm width as the 25mm-tall roll, so the module width is
+        // unchanged and comfortably inside GS1's 0.264mm floor.
+        expect(layout.moduleDots).toBe(3);
+        expect(layout.withinTolerance).toBe(true);
+        // The extra 5mm of height goes to the bars, not the title.
+        const shorter = computeLayout(
+            { ...takealotFormat, stock: LABEL_STOCKS[LabelStockSize.Size50x25] },
+            TAKEALOT_CODE
+        );
+        expect(layout.barHeightDots).toBeGreaterThan(shorter.barHeightDots);
+        expect(layout.titleLines).toBe(2);
+    });
+
     test('keeps two title lines when the annotation is beside the barcode', () => {
         expect(computeLayout(takealotFormat, TAKEALOT_CODE).titleLines).toBe(2);
     });
@@ -306,6 +442,33 @@ describe('buildLabelZpl', () => {
         expect(zpl).toMatch(/\^BCN,\d+,Y,N,N/);
         expect(zpl).toContain(`^FD${FNSKU}^FS`);
         expect(zpl).not.toContain('^BEN');
+    });
+
+    test('runs the title full width from the left margin, past a stacked annotation', () => {
+        const zpl = buildLabelZpl(
+            { code: TAKEALOT_CODE, title: 'National Geographic Metal Detector Starter Kit', quantity: 1 },
+            takealotFormat
+        );
+        const width = mmToDots(50, 203);
+        // Title and the stacked "MP" share the same left edge: the annotation is
+        // below the title, not beside it, so indenting the title would drop
+        // characters off a long product name for no reason. (The y differs — the
+        // top margin is larger than the sides; see the leading-edge test.)
+        expect(zpl).toMatch(/\^FO8,\d+\n\^A0N,\d+/);
+        expect(zpl).toContain(`^FB${width - 16},2,2,L,0`);
+    });
+
+    test('keeps the title clear of the leading edge on every stock', () => {
+        // A 1mm top margin sliced the tops off the title on real 50 × 30 stock:
+        // a thermal printer cannot place ink that close to the label gap, and the
+        // die-cut corner radius is right there too. 3mm clears both.
+        for (const size of Object.keys(LABEL_STOCKS) as LabelStockSize[]) {
+            const zpl = buildLabelZpl(
+                { code: TAKEALOT_CODE, title: 'A long product name that wraps to two lines', quantity: 1 },
+                { ...takealotFormat, stock: LABEL_STOCKS[size] }
+            );
+            expect(zpl).toContain('^FO8,24');
+        }
     });
 
     test('stacks the annotation one character per line when placed left', () => {

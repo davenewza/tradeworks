@@ -189,5 +189,47 @@
     "id": "SupplierDelivery.totalEvents",
     "display_name": "Tracking events",
     "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+  },
+  {
+    "id": "ChannelShipmentStatus",
+    "format": {
+      "enum_config": {
+        "values": [
+          { "value": "Open", "display_value": "Open", "colour": "blue", "display_order": 1 },
+          { "value": "Shipped", "display_value": "Shipped", "colour": "sunshine", "display_order": 2 },
+          { "value": "Received", "display_value": "Received", "colour": "green", "display_order": 3 },
+          { "value": "Cancelled", "display_value": "Cancelled", "colour": "grey", "display_order": 4 }
+        ]
+      }
+    }
+  },
+  {
+    "id": "ChannelShipment.totalLines",
+    "display_name": "Lines",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+  },
+  {
+    "id": "ChannelShipment.matchedLines",
+    "display_name": "Matched",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+  },
+  {
+    "id": "ChannelShipment.totalUnits",
+    "display_name": "Units",
+    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+  },
+  {
+    "id": "LabelStockSize",
+    "format": {
+      "enum_config": {
+        "values": [
+          { "value": "Size40x25", "display_value": "40 × 25 mm", "display_order": 1 },
+          { "value": "Size50x25", "display_value": "50 × 25 mm", "display_order": 2 },
+          { "value": "Size50x30", "display_value": "50 × 30 mm", "display_order": 3 },
+          { "value": "Size67x25", "display_value": "66.7 × 25.4 mm", "display_order": 4 },
+          { "value": "Size100x50", "display_value": "100 × 50 mm", "display_order": 5 }
+        ]
+      }
+    }
   }
 ]

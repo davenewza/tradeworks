@@ -25,6 +25,8 @@ enum BarcodeSymbology {
 enum LabelStockSize {
     Size40x25
     Size50x25
+    // The roll the warehouse actually runs on, and the default for a new spec.
+    Size50x30
     // 66.7 × 25.4 mm — 2⅝" × 1", the common Amazon FBA thermal size.
     Size67x25
     Size100x50
@@ -46,9 +48,12 @@ model ChannelLabelSpec {
         // Amazon's item condition. Not per-product.
         annotation Text?
         annotationPlacement LabelAnnotationPlacement @default(LabelAnnotationPlacement.BelowTitle)
-        // Pre-selected in the print flow; the operator can still override it per
-        // run if a different roll is loaded.
-        defaultStock LabelStockSize @default(LabelStockSize.Size50x25)
+        // The roll this channel's labels are printed on. The print flow reads it
+        // straight off the spec and never asks — the roll is a property of how
+        // the channel is set up, not a per-run decision, and asking every time
+        // invited a mis-click that would waste a run. Change it here when the
+        // warehouse changes stock.
+        defaultStock LabelStockSize @default(LabelStockSize.Size50x30)
         isEnabled Boolean @default(true)
     }
 
@@ -118,13 +123,17 @@ model ProductChannelCode {
     )
 }
 
-// Prints unit labels for a channel. Launched two ways:
+// Prints unit labels for a channel. Launched three ways:
 //   - from the Products space with no input, picking products from a table;
 //   - from a product page as an entry action, which passes productId and skips
-//     straight to that product's label count.
+//     straight to that product's label count;
+//   - from a channel shipment as an entry action, which passes shipmentId: the
+//     shipment fixes the channel and seeds a label count per line from the units
+//     being sent, so a whole consignment is labelled in one run.
 flow PrintChannelBarcodes {
     inputs {
         productId ID?
+        shipmentId ID?
     }
     @permission(roles: [Operator])
 }

@@ -1,0 +1,124 @@
+{
+  "id": "get-channel-shipment",
+  "action_name": "getChannelShipment",
+  "name": "Shipment",
+  "icon": "emoji:📦",
+  "response": {
+    "$.reference": {
+      "display_name": "Reference",
+      "display_order": 1
+    },
+    "$.channelId": {
+      "display_name": "Channel",
+      "display_order": 2
+    },
+    "$.externalId": {
+      "display_name": "Channel's shipment id",
+      "display_order": 3
+    },
+    "$.status": {
+      "display_name": "Status",
+      "display_order": 4
+    },
+    "$.statusDescription": {
+      "display_name": "Channel's wording",
+      "display_order": 5
+    },
+    "$.destination": {
+      "display_name": "Destination",
+      "display_order": 6
+    },
+    "$.dueDate": {
+      "display_name": "Due",
+      "display_order": 7
+    },
+    "$.placedAt": {
+      "display_name": "Placed",
+      "display_order": 8
+    },
+    "$.receivedAt": {
+      "display_name": "Received",
+      "display_order": 9
+    },
+    "$.totalLines": {
+      "display_name": "Lines",
+      "display_order": 10
+    },
+    "$.matchedLines": {
+      "display_name": "Lines matched to a product",
+      "display_order": 11
+    },
+    "$.totalUnits": {
+      "display_name": "Units going in",
+      "display_order": 12
+    },
+    "$.trackingInfo": {
+      "display_name": "Tracking",
+      "display_order": 13
+    },
+    "$.isArchived": {
+      "display_name": "Archived on channel",
+      "display_order": 14
+    },
+    "$.synchronisedAt": {
+      "display_name": "Last synced",
+      "display_order": 15
+    },
+    "$.items": {
+      "visible": false
+    },
+    "$.createdAt": {
+      "visible": false
+    },
+    "$.updatedAt": {
+      "visible": false
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "print-channel-barcodes",
+      "title": "Print barcode labels",
+      "emphasize": true,
+      "display_order": 0,
+      "data_mapping": [
+        {
+          "key": "$.shipmentId",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": "delete-channel-shipment",
+      "title": "Delete",
+      "as_dialog": true,
+      "display_order": 1
+    }
+  ],
+  "embedded_tools": [
+    {
+      "id": "items",
+      "display_order": 0,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-channel-shipment-items",
+            "title": "Lines",
+            "data_mapping": [
+              {
+                "key": "$.where.shipment.id.equals",
+                "path": {
+                  "path": "$.id"
+                }
+              }
+            ]
+          },
+          "response_overrides": {
+            "$.results[*].shipmentId": false
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "id": "list-channel-shipments",
+  "action_name": "listChannelShipments",
+  "name": "Shipments",
+  "icon": "emoji:📦",
+  "title": "Channel shipments",
+  "response": {
+    "$.results[*].reference": {
+      "display_name": "Reference",
+      "display_order": 1
+    },
+    "$.results[*].channelId": {
+      "display_name": "Channel",
+      "display_order": 2
+    },
+    "$.results[*].status": {
+      "display_name": "Status",
+      "display_order": 3
+    },
+    "$.results[*].statusDescription": {
+      "display_name": "Channel's wording",
+      "display_order": 4
+    },
+    "$.results[*].destination": {
+      "display_name": "Destination",
+      "display_order": 5
+    },
+    "$.results[*].dueDate": {
+      "display_name": "Due",
+      "display_order": 6
+    },
+    "$.results[*].totalLines": {
+      "display_name": "Lines",
+      "display_order": 7
+    },
+    "$.results[*].matchedLines": {
+      "display_name": "Matched",
+      "display_order": 8
+    },
+    "$.results[*].totalUnits": {
+      "display_name": "Units",
+      "display_order": 9
+    },
+    "$.results[*].placedAt": {
+      "display_name": "Placed",
+      "display_order": 10
+    },
+    "$.results[*].receivedAt": {
+      "display_name": "Received",
+      "display_order": 11
+    },
+    "$.results[*].synchronisedAt": {
+      "display_name": "Last synced",
+      "display_order": 12
+    },
+    "$.results[*].id": {
+      "display_order": 20,
+      "link": {
+        "tool_id": "get-channel-shipment",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].externalId": {
+      "visible": false
+    },
+    "$.results[*].trackingInfo": {
+      "visible": false
+    },
+    "$.results[*].isArchived": {
+      "visible": false
+    },
+    "$.results[*].items": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  }
+}
