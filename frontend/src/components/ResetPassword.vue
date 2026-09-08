@@ -85,12 +85,12 @@
         </div>
 
         <div class="text-center">
-          <router-link
-            to="/login"
+          <a
+            href="/"
             class="text-sm text-indigo-600 hover:text-indigo-500"
           >
             Back to login
-          </router-link>
+          </a>
         </div>
       </form>
     </div>
@@ -142,9 +142,9 @@ export default {
         this.password = ''
         this.confirmPassword = ''
         
-        // Redirect to login after 3 seconds
+        // Back to the login form (the app has no /login route) after 3 seconds
         setTimeout(() => {
-          window.location.href = '/login'
+          window.location.href = '/'
         }, 3000)
       } catch (error) {
         this.error = error.message || 'Failed to reset password. Please try again.'

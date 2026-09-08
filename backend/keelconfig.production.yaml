@@ -46,6 +46,11 @@ secrets:
 auth:
   userProvisioning: auto
   redirectUrl: https://orders.thecreatespace.co.za/callback
+  # Allow-list for the redirectUrl the frontend passes to the built-in
+  # requestPasswordReset action; the emailed link is this URL plus ?token=.
+  # Without it Keel rejects every reset with "auth.passwordResetUrl must be
+  # configured". Must be the frontend's /reset-password page.
+  passwordResetUrl: https://orders.thecreatespace.co.za/reset-password
   providers:
     - type: google
       name: google_client
