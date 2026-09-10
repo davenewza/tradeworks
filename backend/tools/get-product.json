@@ -235,6 +235,19 @@
           }
         }
       ]
+    },
+    {
+      "tool_id": "list-product-prices-for-product",
+      "title": "View all prices",
+      "display_order": 5,
+      "data_mapping": [
+        {
+          "key": "$.where.product.id.equals",
+          "path": {
+            "path": "$.id"
+          }
+        }
+      ]
     }
   ],
   "embedded_tools": [
@@ -255,6 +268,7 @@
     },
     {
       "id": "prices",
+      "title": "Prices by channel",
       "display_order": 0,
       "tools": [
         {
@@ -262,7 +276,13 @@
             "tool_id": "list-product-prices-for-product"
           },
           "response_overrides": {
-            "$.results[*].productId": false
+            "$.results[*].productId": false,
+            "$.results[*].unitCost": false,
+            "$.results[*].unitFreightIn": false,
+            "$.results[*].channelFees": false,
+            "$.results[*].adSpend": false,
+            "$.results[*].totalCosts": false,
+            "$.results[*].grossProfit": false
           }
         }
       ]
