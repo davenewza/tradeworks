@@ -145,3 +145,13 @@ flow PrintChannelBarcodes {
 flow SyncTakealotBarcodes {
     @permission(roles: [Operator])
 }
+
+// Pulls every FBA listing from the Amazon Selling Partner API (FBA Inventory
+// summaries) and sets each matched product's Amazon channel code to the
+// listing's FNSKU (matched by seller SKU). Bulk backfill and repair, reviewed
+// before apply, like the Takealot sync. There is no per-product subscriber:
+// an FNSKU exists once the listing is created on Amazon, not when the product
+// is created here, so a product-create hook would mostly find nothing yet.
+flow SyncAmazonFnskus {
+    @permission(roles: [Operator])
+}

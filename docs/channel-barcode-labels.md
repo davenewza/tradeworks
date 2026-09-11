@@ -16,6 +16,11 @@ once it has a **label spec**, so adding one is a row rather than a deploy.
 - **A channel shipment → Print barcode labels** — same flow for a whole
   consignment; the shipment fixes the channel and seeds a label count per line
   from the units being sent. See [channel-shipments.md](channel-shipments.md).
+- **Products → Barcode labels → Sync Amazon FNSKUs** — pull each FBA listing's
+  FNSKU from the Selling Partner API. See [amazon-fnskus.md](amazon-fnskus.md).
+- **Products → Barcode labels → Sync Takealot barcodes** — pull each offer's
+  label barcode from the Marketplace API. See
+  [takealot-barcodes.md](takealot-barcodes.md).
 - **Products → Barcode labels → Label specs** — how each channel's label is built.
 - **A product page → Channel codes** — the per-channel codes for that product.
 
@@ -70,8 +75,14 @@ just being silently absent.
 `product_label` (the EAN on Takealot's own label sheets; *not* the merchant
 `barcode` field, which is often an `MPTAL…` placeholder), on product create /
 SKU change and via the *Sync Takealot Barcodes* flow (see
-[takealot-barcodes.md](takealot-barcodes.md)). Manual capture remains for
-channels without an API sync, such as Amazon's FNSKUs.
+[takealot-barcodes.md](takealot-barcodes.md)).
+
+**Amazon FNSKUs are synced too** — from each FBA listing via the Selling
+Partner API's FBA Inventory summaries, through the *Sync Amazon FNSKUs* flow
+(see [amazon-fnskus.md](amazon-fnskus.md)). Both syncs run on the same
+plan → review → apply core (`lib/channelCodeSync.ts`) and share its rules:
+matched by SKU, only that channel's rows touched, nothing ever deleted. Manual
+capture on the product page remains for any other channel.
 
 ## Label stock, and why the symbology changes the answer
 
@@ -216,10 +227,13 @@ Console.
 
 | File | Role |
 | --- | --- |
-| `schemas/labels.keel` | `ChannelLabelSpec`, `ProductChannelCode`, the symbology / stock / placement enums, and the flow. |
+| `schemas/labels.keel` | `ChannelLabelSpec`, `ProductChannelCode`, the symbology / stock / placement enums, and the print, sync and import flows. |
 | `lib/barcodeLabelHelpers.ts` | Code validation, label geometry, ZPL generation, row building. Pure apart from the generated enums — no DB, no printer. |
 | `lib/barcodeLabelSelection.ts` | The DB queries (printable channels, candidates, a shipment's lines, stock on hand). |
 | `flows/printChannelBarcodes.ts` | UI orchestration only: channel → products (or a shipment) → counts → print. |
+| `lib/channelCodeSync.ts` | The plan/apply pair both channel syncs run on. |
+| `lib/takealotOfferHelpers.ts`, `flows/syncTakealotBarcodes.ts` | Takealot codes from the Marketplace API ([takealot-barcodes.md](takealot-barcodes.md)). |
+| `lib/amazonFnskuHelpers.ts`, `flows/syncAmazonFnskus.ts` | Amazon FNSKUs from the Selling Partner API ([amazon-fnskus.md](amazon-fnskus.md)). |
 
 ## Setting up a new channel
 
@@ -227,17 +241,20 @@ Console.
 2. **Products → Barcode labels → Label specs → Add a label spec**: pick the
    channel, its symbology, the fixed annotation and placement, and the default
    stock.
-3. Add a **channel code** per product you intend to label (product page → Add
-   channel code).
+3. Add a **channel code** per product you intend to label — synced for
+   Takealot and Amazon, or per product on its page → Add channel code for any
+   other channel.
 
 ## Known gaps
 
-- **Bulk code capture for non-Takealot channels.** Takealot codes are now synced
-  from the Marketplace API ([takealot-barcodes.md](takealot-barcodes.md)), which
-  covers the catalogue for that channel. Other channels' codes — Amazon FNSKUs in
-  particular — are still entered one product-channel pair at a time; a bulk path
-  would want a CSV import off the channel's own offer export, the same shape as
-  the existing `ImportProductViews` flow.
+- **Amazon codes are only synced on demand.** Takealot codes are also picked
+  up per product on create / SKU change; Amazon's deliberately are not, since
+  the FNSKU only exists once the listing is created on Amazon, normally after
+  the product exists here ([amazon-fnskus.md](amazon-fnskus.md)). Run the sync
+  after listing new products, or add a nightly scheduled sync if that becomes a
+  chore. Any further channel's codes are still entered one product-channel pair
+  at a time; a bulk path for it is a fetcher feeding the shared
+  `channelCodeSync` core, as both syncs do.
 - **No print preview in the Console.** The label is generated as native ZPL and
   rendered by the printer, so there is no on-screen proof before it prints. A
   preview would mean rasterising server-side (the approach klira takes for its

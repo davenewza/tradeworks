@@ -1,11 +1,6 @@
 import { SyncTakealotBarcodes, FlowConfig } from '@teamkeel/sdk';
-import {
-    BarcodeSyncPlan,
-    BarcodeApplyResult,
-    fetchAllOffers,
-    computeBarcodeSyncPlan,
-    applyBarcodeSync,
-} from '../lib/takealotOfferHelpers';
+import { fetchAllOffers, computeBarcodeSyncPlan } from '../lib/takealotOfferHelpers';
+import { ChannelCodeApplyResult, ChannelCodeSyncPlan, applyChannelCodeSync } from '../lib/channelCodeSync';
 
 const config = {
     title: 'Sync Takealot Barcodes',
@@ -24,7 +19,7 @@ const LONG_STEP_TIMEOUT = 10 * 60 * 1000;
 
 // Markdown blocks for the plan's notes, shared by the review and completion
 // pages. Empty when there is nothing to note.
-function buildNotes(plan: BarcodeSyncPlan): string[] {
+function buildNotes(plan: ChannelCodeSyncPlan): string[] {
     const notes: string[] = [];
 
     const capped = (skus: string[]) => {
@@ -33,21 +28,21 @@ function buildNotes(plan: BarcodeSyncPlan): string[] {
         return `${shown}${more}`;
     };
 
-    if (plan.offersWithoutProduct.length > 0) {
+    if (plan.skusWithoutProduct.length > 0) {
         notes.push(
-            `**Note:** ${plan.offersWithoutProduct.length} Takealot offer(s) have no matching product here (run *Sync Products* first to bring them in): ${capped(plan.offersWithoutProduct)}`
+            `**Note:** ${plan.skusWithoutProduct.length} Takealot offer(s) have no matching product here (run *Sync Products* first to bring them in): ${capped(plan.skusWithoutProduct)}`
         );
     }
 
-    if (plan.offersWithoutBarcode.length > 0) {
+    if (plan.skusWithoutCode.length > 0) {
         notes.push(
-            `**Note:** ${plan.offersWithoutBarcode.length} offer(s) carry no label barcode on Takealot, so their products were left untouched: ${capped(plan.offersWithoutBarcode)}`
+            `**Note:** ${plan.skusWithoutCode.length} offer(s) carry no label barcode on Takealot, so their products were left untouched: ${capped(plan.skusWithoutCode)}`
         );
     }
 
-    if (plan.productsWithoutOffer.length > 0) {
+    if (plan.productsWithoutSource.length > 0) {
         notes.push(
-            `${plan.productsWithoutOffer.length} enabled product(s) have no Takealot offer: ${capped(plan.productsWithoutOffer)}`
+            `${plan.productsWithoutSource.length} enabled product(s) have no Takealot offer: ${capped(plan.productsWithoutSource)}`
         );
     }
 
@@ -86,7 +81,7 @@ export default SyncTakealotBarcodes(config, async (ctx) => {
         const offers = await fetchAllOffers(ctx, progress);
         progress.set({ message: 'Comparing against existing channel codes…' });
         return await computeBarcodeSyncPlan(offers);
-    })) as unknown as BarcodeSyncPlan;
+    })) as unknown as ChannelCodeSyncPlan;
 
     // Nothing to do → finish early.
     if (plan.changes.length === 0) {
@@ -108,7 +103,7 @@ export default SyncTakealotBarcodes(config, async (ctx) => {
             }),
             ctx.ui.display.table({
                 data: plan.changes,
-                columns: ['sku', 'product', 'barcode', 'replaces', 'change'],
+                columns: ['sku', 'product', 'code', 'replaces', 'change'],
             }),
             ...buildNotes(plan).map((note) => ctx.ui.display.markdown({ content: note })),
         ],
@@ -117,8 +112,8 @@ export default SyncTakealotBarcodes(config, async (ctx) => {
 
     // ── Step: apply — upsert each product's Takealot channel code ────────────
     const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
-        return await applyBarcodeSync(plan, progress);
-    })) as unknown as BarcodeApplyResult;
+        return await applyChannelCodeSync(plan, progress);
+    })) as unknown as ChannelCodeApplyResult;
 
     // ── Completion: summary of what was applied ──────────────────────────────
     return ctx.complete({
