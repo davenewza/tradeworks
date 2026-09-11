@@ -156,6 +156,10 @@ export interface ShipmentLabelLoad {
     // Lines the channel has cancelled, excluded from the run. Counted rather
     // than listed: they are not a problem to fix, just not being sent.
     cancelledLines: number;
+    // Lines whose unit label the channel applies itself, or whose units carry
+    // the manufacturer's own barcode. Counted for the same reason — nothing to
+    // fix, just nothing for us to print.
+    channelLabelledLines: number;
 }
 
 /**
@@ -167,6 +171,9 @@ export interface ShipmentLabelLoad {
  * Label counts come from `quantitySending`, falling back to `quantityRequired`
  * for a consignment the channel has asked for but that has not been packed yet
  * (everything still sending zero). A line with neither has nothing to print.
+ *
+ * Cancelled lines and lines the channel labels itself are counted and left out
+ * rather than reported as problems — neither is something to go and fix.
  */
 export async function loadShipmentLabelCandidates(
     shipmentId: string
@@ -184,6 +191,7 @@ export async function loadShipmentLabelCandidates(
         candidates: [],
         unprintable: [],
         cancelledLines: 0,
+        channelLabelledLines: 0,
     };
     if (!channel) return load;
 
@@ -210,6 +218,14 @@ export async function loadShipmentLabelCandidates(
     for (const item of items) {
         if (item.cancelled) {
             load.cancelledLines++;
+            continue;
+        }
+
+        // Checked before the product and code checks below: a line the channel
+        // labels itself has no business being reported as missing a code, and
+        // on a manufacturer-barcode listing there deliberately is none.
+        if (item.labelledByChannel) {
+            load.channelLabelledLines++;
             continue;
         }
 

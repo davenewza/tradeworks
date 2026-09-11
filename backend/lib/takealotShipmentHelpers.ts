@@ -125,8 +125,10 @@ export async function fetchShipments(
     // Anything we already track that the filter above excluded still has to be
     // refreshed — otherwise a consignment that shipped since the last sync would
     // sit at "Open" here forever.
-    const missing = (options.alsoFetchIds ?? [])
-        .map((id) => Number(id))
+    // Takealot addresses a shipment by its id alone, so a tracked consignment's
+    // group id (which it never sets) is simply ignored.
+    const missing = (options.alsoFetch ?? [])
+        .map((ref) => Number(ref.externalId))
         .filter((id) => Number.isFinite(id) && !byId.has(id));
 
     if (missing.length > 0) {
@@ -289,11 +291,18 @@ export function toExternalShipments(
                 quantityRequired: item.quantity_required ?? 0,
                 quantitySending: item.quantity_sending ?? 0,
                 cancelled: Boolean(item.cancelled),
+                // Takealot's unit labels are always ours to print, and its
+                // shipment lines state no barcode — the offer does, which is
+                // what the separate barcode sync reads.
+                labelledByChannel: false,
+                code: null,
             });
         }
 
         external.push({
             externalId: String(shipmentId),
+            // Takealot's consignments stand alone; nothing nests them.
+            externalGroupId: null,
             reference: shipment.reference?.trim() || null,
             status: takealotStatus(shipment),
             statusDescription: shipment.purchase_order_state?.trim() || null,

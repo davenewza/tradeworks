@@ -105,7 +105,7 @@ describe('fetchShipments', () => {
                 : { status: 200, body: { items: [shipment({ shipment_id: 1 })] } }
         );
 
-        const result = await fetchShipments(ctx, { alsoFetchIds: ['77'] });
+        const result = await fetchShipments(ctx, { alsoFetch: [{ externalId: '77', externalGroupId: null }] });
 
         // Without this a consignment that shipped since the last sync would stop
         // coming back and sit at its stale status here forever.
@@ -116,7 +116,7 @@ describe('fetchShipments', () => {
     test('does not re-fetch a tracked id the listing already returned', async () => {
         const impl = stubFetch(() => ({ status: 200, body: { items: [shipment({ shipment_id: 5 })] } }));
 
-        const result = await fetchShipments(ctx, { alsoFetchIds: ['5'] });
+        const result = await fetchShipments(ctx, { alsoFetch: [{ externalId: '5', externalGroupId: null }] });
 
         expect(result).toHaveLength(1);
         expect(impl).toHaveBeenCalledTimes(1);
@@ -216,6 +216,8 @@ describe('toExternalShipments', () => {
 
         expect(external).toEqual({
             externalId: '5001',
+            // Takealot's consignments stand alone — nothing nests them.
+            externalGroupId: null,
             reference: 'JHB-2026-08',
             status: ChannelShipmentStatus.Open,
             statusDescription: 'Awaiting delivery',
@@ -233,6 +235,10 @@ describe('toExternalShipments', () => {
                     quantityRequired: 40,
                     quantitySending: 30,
                     cancelled: false,
+                    // Takealot's unit labels are always ours, and its shipment
+                    // lines carry no barcode — the offer does.
+                    labelledByChannel: false,
+                    code: null,
                 },
             ],
         });
@@ -257,6 +263,8 @@ describe('toExternalShipments', () => {
                 quantityRequired: 5,
                 quantitySending: 5,
                 cancelled: false,
+                labelledByChannel: false,
+                code: null,
             },
         ]);
     });

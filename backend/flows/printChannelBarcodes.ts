@@ -433,6 +433,12 @@ function describeShipmentProblems(load: ShipmentLabelLoad): string {
     if (load.cancelledLines > 0) {
         parts.push(`${load.cancelledLines} cancelled line(s) were excluded.`);
     }
+    if (load.channelLabelledLines > 0) {
+        parts.push(
+            `${load.channelLabelledLines} line(s) were excluded because the channel labels ` +
+                'those units itself, or they carry the manufacturer’s own barcode.'
+        );
+    }
     if (parts.length === 0) {
         parts.push('This consignment has no lines to label.');
     }
