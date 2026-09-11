@@ -11,7 +11,12 @@
 //
 // Everything is pure — no DB, no printer — so the ZPL can be asserted in tests.
 
-import { BarcodeSymbology, LabelStockSize, LabelElementKind } from '@teamkeel/sdk';
+import {
+    BarcodeSymbology,
+    LabelStockSize,
+    LabelElementKind,
+    LabelTextAlign,
+} from '@teamkeel/sdk';
 
 const MM_PER_INCH = 25.4;
 
@@ -230,6 +235,15 @@ export interface LabelElement {
     text?: string | null;
     // Title only.
     maxLines?: number | null;
+    // Barcode only. Null, zero or negative means no cap.
+    maxHeightMm?: number | null;
+    // Null, zero or negative means the size the layout derives for this kind.
+    // On a Barcode it sizes the interpretation line under the bars.
+    fontSizeMm?: number | null;
+    // Blank space below this element. Null, zero or negative means none.
+    paddingMm?: number | null;
+    // Ignored by StackedText, which is a column of single characters.
+    align?: LabelTextAlign | null;
 }
 
 /**
@@ -326,11 +340,15 @@ export interface PlacedElement {
     // from the product being printed.
     text: string;
     yDots: number;
-    // What the element occupies, including the interpretation line for a
-    // barcode. The next element starts at yDots + heightDots.
+    // What the element occupies, including its padding — and, for a barcode,
+    // the interpretation line. The next element starts at yDots + heightDots.
     heightDots: number;
     // Title only.
     lines: number;
+    // The size this element's text is actually set at, explicit or derived. On
+    // a barcode, the interpretation line's size.
+    fontDots: number;
+    align: LabelTextAlign;
 }
 
 export interface LabelLayout {
@@ -343,14 +361,19 @@ export interface LabelLayout {
     barHeightDots: number;
     barHeightMm: number;
     // Whether the bars clear MIN_BAR_HEIGHT_MM after everything else has taken
-    // its share of the label.
+    // its share of the label — and, if the element caps them, after that too.
     barHeightWithinTolerance: boolean;
+    // White space left at the foot of the label because the barcode was capped
+    // below the height available. Zero on an uncapped label.
+    slackDots: number;
     symbolXDots: number;
     barcodeYDots: number;
     titleFontDots: number;
     titleWidthDots: number;
     titleLines: number;
     textFontDots: number;
+    // Stacked text is set larger than the body text — see STACKED_TEXT_SCALE.
+    stackedFontDots: number;
     stackedText: string | null;
     // The vertical flow, in print order. Every coordinate the renderer emits
     // comes from here.
@@ -392,6 +415,22 @@ const MIN_TEXT_FONT_DOTS = 12;
 // directly under an FNSKU there is nothing left to absorb it.
 const INTERPRETATION_GAP_DOTS = 6;
 
+// Stacked text is a marker read at arm's length across a receiving bay, not a
+// line anyone reads up close, so it is set larger than the label's body text:
+// 25 dots (3.1mm) against 18 on the warehouse's 50 × 30 mm roll. It is bounded
+// by the width it steals from the symbol, not by legibility.
+const STACKED_TEXT_SCALE = 1.4;
+
+// Clearance between the stacked column and the symbol's quiet zone. The column
+// itself is the font's full declared character width — `^A0N,f,f` sets the cell
+// the glyph is drawn into, so nothing can be wider than that, where a measured
+// average would only be a guess about the widest letter anyone might configure.
+// Being wrong here does not look untidy, it puts ink in the quiet zone and
+// stops the label scanning, so the column takes the guarantee and the snugness
+// comes from the pad — 2 dots, against the 6 it was — and from no longer
+// centring the symbol in what is left.
+const STACKED_COL_PAD_DOTS = 2;
+
 // A title may wrap to at most this many lines however the row is configured;
 // past three there is nothing left for the bars on any stock the warehouse runs.
 const MAX_TITLE_LINES = 3;
@@ -407,65 +446,127 @@ export const MIN_BAR_HEIGHT_MM = 6.35;
 // instead of a negative bar height. Anything near it is already flagged.
 const FLOOR_BAR_HEIGHT_DOTS = 16;
 
+// Guards on an explicitly configured font size. Not a judgement about what
+// reads well — that is the operator's call once they have overruled the derived
+// size — only a backstop against a typo that would emit a font the printer
+// cannot draw or one taller than the label.
+const MIN_EXPLICIT_FONT_DOTS = 6;
+
 const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
 
 const titleLinesFor = (element: LabelElement): number =>
     clamp(Math.round(element.maxLines ?? 2), 1, MAX_TITLE_LINES);
 
+/** A configured millimetre figure in dots, or 0 when it is unset or nonsense. */
+const optionalMm = (mm: number | null | undefined, dpi: number): number =>
+    mm && mm > 0 ? mmToDots(mm, dpi) : 0;
+
 /**
- * Stack the vertical elements at a given pair of font sizes.
+ * The size an element's text is set at: what the row asks for, or what the
+ * layout derives for that kind.
+ *
+ * The derived size is the better default — it is a fraction of the label
+ * height, so it follows the label to a different roll where a fixed millimetre
+ * figure would not — but a row that names a size wins, because overruling it is
+ * the whole point of naming one.
+ */
+function fontDotsFor(
+    element: LabelElement,
+    derived: number,
+    heightDots: number,
+    dpi: number
+): number {
+    const explicit = optionalMm(element.fontSizeMm, dpi);
+    if (explicit === 0) return derived;
+    return clamp(explicit, MIN_EXPLICIT_FONT_DOTS, heightDots);
+}
+
+/**
+ * Stack the vertical elements at a given pair of derived font sizes.
  *
  * The barcode is the flexible one: every other element takes the height its
- * text needs, and the bars get what is left. A barcode's block includes the
- * interpretation line the printer draws directly beneath it, which is what puts
- * an FNSKU under its own bars without an element for it.
+ * text and padding need, and the bars get what is left — up to the cap the
+ * barcode's own row may set, with anything beyond that falling to the foot of
+ * the label as white space. A barcode's block includes the interpretation line
+ * the printer draws directly beneath it, which is what puts an FNSKU under its
+ * own bars without an element for it.
  */
 function stackElements(
     elements: LabelElement[],
     heightDots: number,
+    dpi: number,
     titleFontDots: number,
     textFontDots: number
-): { placements: PlacedElement[]; barHeightDots: number; barcodeYDots: number } {
+): {
+    placements: PlacedElement[];
+    // What the other elements leave the bars, before any cap. This is what the
+    // font search works against: shrinking the text is what buys the barcode
+    // room, and a cap is a deliberate choice rather than a shortage.
+    availableBarDots: number;
+    barHeightDots: number;
+    barcodeYDots: number;
+    slackDots: number;
+} {
     const vertical = elements.filter(isVertical);
-    const interpretationDots = textFontDots + INTERPRETATION_GAP_DOTS;
 
-    const fixedDots = vertical.reduce((sum, element) => {
-        if (element.kind === LabelElementKind.Title) {
-            return sum + titleLinesFor(element) * (titleFontDots + 2);
-        }
-        if (element.kind === LabelElementKind.Text) return sum + textFontDots + 2;
-        return sum + interpretationDots;
-    }, 0);
+    // Resolved once, since the block heights and the emitted ZPL have to agree
+    // on every one of these.
+    const resolved = vertical.map((element) => {
+        const derived =
+            element.kind === LabelElementKind.Title ? titleFontDots : textFontDots;
+        const fontDots = fontDotsFor(element, derived, heightDots, dpi);
+        const paddingDots = optionalMm(element.paddingMm, dpi);
+        const lines = element.kind === LabelElementKind.Title ? titleLinesFor(element) : 0;
+        const contentDots =
+            element.kind === LabelElementKind.Title
+                ? lines * (fontDots + 2)
+                : element.kind === LabelElementKind.Text
+                  ? fontDots + 2
+                  : fontDots + INTERPRETATION_GAP_DOTS;
+        return { element, fontDots, paddingDots, lines, contentDots };
+    });
 
-    const barHeightDots = heightDots - TOP_MARGIN_DOTS - MARGIN_DOTS - fixedDots;
+    const fixedDots = resolved.reduce((sum, r) => sum + r.contentDots + r.paddingDots, 0);
+    const availableBarDots = heightDots - TOP_MARGIN_DOTS - MARGIN_DOTS - fixedDots;
+
+    const barcode = vertical.find((e) => e.kind === LabelElementKind.Barcode);
+    const capDots = optionalMm(barcode?.maxHeightMm, dpi) || Infinity;
+    const barHeightDots = Math.max(
+        FLOOR_BAR_HEIGHT_DOTS,
+        Math.min(availableBarDots, capDots)
+    );
 
     const placements: PlacedElement[] = [];
     let y = TOP_MARGIN_DOTS;
     let barcodeYDots = TOP_MARGIN_DOTS;
 
-    for (const element of vertical) {
-        let blockDots: number;
-        let lines = 0;
-        if (element.kind === LabelElementKind.Title) {
-            lines = titleLinesFor(element);
-            blockDots = lines * (titleFontDots + 2);
-        } else if (element.kind === LabelElementKind.Text) {
-            blockDots = textFontDots + 2;
-        } else {
-            barcodeYDots = y;
-            blockDots = Math.max(FLOOR_BAR_HEIGHT_DOTS, barHeightDots) + interpretationDots;
-        }
+    for (const r of resolved) {
+        if (r.element.kind === LabelElementKind.Barcode) barcodeYDots = y;
+        const blockDots =
+            (r.element.kind === LabelElementKind.Barcode
+                ? barHeightDots + r.contentDots
+                : r.contentDots) + r.paddingDots;
         placements.push({
-            kind: element.kind,
-            text: sanitiseZplText(element.text ?? ''),
+            kind: r.element.kind,
+            text: sanitiseZplText(r.element.text ?? ''),
             yDots: y,
             heightDots: blockDots,
-            lines,
+            lines: r.lines,
+            fontDots: r.fontDots,
+            align: r.element.align ?? LabelTextAlign.Left,
         });
         y += blockDots;
     }
 
-    return { placements, barHeightDots, barcodeYDots };
+    // Capping the bars moves everything below them up, so the white space lands
+    // at the foot of the label rather than in a gap mid-stack.
+    return {
+        placements,
+        availableBarDots,
+        barHeightDots,
+        barcodeYDots,
+        slackDots: Math.max(0, heightDots - MARGIN_DOTS - y),
+    };
 }
 
 /**
@@ -499,23 +600,27 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
     );
     const minBarDots = mmToDots(MIN_BAR_HEIGHT_MM, stock.dpi);
 
-    // Shrink both fonts a dot at a time until the bars clear their minimum, or
-    // until the text is as small as it may go. Stepping them together keeps the
-    // title and the fixed lines in proportion, which is how the two read as one
-    // label rather than as a title with a caption bolted on.
+    const stack = (title: number, text: number) =>
+        stackElements(elements, heightDots, stock.dpi, title, text);
+
+    // Shrink both derived fonts a dot at a time until the bars clear their
+    // minimum, or until the text is as small as it may go. Stepping them
+    // together keeps the title and the fixed lines in proportion, which is how
+    // the two read as one label rather than as a title with a caption bolted
+    // on. Sizes a row states explicitly are left alone — undoing what was asked
+    // for would be worse than reporting that it does not fit — so a label made
+    // entirely of explicit sizes simply never shrinks.
     let titleFontDots = nominalTitle;
     let textFontDots = nominalText;
-    let stacked = stackElements(elements, heightDots, titleFontDots, textFontDots);
+    let stacked = stack(titleFontDots, textFontDots);
     while (
-        stacked.barHeightDots < minBarDots &&
+        stacked.availableBarDots < minBarDots &&
         (titleFontDots > MIN_TITLE_FONT_DOTS || textFontDots > MIN_TEXT_FONT_DOTS)
     ) {
         if (titleFontDots > MIN_TITLE_FONT_DOTS) titleFontDots--;
         if (textFontDots > MIN_TEXT_FONT_DOTS) textFontDots--;
-        stacked = stackElements(elements, heightDots, titleFontDots, textFontDots);
+        stacked = stack(titleFontDots, textFontDots);
     }
-
-    const barHeightDots = Math.max(FLOOR_BAR_HEIGHT_DOTS, stacked.barHeightDots);
 
     // A stacked element needs a column at the left, outside the barcode's quiet
     // zone, so it comes off the width available to the symbol.
@@ -526,7 +631,15 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
     // characters on a long product name for nothing.
     const stackedElement = elements.find((e) => e.kind === LabelElementKind.StackedText);
     const stackedText = stackedElement ? sanitiseZplText(stackedElement.text ?? '') : null;
-    const markerColDots = stackedText ? textFontDots + 6 : 0;
+    const stackedFontDots = stackedElement
+        ? fontDotsFor(
+              stackedElement,
+              Math.round(textFontDots * STACKED_TEXT_SCALE),
+              heightDots,
+              stock.dpi
+          )
+        : 0;
+    const markerColDots = stackedText ? stackedFontDots + STACKED_COL_PAD_DOTS : 0;
     const availableDots = widthDots - MARGIN_DOTS * 2 - markerColDots;
 
     const modules = totalModulesFor(symbology, code);
@@ -537,13 +650,18 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
         stock.dpi
     );
 
-    // Centre the whole quiet-zone-inclusive block in what's left, then step in
-    // past the left quiet zone to where the bars themselves start.
+    // With a marker column the symbol is pushed hard against it rather than
+    // centred in what is left: the quiet zone is already 4mm of mandatory white
+    // between the characters and the first bar, and centring added another
+    // couple of millimetres on top, which read as the marker floating away from
+    // the code it marks. Without one, centring is still right.
     const totalBarDots = modules * moduleDots;
     const leftQuietModules =
         symbology === BarcodeSymbology.Ean13 ? EAN13_QUIET_LEFT_MODULES : CODE128_QUIET_MODULES;
     const blockXDots =
-        MARGIN_DOTS + markerColDots + Math.max(0, Math.floor((availableDots - totalBarDots) / 2));
+        MARGIN_DOTS +
+        markerColDots +
+        (markerColDots > 0 ? 0 : Math.max(0, Math.floor((availableDots - totalBarDots) / 2)));
     const symbolXDots = blockXDots + leftQuietModules * moduleDots;
 
     const title = stacked.placements.find((p) => p.kind === LabelElementKind.Title);
@@ -554,15 +672,17 @@ export function computeLayout(format: LabelFormat, code: string): LabelLayout {
         moduleDots,
         xDimensionMm,
         withinTolerance,
-        barHeightDots,
-        barHeightMm: dotsToMm(barHeightDots, stock.dpi),
+        barHeightDots: stacked.barHeightDots,
+        barHeightMm: dotsToMm(stacked.barHeightDots, stock.dpi),
         barHeightWithinTolerance: stacked.barHeightDots >= minBarDots,
+        slackDots: stacked.slackDots,
         symbolXDots,
         barcodeYDots: stacked.barcodeYDots,
-        titleFontDots,
+        titleFontDots: title?.fontDots ?? titleFontDots,
         titleWidthDots: widthDots - MARGIN_DOTS * 2,
         titleLines: title?.lines ?? 0,
         textFontDots,
+        stackedFontDots,
         stackedText: stackedText && stackedText.length > 0 ? stackedText : null,
         placements: stacked.placements,
     };
@@ -663,6 +783,10 @@ export interface LabelSpec {
     quantity: number;
 }
 
+// ^FB's justification parameter.
+const zplJustification = (align: LabelTextAlign): string =>
+    align === LabelTextAlign.Centre ? 'C' : align === LabelTextAlign.Right ? 'R' : 'L';
+
 /**
  * Build the ZPL for one product's labels on one channel. `quantity` becomes ^PQ
  * rather than repeating the format, so 200 labels is one small format, not 200
@@ -700,7 +824,6 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
     }
 
     const layout = computeLayout(format, check.code);
-    const { titleFontDots, textFontDots } = layout;
 
     const lines: string[] = [
         '^XA',
@@ -709,25 +832,26 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
         `^PW${layout.widthDots}`,
         `^LL${layout.heightDots}`,
         '^LH0,0',
-        // The barcode's interpretation line takes the default font, so pin it.
-        `^CF0,${textFontDots}`,
     ];
 
     for (const placement of layout.placements) {
+        const { fontDots } = placement;
+
         if (placement.kind === LabelElementKind.Title) {
             // Word-wrapped by ^FB and truncated past the element's line count.
-            // Always flush to the left margin and the full width of the label —
-            // stacked text is beside the bars, not beside the title.
+            // The block always spans the full width of the label from the left
+            // margin — stacked text is beside the bars, not beside the title —
+            // so alignment moves the text within that, it does not indent it.
             const title = fitTitle(
                 sanitiseZplText(spec.title),
                 layout.titleWidthDots,
-                titleFontDots,
+                fontDots,
                 placement.lines
             );
             lines.push(
                 `^FO${MARGIN_DOTS},${placement.yDots}`,
-                `^A0N,${titleFontDots},${titleFontDots}`,
-                `^FB${layout.titleWidthDots},${placement.lines},2,L,0`,
+                `^A0N,${fontDots},${fontDots}`,
+                `^FB${layout.titleWidthDots},${placement.lines},2,${zplJustification(placement.align)},0`,
                 `^FD${title}^FS`
             );
             continue;
@@ -736,7 +860,8 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
         if (placement.kind === LabelElementKind.Text) {
             lines.push(
                 `^FO${MARGIN_DOTS},${placement.yDots}`,
-                `^A0N,${textFontDots},${textFontDots}`,
+                `^A0N,${fontDots},${fontDots}`,
+                `^FB${layout.titleWidthDots},1,0,${zplJustification(placement.align)},0`,
                 `^FD${placement.text}^FS`
             );
             continue;
@@ -747,8 +872,13 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
         // passing 13 would encode the check digit as data. ^BC draws Code 128,
         // which auto-selects its subset and appends its own check character.
         // Both are asked for the interpretation line *below* the bars, which is
-        // what puts an FNSKU directly under its own symbol.
-        lines.push(`^FO${layout.symbolXDots},${placement.yDots}`, `^BY${layout.moduleDots}`);
+        // what puts an FNSKU directly under its own symbol. That line takes the
+        // default font rather than a ^A of its own, so it is pinned here.
+        lines.push(
+            `^CF0,${fontDots}`,
+            `^FO${layout.symbolXDots},${placement.yDots}`,
+            `^BY${layout.moduleDots}`
+        );
         if (format.symbology === BarcodeSymbology.Ean13) {
             lines.push(`^BEN,${layout.barHeightDots},Y,N`, `^FD${check.code.slice(0, 12)}^FS`);
         } else {
@@ -757,12 +887,13 @@ export function buildLabelZpl(spec: LabelSpec, format: LabelFormat): string {
     }
 
     // Out of the vertical flow: one character per line down the left of the
-    // bars, as on Takealot's own label.
+    // bars, as on Takealot's own label, and set larger than the label's other
+    // text so it reads across a receiving bay.
     if (layout.stackedText) {
         layout.stackedText.split('').forEach((char, index) => {
             lines.push(
-                `^FO${MARGIN_DOTS},${layout.barcodeYDots + index * textFontDots}`,
-                `^A0N,${textFontDots},${textFontDots}`,
+                `^FO${MARGIN_DOTS},${layout.barcodeYDots + index * layout.stackedFontDots}`,
+                `^A0N,${layout.stackedFontDots},${layout.stackedFontDots}`,
                 `^FD${char}^FS`
             );
         });

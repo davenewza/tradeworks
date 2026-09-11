@@ -49,7 +49,17 @@ enum LabelElementKind {
     Text
     // Fixed text set one character per line down the left of the symbol —
     // Takealot's "MP". Out of the vertical flow, so `position` does not apply.
+    // Printed larger than the label's other text: it is a marker read across a
+    // receiving bay, not a line anyone reads up close.
     StackedText
+}
+
+// How text sits in the width it is given. Stacked text ignores it — it is a
+// column of single characters beside the bars.
+enum LabelTextAlign {
+    Left
+    Centre
+    Right
 }
 
 // How one channel's unit label is built. One row per channel we label for,
@@ -109,6 +119,30 @@ model ChannelLabelElement {
         // truncated. Two fits most names on the warehouse roll; one buys the
         // barcode about 2.7mm of extra height.
         maxLines Number @default(2)
+        // Barcode only: how tall the bars may grow. The barcode takes whatever
+        // the other elements leave, which on a tall roll is more height than it
+        // needs — 17.5mm of bars on a 30mm label reads as all barcode. Capping
+        // it leaves the difference as white space at the foot of the label.
+        // Empty means no cap, which is the shape every label had before this
+        // existed. Taller bars never scan worse, so this is about how the label
+        // looks, not whether it works.
+        maxHeightMm Decimal?
+        // Cap height for this element's text, in millimetres. Empty means the
+        // size the layout derives from the label height — which is the better
+        // default, because it follows the label to a different roll where a
+        // fixed millimetre figure would not. Set it to overrule that for one
+        // element. On a barcode it sets the interpretation line under the bars.
+        //
+        // An explicit size is never shrunk: the fit search that keeps the bars
+        // above their minimum only has the derived sizes to work with, so an
+        // over-specified label reports a short barcode rather than quietly
+        // undoing what was asked for.
+        fontSizeMm Decimal?
+        // Blank space below this element, in millimetres. There is no padding
+        // above: put it below the element before instead. Comes out of the
+        // barcode's share, like any other height on the label.
+        paddingMm Decimal?
+        align LabelTextAlign @default(LabelTextAlign.Left)
     }
 
     actions {
@@ -116,8 +150,27 @@ model ChannelLabelElement {
         list listChannelLabelElements(spec.id?) {
             @orderBy(position: asc)
         }
-        create createChannelLabelElement() with (spec.id, kind, position?, text?, maxLines?)
-        update updateChannelLabelElement(id) with (kind, position?, text?, maxLines?)
+        create createChannelLabelElement() with (
+            spec.id,
+            kind,
+            position?,
+            text?,
+            maxLines?,
+            maxHeightMm?,
+            fontSizeMm?,
+            paddingMm?,
+            align?,
+        )
+        update updateChannelLabelElement(id) with (
+            kind,
+            position?,
+            text?,
+            maxLines?,
+            maxHeightMm?,
+            fontSizeMm?,
+            paddingMm?,
+            align?,
+        )
         delete deleteChannelLabelElement(id)
     }
 
