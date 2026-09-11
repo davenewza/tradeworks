@@ -1,0 +1,24 @@
+{
+  "id": "list-channel-label-elements",
+  "action_name": "listChannelLabelElements",
+  "name": "Label elements",
+  "icon": "emoji:📐",
+  "help_text": "What this channel's label carries, top to bottom in position order. Barcode is the symbol plus the code printed under its own bars — every label needs exactly one. Title is the product name, wrapped to its line count. Text is a fixed line, such as the item condition Amazon requires at the bottom of an FBA label. Stacked text sits beside the bars, one character per line, and ignores position — that is Takealot's \"MP\".",
+  "response": {
+    "$.results[*].position": { "display_name": "Position", "display_order": 1 },
+    "$.results[*].kind": { "display_name": "Element", "display_order": 2 },
+    "$.results[*].text": { "display_name": "Text", "display_order": 3 },
+    "$.results[*].maxLines": { "display_name": "Max lines", "display_order": 4 },
+    "$.results[*].specId": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": {
+      "display_order": 9,
+      "link": {
+        "tool_id": "update-channel-label-element",
+        "display_order": 0,
+        "data_mapping": [{ "key": "$.id", "path": { "path": "$.results[*].id" } }]
+      }
+    }
+  }
+}

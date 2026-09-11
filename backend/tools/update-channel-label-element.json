@@ -1,0 +1,14 @@
+{
+  "id": "update-channel-label-element",
+  "action_name": "updateChannelLabelElement",
+  "name": "Edit label element",
+  "title": "Edit this line of the label",
+  "help_text": "Position orders the elements down the label; stacked text ignores it and sits beside the bars. Text applies to Text and Stacked text; max lines to Title.",
+  "inputs": {
+    "$.where.id": { "display_name": "Element", "display_order": 1 },
+    "$.values.position": { "display_name": "Position", "display_order": 2 },
+    "$.values.kind": { "display_name": "Element", "display_order": 3 },
+    "$.values.text": { "display_name": "Text", "display_order": 4 },
+    "$.values.maxLines": { "display_name": "Max lines (title only)", "display_order": 5 }
+  }
+}

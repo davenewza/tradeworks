@@ -132,7 +132,7 @@
             "link": {
               "tool_id": "list-channel-label-specs",
               "title": "Label specs",
-              "description": "How each channel’s label is built — symbology, annotation, stock",
+              "description": "How each channel’s label is built — symbology, stock, and what it carries",
               "display_order": 3
             },
             "hidden": false
@@ -142,7 +142,7 @@
             "link": {
               "tool_id": "create-channel-label-spec",
               "title": "Add a label spec",
-              "description": "Make a channel printable — symbology, annotation, label stock",
+              "description": "Make a channel printable — symbology and label stock, then its elements",
               "display_order": 4
             },
             "hidden": false

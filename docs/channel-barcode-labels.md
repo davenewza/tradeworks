@@ -5,7 +5,10 @@ fulfilment centre, straight to the warehouse Zebra as ZPL. It replaces
 downloading each channel's barcode PDF and printing it n-up on A4.
 
 Nothing about the label is channel-specific in code. A channel becomes printable
-once it has a **label spec**, so adding one is a row rather than a deploy.
+once it has a **label spec**, and what its label carries — the barcode, the
+product name, any fixed text — is a list of **label element** rows hanging off
+that spec. Both are data, so a new channel, or a new line of text on an existing
+one, is a row rather than a deploy.
 
 ## Where to find it
 
@@ -21,27 +24,51 @@ once it has a **label spec**, so adding one is a row rather than a deploy.
 - **Products → Barcode labels → Sync Takealot barcodes** — pull each offer's
   label barcode from the Marketplace API. See
   [takealot-barcodes.md](takealot-barcodes.md).
-- **Products → Barcode labels → Label specs** — how each channel's label is built.
+- **Products → Barcode labels → Label specs** — how each channel's label is
+  built; open one to edit the elements it carries.
 - **A product page → Channel codes** — the per-channel codes for that product.
 
-## The two shapes in use
+## What a label is made of
+
+A label is a stack of **elements**, printed top to bottom in `position` order.
+There are four kinds:
+
+| Kind | What it prints |
+| --- | --- |
+| **Barcode** | The symbol, plus the human-readable interpretation line the printer draws directly beneath the bars. Exactly one per spec. It takes whatever height the other elements leave. |
+| **Title** | The product name, wrapped to its `maxLines` and truncated to fit. |
+| **Text** | A fixed line — Amazon's item condition. |
+| **Stacked text** | Fixed text set one character per line down the left of the symbol — Takealot's `MP`. Out of the vertical flow, so `position` does not apply to it. |
+
+That the *barcode and the title are themselves elements* is the point. The two
+shapes in use disagree about where the product name goes, not just about the
+fixed text, so no arrangement of named slots — "above the barcode", "below the
+barcode" — covers both:
 
 |  | Takealot | Amazon FBA |
 | --- | --- | --- |
 | **Symbology** | EAN-13 | Code 128 |
 | **Code** | the product's GTIN, as held against the offer | the **FNSKU** Amazon assigns |
-| **Annotation** | `MP`, stacked beside the symbol | the **item condition** (`New`), below the title |
-| **Label stock** | 50 × 30 mm — the warehouse roll | 66.7 × 25.4 mm (2⅝" × 1") |
+| **Elements** | Title → Barcode, with `MP` stacked beside the bars | Barcode → Title → Text `New` |
+| **Label stock** | 50 × 30 mm — the warehouse roll | 50 × 30 mm |
 
-Amazon requires the item condition on every unit label, which is what the
-annotation carries.
+Amazon requires the **item condition** on every unit label and wants it at the
+bottom, under the product name — hence the order. The FNSKU itself needs no
+element: it is the barcode's own interpretation line, which `^BC`'s fourth
+parameter puts directly beneath the bars.
 
-The **title always runs the full width of the label from the left margin**, on
-both shapes. A stacked annotation sits beside the *bars*, which start well below
-the title block, so it never reaches the title — indenting the title to clear
-that column would only drop characters off a long product name. On a Takealot
-label the title, the stacked `MP` and the EAN's lead digit therefore share one
-left edge.
+A spec with **no elements still prints** — the product name over the barcode,
+the shape every channel shares — and the print page says so in a banner. The
+same fallback catches a spec whose elements do not make a label (no barcode, two
+titles, a text element with no text); the banner names the problem. A plain
+label beats a blank one when the run is a consignment that is already packed,
+but it should never pass for a configured one.
+
+The **title always runs the full width of the label from the left margin**,
+wherever it sits in the stack. Stacked text sits beside the *bars*, not beside
+the title, so it never reaches it — indenting the title to clear that column
+would only drop characters off a long product name. On a Takealot label the
+title, the stacked `MP` and the EAN's lead digit therefore share one left edge.
 
 The Takealot geometry was measured off a Seller Portal
 barcode sheet (`product_labels_<date>_<DC>.pdf`); the bar pattern our EAN-13 path
@@ -115,7 +142,15 @@ is exactly in spec:
 | 3 dots | 0.375 mm | 61.9 mm | ✓ |
 
 So Amazon labels are *easier* on this printer than Takealot's, despite the longer
-symbol. On 66.7 mm stock a 10-character FNSKU gets a comfortable 3-dot module.
+symbol. On the 50 mm roll a 10-character FNSKU gets a 2-dot module — in spec, but
+exactly at the floor, which puts a **hard ceiling of 12 characters** on an FBA
+code before the symbol drops to a 1-dot module and stops scanning:
+
+| Code length | modules | at 2 dots | |
+| --- | --- | --- | --- |
+| 10 chars (a standard FNSKU) | 165 | 41.3 mm | fits |
+| 12 chars | 187 | 46.8 mm | fits, at the limit |
+| 13 chars | 198 | 49.5 mm | falls to a 1-dot module, out of spec |
 
 Because Code 128 grows with the code, the print page checks **every** row and
 warns on the tightest one — a long code in the batch is what decides whether the
@@ -129,11 +164,46 @@ specs* when the warehouse changes stock; the print page shows which roll the run
 assumed. `computeLayout` derives every coordinate from the stock, symbology and
 code, so adding a roll size is one entry in `LABEL_STOCKS` plus one enum value.
 
+## Text size, and how the height is shared
+
+Every element takes the height its text needs; **the barcode gets what is
+left**. On the 50 × 30 mm roll (400 × 240 dots at 203 dpi) that works out at:
+
+| | Takealot | Amazon FBA |
+| --- | --- | --- |
+| Elements | Title (2 lines) → Barcode | Barcode → Title (2 lines) → Text |
+| Title / text font | 20 / 18 dots | 20 / 18 dots |
+| Characters per title line | 38 | 38 |
+| Bar height | 17.5 mm | 15.0 mm |
+
+The fonts are **20 and 18 dots** — 2.5 mm and 2.2 mm of cap height, about 7 pt
+and 6.5 pt — derived as a fraction of the label height so a different roll
+scales with it. That is smaller than the label carried before elements existed:
+a 26-dot title fitted 29 characters a line on this roll and a 20-dot one fits
+38, which is what pays for a second title line once the barcode, the name and a
+condition all share the height. The Amazon label went from one 29-character line
+to two 38-character ones at no cost to the bars.
+
+When a spec is crowded enough that the bars would fall under **6.35 mm** (0.25",
+Amazon's floor for a unit label), both fonts **shrink a dot at a time** until
+they clear it, stopping at 14 / 12 dots — below that the warehouse cannot read
+the label and a shorter barcode is the better trade. If even the floor does not
+fit, the print page says so in a banner, the same way it warns on a too-narrow
+module. Both searches exist for the same reason: ZPL only takes whole dots, so
+the answer has to be found rather than calculated.
+
+A **barcode's interpretation line** is reserved as part of the barcode's own
+block — the font height plus 6 dots. The gap is larger than the 2 dots between
+ordinary lines on purpose: the firmware adds a little space of its own, which
+the bottom margin used to absorb, and with a product name now sitting directly
+under an FNSKU there is nothing left to absorb it.
+
 ## The title block
 
-Two lines on Takealot's shape, one on Amazon's (the item condition takes the
-other). **Long product names are truncated in software**, with a trailing `...`,
-before the ZPL is built.
+Up to `maxLines` per the Title element — two on both shapes today; one buys the
+bars about 2.7 mm, and three is the cap whatever the row says. **Long product
+names are truncated in software**, with a trailing `...`, before the ZPL is
+built.
 
 That is not belt-and-braces. `^FB`'s max-lines parameter is documented as
 truncating, but the ZD220 prints the overflow **on top of the last line** — a
@@ -227,7 +297,7 @@ Console.
 
 | File | Role |
 | --- | --- |
-| `schemas/labels.keel` | `ChannelLabelSpec`, `ProductChannelCode`, the symbology / stock / placement enums, and the print, sync and import flows. |
+| `schemas/labels.keel` | `ChannelLabelSpec`, `ChannelLabelElement`, `ProductChannelCode`, the symbology / stock / element-kind enums, and the print and sync flows. |
 | `lib/barcodeLabelHelpers.ts` | Code validation, label geometry, ZPL generation, row building. Pure apart from the generated enums — no DB, no printer. |
 | `lib/barcodeLabelSelection.ts` | The DB queries (printable channels, candidates, a shipment's lines, stock on hand). |
 | `flows/printChannelBarcodes.ts` | UI orchestration only: channel → products (or a shipment) → counts → print. |
@@ -239,11 +309,24 @@ Console.
 
 1. Create the `Channel` if it does not exist.
 2. **Products → Barcode labels → Label specs → Add a label spec**: pick the
-   channel, its symbology, the fixed annotation and placement, and the default
-   stock.
-3. Add a **channel code** per product you intend to label — synced for
+   channel, its symbology and the label stock.
+3. Open the spec and **add its elements** — the barcode, the product name, and
+   any fixed text, in the order they should print. Until you do, the channel
+   prints the product name over the barcode and the print page says so.
+4. Add a **channel code** per product you intend to label — synced for
    Takealot and Amazon, or per product on its page → Add channel code for any
    other channel.
+
+The two shapes in use, as rows:
+
+| Channel | Position | Kind | Text | Max lines |
+| --- | --- | --- | --- | --- |
+| Takealot | 1 | Title | | 2 |
+| | 2 | Barcode | | |
+| | 3 | Stacked text | `MP` | |
+| Amazon | 1 | Barcode | | |
+| | 2 | Title | | 2 |
+| | 3 | Text | `New` | |
 
 ## Known gaps
 
@@ -255,6 +338,10 @@ Console.
   chore. Any further channel's codes are still entered one product-channel pair
   at a time; a bulk path for it is a fetcher feeding the shared
   `channelCodeSync` core, as both syncs do.
+- **Element order is a number you type.** Re-ordering a label means editing
+  `position` on two rows; there is no drag handle, because the Console's list
+  tools do not offer one. With three or four rows per channel that is a
+  30-second job, but it would not scale to a label with a dozen lines.
 - **No print preview in the Console.** The label is generated as native ZPL and
   rendered by the printer, so there is no on-screen proof before it prints. A
   preview would mean rasterising server-side (the approach klira takes for its
