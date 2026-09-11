@@ -35,10 +35,14 @@ There are four kinds:
 
 | Kind | What it prints |
 | --- | --- |
-| **Barcode** | The symbol, plus the human-readable interpretation line the printer draws directly beneath the bars. Exactly one per spec. It takes whatever height the other elements leave. |
+| **Barcode** | The symbol, plus the human-readable interpretation line the printer draws directly beneath the bars. Exactly one per spec. It takes whatever height the other elements leave, up to `maxHeightMm`. |
 | **Title** | The product name, wrapped to its `maxLines` and truncated to fit. |
 | **Text** | A fixed line — Amazon's item condition. |
-| **Stacked text** | Fixed text set one character per line down the left of the symbol — Takealot's `MP`. Out of the vertical flow, so `position` does not apply to it. |
+| **Stacked text** | Fixed text set one character per line down the left of the symbol — Takealot's `MP`. Out of the vertical flow, so `position` does not apply to it. Set larger than the label's body text, since it is a marker read across a receiving bay. |
+
+Every element also takes an optional **`fontSizeMm`**, **`paddingMm`** (blank space
+below it) and **`align`** (left, centre, right). All three are optional, and all
+three come out of the barcode's share of the height.
 
 That the *barcode and the title are themselves elements* is the point. The two
 shapes in use disagree about where the product name goes, not just about the
@@ -65,10 +69,20 @@ label beats a blank one when the run is a consignment that is already packed,
 but it should never pass for a configured one.
 
 The **title always runs the full width of the label from the left margin**,
-wherever it sits in the stack. Stacked text sits beside the *bars*, not beside
-the title, so it never reaches it — indenting the title to clear that column
-would only drop characters off a long product name. On a Takealot label the
-title, the stacked `MP` and the EAN's lead digit therefore share one left edge.
+wherever it sits in the stack; `align` moves the text within that block rather
+than indenting the block. Stacked text sits beside the *bars*, not beside the
+title, so it never reaches it — indenting the title to clear that column would
+only drop characters off a long product name. On a Takealot label the title, the
+stacked `MP` and the EAN's lead digit therefore share one left edge.
+
+The marker column reserves a **whole character cell** — the width `^A0N,f,f`
+declares, which no glyph can exceed — rather than a measured average. Being
+wrong there would not look untidy, it would put ink in the symbol's quiet zone
+and stop the label scanning. The column is snug because the pad either side is
+2 dots and because a label with a marker **pushes the symbol against the column
+instead of centring it**: the quiet zone is already 4 mm of mandatory white, and
+centring added a couple of millimetres more, which read as the marker floating
+away from the code it marks.
 
 The Takealot geometry was measured off a Seller Portal
 barcode sheet (`product_labels_<date>_<DC>.pdf`); the bar pattern our EAN-13 path
@@ -191,6 +205,32 @@ the label and a shorter barcode is the better trade. If even the floor does not
 fit, the print page says so in a banner, the same way it warns on a too-narrow
 module. Both searches exist for the same reason: ZPL only takes whole dots, so
 the answer has to be found rather than calculated.
+
+A size set on an element with **`fontSizeMm` is never shrunk**. The fit search
+only has the derived sizes to work with, so a label that names all of its sizes
+simply never shrinks and reports a short barcode instead — undoing what was
+asked for would be worse than saying it does not fit. Leaving `fontSizeMm` empty
+is the better default anyway: the derived size is a fraction of the label
+height, so it follows the label to a different roll where a fixed millimetre
+figure would not.
+
+There is **no weight or face to choose.** The ZD220's resident scalable font is
+CG Triumvirate Bold Condensed, which is why the printed title looks heavier than
+Takealot's PDF-set one. Getting a different face means downloading a TrueType
+font to the printer's flash and aliasing it with `^CW` — possible, but a
+different job from this.
+
+### Capping the barcode
+
+The barcode is the flexible element, so on a tall roll it absorbs every dot
+nothing else claims — 17.5 mm of bars on a 30 mm label, which reads as all
+barcode next to Takealot's own sheet. **`maxHeightMm` on the barcode element**
+caps it and leaves the difference as white space **at the foot of the label**:
+capping the bars moves everything below them up, rather than opening a gap
+mid-stack. Taller bars never scan worse, so this is about how the label looks,
+not whether it works — and a cap set below 6.35 mm is reported like any other
+short barcode, without sending the font search shrinking text that would not
+help.
 
 A **barcode's interpretation line** is reserved as part of the barcode's own
 block — the font height plus 6 dots. The gap is larger than the 2 dots between
@@ -319,14 +359,17 @@ Console.
 
 The two shapes in use, as rows:
 
-| Channel | Position | Kind | Text | Max lines |
-| --- | --- | --- | --- | --- |
-| Takealot | 1 | Title | | 2 |
-| | 2 | Barcode | | |
-| | 3 | Stacked text | `MP` | |
-| Amazon | 1 | Barcode | | |
-| | 2 | Title | | 2 |
-| | 3 | Text | `New` | |
+| Channel | Position | Kind | Text | Max lines | Max bar height |
+| --- | --- | --- | --- | --- | --- |
+| Takealot | 1 | Title | | 2 | |
+| | 2 | Barcode | | | 13 mm |
+| | 3 | Stacked text | `MP` | | |
+| Amazon | 1 | Barcode | | | |
+| | 2 | Title | | 2 | |
+| | 3 | Text | `New` | | |
+
+Font size, padding and alignment are left empty on both — the derived sizes are
+what you want unless a particular label needs overruling.
 
 ## Known gaps
 
@@ -338,6 +381,9 @@ The two shapes in use, as rows:
   chore. Any further channel's codes are still entered one product-channel pair
   at a time; a bulk path for it is a fetcher feeding the shared
   `channelCodeSync` core, as both syncs do.
+- **Padding is below only.** There is no padding above an element; put it below
+  the element before instead. With three or four rows that covers everything
+  except space above the first element, which is what the 3 mm top margin is.
 - **Element order is a number you type.** Re-ordering a label means editing
   `position` on two rows; there is no drag handle, because the Console's list
   tools do not offer one. With three or four rows per channel that is a

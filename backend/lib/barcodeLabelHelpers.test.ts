@@ -1,5 +1,10 @@
 import { test, expect, describe } from 'vitest';
-import { BarcodeSymbology, LabelElementKind, LabelStockSize } from '@teamkeel/sdk';
+import {
+    BarcodeSymbology,
+    LabelElementKind,
+    LabelStockSize,
+    LabelTextAlign,
+} from '@teamkeel/sdk';
 import {
     computeEan13CheckDigit,
     checkCode,
@@ -398,7 +403,31 @@ describe('computeLayout — Takealot shape (product name over an EAN-13)', () =>
     test('keeps the stacked marker clear of the left quiet zone', () => {
         const layout = computeLayout(takealotFormat, TAKEALOT_CODE);
         const quietZoneStart = layout.symbolXDots - EAN13_QUIET_LEFT_MODULES * layout.moduleDots;
-        expect(quietZoneStart).toBeGreaterThanOrEqual(8 + layout.textFontDots);
+        // The column reserves a whole character cell, which is what `^A0N,f,f`
+        // declares and therefore what no glyph can exceed. Estimating it from
+        // an average letter width would not put ink somewhere untidy, it would
+        // put ink in the quiet zone and stop the label scanning.
+        expect(quietZoneStart).toBeGreaterThanOrEqual(8 + layout.stackedFontDots);
+    });
+
+    test('sets the marker larger than the body text and snug against the symbol', () => {
+        const layout = computeLayout(takealotFormat, TAKEALOT_CODE);
+        expect(layout.stackedFontDots).toBeGreaterThan(layout.textFontDots);
+
+        // Snug: the symbol is pushed against the marker column rather than
+        // centred in what is left, so the only white between them is the 2-dot
+        // pad and the symbology's own mandatory quiet zone.
+        const quietZoneStart = layout.symbolXDots - EAN13_QUIET_LEFT_MODULES * layout.moduleDots;
+        expect(quietZoneStart).toBe(8 + layout.stackedFontDots + 2);
+
+        // A label with no marker still centres its symbol.
+        const plain = computeLayout(
+            { ...takealotFormat, elements: [takealotElements[0], takealotElements[1]] },
+            TAKEALOT_CODE
+        );
+        expect(plain.symbolXDots).toBeGreaterThan(
+            8 + EAN13_QUIET_LEFT_MODULES * plain.moduleDots
+        );
     });
 
     test('the extra 5mm of a 30mm roll goes to the bars, not the title', () => {
@@ -545,6 +574,120 @@ describe('computeLayout — text shrinks to fit before the bars are sacrificed',
     });
 });
 
+describe('computeLayout — the barcode can be capped to leave white space', () => {
+    const capped = (mm: number): LabelFormat => ({
+        ...takealotFormat,
+        elements: [
+            takealotElements[0],
+            { kind: LabelElementKind.Barcode, maxHeightMm: mm },
+            takealotElements[2],
+        ],
+    });
+
+    test('caps the bars and drops the difference to the foot of the label', () => {
+        const uncapped = computeLayout(takealotFormat, TAKEALOT_CODE);
+        const layout = computeLayout(capped(13), TAKEALOT_CODE);
+
+        expect(uncapped.barHeightMm).toBeGreaterThan(13);
+        expect(layout.barHeightMm).toBeCloseTo(13, 1);
+        expect(uncapped.slackDots).toBe(0);
+        expect(layout.slackDots).toBe(uncapped.barHeightDots - layout.barHeightDots);
+        // The white space is at the bottom, not a gap mid-stack: everything
+        // above the barcode is exactly where it was.
+        expect(layout.placements[0].yDots).toBe(uncapped.placements[0].yDots);
+    });
+
+    test('a cap above what the label leaves changes nothing', () => {
+        const uncapped = computeLayout(takealotFormat, TAKEALOT_CODE);
+        expect(computeLayout(capped(40), TAKEALOT_CODE).barHeightDots).toBe(
+            uncapped.barHeightDots
+        );
+        expect(computeLayout(capped(0), TAKEALOT_CODE).barHeightDots).toBe(
+            uncapped.barHeightDots
+        );
+    });
+
+    test('a cap below the minimum is reported, not silently honoured as fine', () => {
+        const layout = computeLayout(capped(4), TAKEALOT_CODE);
+        expect(layout.barHeightWithinTolerance).toBe(false);
+        // And it does not send the fit search shrinking text that would not
+        // help — the height was given away deliberately, not run out of.
+        expect(layout.titleFontDots).toBe(computeLayout(takealotFormat, TAKEALOT_CODE).titleFontDots);
+    });
+});
+
+describe('computeLayout — per-element font, padding and alignment', () => {
+    const withOverride = (overrides: Partial<LabelElement>): LabelFormat => ({
+        ...amazonFormat,
+        elements: [
+            amazonElements[0],
+            { ...amazonElements[1], ...overrides },
+            amazonElements[2],
+        ],
+    });
+
+    test('an explicit font size overrules the derived one', () => {
+        const layout = computeLayout(withOverride({ fontSizeMm: 4 }), FNSKU);
+        const title = layout.placements.find((p) => p.kind === LabelElementKind.Title)!;
+        expect(title.fontDots).toBe(mmToDots(4, 203));
+        // Only that element — the condition still takes the derived size.
+        const condition = layout.placements.find((p) => p.kind === LabelElementKind.Text)!;
+        expect(condition.fontDots).toBe(layout.textFontDots);
+    });
+
+    test('a bigger explicit size comes out of the barcode', () => {
+        const plain = computeLayout(amazonFormat, FNSKU);
+        const big = computeLayout(withOverride({ fontSizeMm: 5 }), FNSKU);
+        expect(big.barHeightDots).toBeLessThan(plain.barHeightDots);
+    });
+
+    test('an explicit size is never shrunk by the fit search', () => {
+        // Crowded enough that the derived sizes would be driven to their floor.
+        const crowded: LabelFormat = {
+            ...amazonFormat,
+            stock: LABEL_STOCKS[LabelStockSize.Size50x25],
+            elements: [
+                { kind: LabelElementKind.Barcode },
+                { kind: LabelElementKind.Title, maxLines: 2, fontSizeMm: 3 },
+                ...Array.from({ length: 6 }, (_, i) => text(`Line ${i + 1}`)),
+            ],
+        };
+        const layout = computeLayout(crowded, FNSKU);
+        const title = layout.placements.find((p) => p.kind === LabelElementKind.Title)!;
+        expect(title.fontDots).toBe(mmToDots(3, 203));
+        expect(layout.textFontDots).toBe(12); // the derived one did shrink
+    });
+
+    test('padding comes out of the barcode, below the element that sets it', () => {
+        const plain = computeLayout(amazonFormat, FNSKU);
+        const padded = computeLayout(withOverride({ paddingMm: 2 }), FNSKU);
+        const padDots = mmToDots(2, 203);
+
+        // The barcode is what pays for it, being the flexible element.
+        expect(plain.barHeightDots - padded.barHeightDots).toBe(padDots);
+        // Which leaves the padded element's own block that much taller, the
+        // gap opening below it rather than above.
+        expect(padded.placements[1].heightDots - plain.placements[1].heightDots).toBe(padDots);
+        // And everything after it lands exactly where it did before.
+        expect(padded.placements[2].yDots).toBe(plain.placements[2].yDots);
+    });
+
+    test('a nonsensical font size is clamped rather than emitted', () => {
+        const huge = computeLayout(withOverride({ fontSizeMm: 500 }), FNSKU);
+        const title = huge.placements.find((p) => p.kind === LabelElementKind.Title)!;
+        expect(title.fontDots).toBeLessThanOrEqual(huge.heightDots);
+    });
+
+    test('alignment defaults to left and is carried through', () => {
+        expect(computeLayout(amazonFormat, FNSKU).placements[2].align).toBe(LabelTextAlign.Left);
+        const centred = computeLayout(
+            { ...amazonFormat, elements: [amazonElements[0], amazonElements[1], { ...amazonElements[2], align: LabelTextAlign.Centre }] },
+            FNSKU
+        );
+        expect(centred.placements[2].align).toBe(LabelTextAlign.Centre);
+    });
+});
+
 describe('computeLayout — fits every stock and symbology', () => {
     const cases: Array<[string, LabelFormat, string]> = [];
     for (const size of Object.keys(LABEL_STOCKS) as LabelStockSize[]) {
@@ -685,6 +828,66 @@ describe('buildLabelZpl', () => {
 
         const takealot = buildLabelZpl({ code: TAKEALOT_CODE, title: 'Widget', quantity: 1 }, takealotFormat);
         expect(takealot.indexOf('^FDWidget^FS')).toBeLessThan(takealot.indexOf('^BEN'));
+    });
+
+    test('sets each element at its own size, and the marker larger still', () => {
+        const zpl = buildLabelZpl(
+            { code: FNSKU, title: 'Widget', quantity: 1 },
+            {
+                ...amazonFormat,
+                elements: [
+                    amazonElements[0],
+                    { ...amazonElements[1], fontSizeMm: 4 },
+                    amazonElements[2],
+                ],
+            }
+        );
+        const titleDots = mmToDots(4, 203);
+        expect(zpl).toContain(`^A0N,${titleDots},${titleDots}`);
+        // The condition keeps the derived size.
+        const layout = computeLayout(amazonFormat, FNSKU);
+        expect(zpl).toContain(`^A0N,${layout.textFontDots},${layout.textFontDots}`);
+    });
+
+    test('pins the interpretation line to the barcode element\u2019s size', () => {
+        const zpl = buildLabelZpl(
+            { code: FNSKU, title: 'W', quantity: 1 },
+            {
+                ...amazonFormat,
+                elements: [
+                    { kind: LabelElementKind.Barcode, fontSizeMm: 3 },
+                    amazonElements[1],
+                    amazonElements[2],
+                ],
+            }
+        );
+        // ^CF is what the printer draws the interpretation line with, so it has
+        // to carry the barcode's own size, not the label's body size.
+        expect(zpl).toContain(`^CF0,${mmToDots(3, 203)}`);
+    });
+
+    test('steps the stacked characters down by their own font size', () => {
+        const zpl = buildLabelZpl({ code: TAKEALOT_CODE, title: 'W', quantity: 1 }, takealotFormat);
+        const layout = computeLayout(takealotFormat, TAKEALOT_CODE);
+        expect(zpl).toContain(`^FO8,${layout.barcodeYDots}\n^A0N,${layout.stackedFontDots},${layout.stackedFontDots}\n^FDM^FS`);
+        expect(zpl).toContain(`^FO8,${layout.barcodeYDots + layout.stackedFontDots}`);
+    });
+
+    test('carries alignment into ^FB', () => {
+        const zpl = buildLabelZpl(
+            { code: FNSKU, title: 'W', quantity: 1 },
+            {
+                ...amazonFormat,
+                elements: [
+                    amazonElements[0],
+                    amazonElements[1],
+                    { ...amazonElements[2], align: LabelTextAlign.Centre },
+                ],
+            }
+        );
+        expect(zpl).toMatch(/\^FB\d+,1,0,C,0\n\^FDNew\^FS/);
+        // The title is still left, since only the condition was changed.
+        expect(zpl).toMatch(/\^FB\d+,2,2,L,0/);
     });
 
     test('asks for the interpretation line below the bars, not above', () => {
