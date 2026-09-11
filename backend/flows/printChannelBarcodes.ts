@@ -354,9 +354,10 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
                               description:
                                   `What the label’s other elements leave the bars is ` +
                                   `${worst.barHeightMm.toFixed(1)}mm, under the ${MIN_BAR_HEIGHT_MM}mm ` +
-                                  'a unit label should carry. Remove an element, drop the product name ' +
-                                  'to one line, or move this channel to a taller roll — under ' +
-                                  'Products → Barcode labels → Label specs.',
+                                  'a unit label should carry. Raise or clear the barcode element’s ' +
+                                  'height cap, remove an element, drop the product name to one line, ' +
+                                  'or move this channel to a taller roll — under Products → ' +
+                                  'Barcode labels → Label specs.',
                               mode: 'warning',
                           }),
                       ]),

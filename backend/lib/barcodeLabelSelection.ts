@@ -62,7 +62,15 @@ export async function loadPrintableChannels(): Promise<PrintableChannel[]> {
         // unique, so two rows can legitimately share one.
         .sort((a, b) => a.position - b.position || a.createdAt.getTime() - b.createdAt.getTime())) {
         const list = elementsBySpec.get(row.specId) ?? [];
-        list.push({ kind: row.kind, text: row.text, maxLines: row.maxLines });
+        list.push({
+            kind: row.kind,
+            text: row.text,
+            maxLines: row.maxLines,
+            maxHeightMm: row.maxHeightMm,
+            fontSizeMm: row.fontSizeMm,
+            paddingMm: row.paddingMm,
+            align: row.align,
+        });
         elementsBySpec.set(row.specId, list);
     }
 
