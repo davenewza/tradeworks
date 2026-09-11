@@ -87,6 +87,17 @@ right, so it is still synced. Amazon's own New variants (`NewItem`,
   validation still applies: a code Code 128 cannot encode drops out of the print
   picker with a banner.
 
+## The shipment sync also sets codes
+
+Amazon's **inbound shipment** lines carry the FNSKU of the units actually going
+into the fulfilment centre, so
+[Sync channel shipments](channel-shipments.md#label-codes-stated-on-a-line) sets
+the matched products' Amazon codes from them as it goes — a consignment can be
+labelled without running this sync first. It applies the same rules (matched by
+SKU, only this channel's rows, an ASIN-as-FNSKU refused, nothing ever deleted),
+on the same shared core, but it only ever sees the SKUs on those consignments.
+This sync remains the way to cover the **whole catalogue**.
+
 ## Why there is no per-product subscriber
 
 Takealot codes are also synced one product at a time, on product create or SKU
@@ -121,7 +132,8 @@ exists, *Print barcodes* offers Amazon alongside Takealot.
 | `AMAZON_LWA_REFRESH_TOKEN` | Secret. The refresh token from self-authorising the app. |
 
 The app is created in Seller Central under **Apps & Services → Develop Apps**;
-its roles must include the FBA Inventory API (the *Amazon Fulfillment* role).
+its roles must include the FBA Inventory API (the *Amazon Fulfillment* role,
+which also covers the Fulfillment Inbound API the shipment sync reads).
 Self-authorising it there produces the refresh token. Set the two secrets per
 environment with `keel secrets set`; without them the flow fails loudly on its
 first fetch. Rotating the client secret in Developer Central invalidates the old
@@ -132,6 +144,7 @@ one, so coordinate before regenerating.
 | File | Role |
 | --- | --- |
 | `schemas/labels.keel` | The `SyncAmazonFnskus` flow declaration (next to `ProductChannelCode`). |
-| `lib/amazonFnskuHelpers.ts` | LWA token exchange, the paged FBA Inventory fetch with pacing and throttle retries, the Amazon-specific plan (manufacturer-barcode and condition notes), the label-spec check. |
+| `lib/amazonFnskuHelpers.ts` | The paged FBA Inventory fetch, the Amazon-specific plan (manufacturer-barcode and condition notes), the label-spec check. |
+| `lib/amazonApi.ts` | The LWA token exchange and the paced, throttle-aware GET, shared with the inbound shipment sync. |
 | `lib/channelCodeSync.ts` | The plan/apply pair shared with the Takealot barcode sync. |
 | `flows/syncAmazonFnskus.ts` | UI orchestration only: confirm → review changes → apply. |

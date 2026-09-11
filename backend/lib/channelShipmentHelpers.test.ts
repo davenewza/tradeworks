@@ -6,7 +6,7 @@ import {
     ExternalShipmentItem,
     applyShipmentSync,
     computeShipmentSyncPlan,
-    openShipmentExternalIds,
+    openShipmentRefs,
 } from './channelShipmentHelpers';
 import { TAKEALOT_CHANNEL_NAME } from './zohoChannelFeeHelpers';
 
@@ -22,6 +22,8 @@ function line(overrides: Partial<ExternalShipmentItem> = {}): ExternalShipmentIt
         quantityRequired: 40,
         quantitySending: 30,
         cancelled: false,
+        labelledByChannel: false,
+        code: null,
         ...overrides,
     };
 }
@@ -29,6 +31,7 @@ function line(overrides: Partial<ExternalShipmentItem> = {}): ExternalShipmentIt
 function external(overrides: Partial<ExternalShipment> = {}): ExternalShipment {
     return {
         externalId: '5001',
+        externalGroupId: null,
         reference: 'JHB-2026-08',
         status: ChannelShipmentStatus.Open,
         statusDescription: 'Awaiting delivery',
@@ -178,11 +181,11 @@ describe('computeShipmentSyncPlan', () => {
     });
 });
 
-// ─── openShipmentExternalIds ────────────────────────────────────────────────
+// ─── openShipmentRefs ───────────────────────────────────────────────────────
 
-describe('openShipmentExternalIds', () => {
+describe('openShipmentRefs', () => {
     test('returns nothing when the channel has never been synced', async () => {
-        expect(await openShipmentExternalIds(TAKEALOT_CHANNEL_NAME)).toEqual([]);
+        expect(await openShipmentRefs(TAKEALOT_CHANNEL_NAME)).toEqual([]);
     });
 
     test('lists consignments that have not finished, so they keep being refreshed', async () => {
@@ -194,11 +197,20 @@ describe('openShipmentExternalIds', () => {
             external({ externalId: '4', status: ChannelShipmentStatus.Cancelled }),
         ]);
 
-        const ids = (await openShipmentExternalIds(TAKEALOT_CHANNEL_NAME)).sort();
+        const refs = await openShipmentRefs(TAKEALOT_CHANNEL_NAME);
 
         // Open and Shipped still move; Received and Cancelled are terminal and
         // drop out, so they stop costing a lookup on every sync.
-        expect(ids).toEqual(['1', '2']);
+        expect(refs.map((r) => r.externalId).sort()).toEqual(['1', '2']);
+    });
+
+    test('carries the group id, without which a nested consignment cannot be re-fetched', async () => {
+        await createProduct('ACME-001');
+        await sync([external({ externalId: 'sh-1', externalGroupId: 'wf-1' })]);
+
+        expect(await openShipmentRefs(TAKEALOT_CHANNEL_NAME)).toEqual([
+            { externalId: 'sh-1', externalGroupId: 'wf-1' },
+        ]);
     });
 
     test('does not leak ids from another channel', async () => {
@@ -206,8 +218,10 @@ describe('openShipmentExternalIds', () => {
         const otherPlan = await computeShipmentSyncPlan('Amazon', [external({ externalId: '9' })]);
         await applyShipmentSync(otherPlan);
 
-        expect(await openShipmentExternalIds(TAKEALOT_CHANNEL_NAME)).toEqual(['1']);
-        expect(await openShipmentExternalIds('Amazon')).toEqual(['9']);
+        expect((await openShipmentRefs(TAKEALOT_CHANNEL_NAME)).map((r) => r.externalId)).toEqual([
+            '1',
+        ]);
+        expect((await openShipmentRefs('Amazon')).map((r) => r.externalId)).toEqual(['9']);
     });
 });
 
@@ -327,5 +341,148 @@ describe('applyShipmentSync', () => {
         const rows = await models.channelShipment.findMany({ where: { externalId: '5001' } });
         expect(rows).toHaveLength(2);
         expect(new Set(rows.map((r) => r.channelId)).size).toBe(2);
+    });
+});
+
+// ─── Nested consignments ────────────────────────────────────────────────────
+
+describe('externalGroupId', () => {
+    test('is stored, so a platform that nests consignments can re-fetch one', async () => {
+        await createProduct('ACME-001');
+
+        await sync([external({ externalGroupId: 'wf-1' })]);
+
+        expect((await storedShipment()).externalGroupId).toBe('wf-1');
+    });
+
+    test('a consignment moving to another group is a change, not a match', async () => {
+        await createProduct('ACME-001');
+        await sync([external({ externalGroupId: 'wf-1' })]);
+
+        const plan = await computeShipmentSyncPlan(TAKEALOT_CHANNEL_NAME, [
+            external({ externalGroupId: 'wf-2' }),
+        ]);
+
+        expect(plan.changes).toHaveLength(1);
+        expect(plan.changes[0].change).toBe('Update');
+    });
+});
+
+// ─── Lines the channel labels itself ────────────────────────────────────────
+
+describe('labelledByChannel', () => {
+    test('is stored on the line', async () => {
+        await createProduct('ACME-001');
+
+        await sync([external({ items: [line({ labelledByChannel: true })] })]);
+
+        const shipment = await storedShipment();
+        const items = await models.channelShipmentItem.findMany({
+            where: { shipmentId: shipment.id },
+        });
+        expect(items[0].labelledByChannel).toBe(true);
+    });
+
+    test('a line that changes hands is a change, not a match', async () => {
+        await createProduct('ACME-001');
+        await sync([external()]);
+
+        // Switching a listing to Amazon-applied labels mid-consignment has to
+        // land, or a print run would keep offering labels nobody wants.
+        const plan = await computeShipmentSyncPlan(TAKEALOT_CHANNEL_NAME, [
+            external({ items: [line({ labelledByChannel: true })] }),
+        ]);
+
+        expect(plan.changes).toHaveLength(1);
+    });
+});
+
+// ─── Label codes stated on the lines ────────────────────────────────────────
+
+describe('codes stated by a consignment', () => {
+    async function storedCode(sku: string) {
+        const products = await models.product.findMany({ where: { sku } });
+        const codes = await models.productChannelCode.findMany({
+            where: { productId: products[0].id },
+        });
+        return codes.length > 0 ? codes[0].code : null;
+    }
+
+    test('a code on a line becomes the matched product’s channel code', async () => {
+        await createProduct('ACME-001');
+
+        const { result } = await sync([external({ items: [line({ code: 'X001ACME01' })] })]);
+
+        expect(result.codesCreated).toBe(1);
+        expect(await storedCode('ACME-001')).toBe('X001ACME01');
+    });
+
+    test('a code that has drifted is fixed even when no consignment moved', async () => {
+        await createProduct('ACME-001');
+        await sync([external({ items: [line({ code: 'X001OLD000' })] })]);
+
+        // The consignment itself is identical; only the code Amazon states has
+        // changed, and that is still worth applying before anything is printed.
+        const { plan, result } = await sync([external({ items: [line({ code: 'X001NEW000' })] })]);
+
+        expect(plan.changes).toHaveLength(0);
+        expect(plan.codePlan.changes).toHaveLength(1);
+        expect(result.codesUpdated).toBe(1);
+        expect(await storedCode('ACME-001')).toBe('X001NEW000');
+    });
+
+    test('a channel that states no codes writes none', async () => {
+        await createProduct('ACME-001');
+
+        const { plan, result } = await sync([external()]);
+
+        expect(plan.codePlan.changes).toEqual([]);
+        expect(result.codesCreated + result.codesUpdated).toBe(0);
+        expect(await storedCode('ACME-001')).toBeNull();
+    });
+
+    test('one SKU across several consignments is not a duplicate to warn about', async () => {
+        await createProduct('ACME-001');
+
+        const { plan } = await sync([
+            external({ externalId: '1', items: [line({ code: 'X001ACME01' })] }),
+            external({ externalId: '2', items: [line({ code: 'X001ACME01' })] }),
+        ]);
+
+        // Ordinary — the same product goes into more than one consignment.
+        expect(plan.warnings).toEqual([]);
+        expect(plan.codePlan.changes).toHaveLength(1);
+    });
+
+    test('consignments that disagree about a code warn, and the most recent wins', async () => {
+        await createProduct('ACME-001');
+
+        // Newest first, the order an adapter returns them in: taking them as
+        // they come would let the older consignment overwrite the newer code.
+        const { plan } = await sync([
+            external({
+                externalId: '2',
+                placedAt: '2026-09-01T00:00:00.000Z',
+                items: [line({ code: 'X001NEW000' })],
+            }),
+            external({
+                externalId: '1',
+                placedAt: '2026-06-01T00:00:00.000Z',
+                items: [line({ code: 'X001OLD000' })],
+            }),
+        ]);
+
+        expect(plan.warnings).toEqual([
+            'Consignments disagree on the label code for ACME-001 — using the most recent one (X001NEW000)',
+        ]);
+        expect(await storedCode('ACME-001')).toBe('X001NEW000');
+    });
+
+    test('a code on a line that matches no product writes nothing', async () => {
+        const { result } = await sync([
+            external({ items: [line({ sku: 'NOT-IN-CATALOGUE', code: 'X001ACME01' })] }),
+        ]);
+
+        expect(result.codesCreated + result.codesUpdated).toBe(0);
     });
 });

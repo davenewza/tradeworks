@@ -67,6 +67,7 @@ async function addLine(
         quantitySending?: number;
         quantityRequired?: number;
         cancelled?: boolean;
+        labelledByChannel?: boolean;
     } = {}
 ) {
     return await models.channelShipmentItem.create({
@@ -78,6 +79,7 @@ async function addLine(
         quantitySending: fields.quantitySending ?? 0,
         quantityRequired: fields.quantityRequired ?? 0,
         cancelled: fields.cancelled ?? false,
+        labelledByChannel: fields.labelledByChannel ?? false,
     });
 }
 
@@ -160,6 +162,42 @@ describe('loadShipmentLabelCandidates', () => {
         // Not a problem to fix — just not being sent — so it is counted, not listed.
         expect(load.cancelledLines).toBe(1);
         expect(load.unprintable).toEqual([]);
+    });
+
+    test('excludes lines the channel labels itself and counts them', async () => {
+        const { channel, brand, shipment } = await setup();
+        const widget = await addProduct(brand.id, 'ACME-001', 'Widget', channel.id, EAN_A);
+        await addLine(shipment.id, '91', {
+            productId: widget.id,
+            sku: 'ACME-001',
+            quantitySending: 30,
+            labelledByChannel: true,
+        });
+
+        const load = (await loadShipmentLabelCandidates(shipment.id))!;
+
+        // Amazon applies the label itself, or the units carry the
+        // manufacturer's barcode — nothing for us to print either way.
+        expect(load.candidates).toEqual([]);
+        expect(load.channelLabelledLines).toBe(1);
+        expect(load.unprintable).toEqual([]);
+    });
+
+    test('a line the channel labels is not reported as missing a code', async () => {
+        const { channel, brand, shipment } = await setup();
+        // A manufacturer-barcode listing deliberately has no code stored.
+        const widget = await addProduct(brand.id, 'ACME-001', 'Widget', channel.id);
+        await addLine(shipment.id, '91', {
+            productId: widget.id,
+            sku: 'ACME-001',
+            quantitySending: 30,
+            labelledByChannel: true,
+        });
+
+        const load = (await loadShipmentLabelCandidates(shipment.id))!;
+
+        expect(load.unprintable).toEqual([]);
+        expect(load.channelLabelledLines).toBe(1);
     });
 
     test('reports an unmatched line by its SKU, or by its listing when there is none', async () => {
