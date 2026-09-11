@@ -108,12 +108,32 @@
             "hidden": false
           },
           {
+            "id": "action-sync-amazon-fnskus",
+            "link": {
+              "tool_id": "sync-amazon-fnskus",
+              "title": "Sync Amazon FNSKUs",
+              "description": "Pull each FBA listing’s FNSKU from the Selling Partner API",
+              "display_order": 1
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-sync-takealot-barcodes",
+            "link": {
+              "tool_id": "sync-takealot-barcodes",
+              "title": "Sync Takealot barcodes",
+              "description": "Pull each offer’s label barcode from the Marketplace API",
+              "display_order": 2
+            },
+            "hidden": false
+          },
+          {
             "id": "action-list-channel-label-specs",
             "link": {
               "tool_id": "list-channel-label-specs",
               "title": "Label specs",
               "description": "How each channel’s label is built — symbology, annotation, stock",
-              "display_order": 1
+              "display_order": 3
             },
             "hidden": false
           },
@@ -123,7 +143,7 @@
               "tool_id": "create-channel-label-spec",
               "title": "Add a label spec",
               "description": "Make a channel printable — symbology, annotation, label stock",
-              "display_order": 2
+              "display_order": 4
             },
             "hidden": false
           }

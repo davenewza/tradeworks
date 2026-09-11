@@ -6,9 +6,9 @@ import {
     fetchOfferBySku,
     fetchAllOffers,
     computeBarcodeSyncPlan,
-    applyBarcodeSync,
     syncProductBarcodeFromTakealot,
 } from './takealotOfferHelpers';
+import { applyChannelCodeSync } from './channelCodeSync';
 import { TAKEALOT_CHANNEL_NAME } from './zohoChannelFeeHelpers';
 
 beforeEach(resetDatabase);
@@ -124,7 +124,7 @@ describe('computeBarcodeSyncPlan', () => {
             {
                 sku: 'SKU-1',
                 product: product.name,
-                barcode: '6001234567893',
+                code: '6001234567893',
                 replaces: '',
                 change: 'New',
                 productId: product.id,
@@ -141,7 +141,7 @@ describe('computeBarcodeSyncPlan', () => {
         const plan = await computeBarcodeSyncPlan([offer('SKU-1', '6001234567893')]);
 
         expect(plan.changes).toHaveLength(1);
-        expect(plan.changes[0]).toMatchObject({ change: 'Update', barcode: '6001234567893', replaces: 'OLD-CODE' });
+        expect(plan.changes[0]).toMatchObject({ change: 'Update', code: '6001234567893', replaces: 'OLD-CODE' });
     });
 
     test('counts a matching stored code as unchanged', async () => {
@@ -170,7 +170,7 @@ describe('computeBarcodeSyncPlan', () => {
         const plan = await computeBarcodeSyncPlan([offer('UNKNOWN', '6001234567893')]);
 
         expect(plan.changes).toHaveLength(0);
-        expect(plan.offersWithoutProduct).toEqual(['UNKNOWN']);
+        expect(plan.skusWithoutProduct).toEqual(['UNKNOWN']);
     });
 
     test('leaves the stored code alone when the offer has no label barcode, and surfaces it', async () => {
@@ -181,7 +181,7 @@ describe('computeBarcodeSyncPlan', () => {
         const plan = await computeBarcodeSyncPlan([mptalOffer('SKU-1', ''), offer('SKU-1', null)]);
 
         expect(plan.changes).toHaveLength(0);
-        expect(plan.offersWithoutBarcode).toEqual(['SKU-1']);
+        expect(plan.skusWithoutCode).toEqual(['SKU-1']);
         const rows = await codesForProduct(product.id);
         expect(rows.map((r) => r.code)).toEqual(['KEEP-ME']);
     });
@@ -192,7 +192,7 @@ describe('computeBarcodeSyncPlan', () => {
         const plan = await computeBarcodeSyncPlan([mptalOffer('SKU-1', '9901043896425')]);
 
         expect(plan.changes).toHaveLength(1);
-        expect(plan.changes[0]).toMatchObject({ productId: product.id, barcode: '9901043896425' });
+        expect(plan.changes[0]).toMatchObject({ productId: product.id, code: '9901043896425' });
     });
 
     test('a stored MPTAL placeholder is planned for replacement by the label barcode', async () => {
@@ -205,7 +205,7 @@ describe('computeBarcodeSyncPlan', () => {
         expect(plan.changes).toHaveLength(1);
         expect(plan.changes[0]).toMatchObject({
             change: 'Update',
-            barcode: '9901043896425',
+            code: '9901043896425',
             replaces: 'MPTAL75747951',
         });
     });
@@ -217,7 +217,7 @@ describe('computeBarcodeSyncPlan', () => {
 
         expect(plan.warnings).toEqual(['Duplicate SKU on Takealot: SKU-1 — using the last occurrence']);
         expect(plan.changes).toHaveLength(1);
-        expect(plan.changes[0]).toMatchObject({ productId: product.id, barcode: '2222222222222' });
+        expect(plan.changes[0]).toMatchObject({ productId: product.id, code: '2222222222222' });
     });
 
     test('lists enabled products with no offer, leaving disabled ones out', async () => {
@@ -227,18 +227,18 @@ describe('computeBarcodeSyncPlan', () => {
 
         const plan = await computeBarcodeSyncPlan([offer('ON-TAKEALOT', '6001234567893')]);
 
-        expect(plan.productsWithoutOffer).toEqual(['NOT-LISTED']);
+        expect(plan.productsWithoutSource).toEqual(['NOT-LISTED']);
     });
 });
 
-// ─── applyBarcodeSync ───────────────────────────────────────────────────────
+// ─── applyChannelCodeSync, fed by a Takealot plan ───────────────────────────
 
-describe('applyBarcodeSync', () => {
+describe('applyChannelCodeSync', () => {
     test('creates the channel and codes, and a re-run plans nothing further', async () => {
         const product = await createProduct('SKU-1');
         const offers = [offer('SKU-1', '6001234567893')];
 
-        const result = await applyBarcodeSync(await computeBarcodeSyncPlan(offers));
+        const result = await applyChannelCodeSync(await computeBarcodeSyncPlan(offers));
 
         expect(result).toEqual({ created: 1, updated: 0 });
         const channels = await models.channel.findMany({ where: { name: { equals: TAKEALOT_CHANNEL_NAME } } });
@@ -258,7 +258,7 @@ describe('applyBarcodeSync', () => {
         const channel = await createTakealotChannel();
         await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'OLD-CODE' });
 
-        const result = await applyBarcodeSync(await computeBarcodeSyncPlan([offer('SKU-1', '6001234567893')]));
+        const result = await applyChannelCodeSync(await computeBarcodeSyncPlan([offer('SKU-1', '6001234567893')]));
 
         expect(result).toEqual({ created: 0, updated: 1 });
         const rows = await codesForProduct(product.id);
@@ -270,8 +270,8 @@ describe('applyBarcodeSync', () => {
         const product = await createProduct('SKU-1');
         const plan = await computeBarcodeSyncPlan([offer('SKU-1', '6001234567893')]);
 
-        await applyBarcodeSync(plan);
-        const rerun = await applyBarcodeSync(plan);
+        await applyChannelCodeSync(plan);
+        const rerun = await applyChannelCodeSync(plan);
 
         expect(rerun).toEqual({ created: 0, updated: 1 });
         expect(await codesForProduct(product.id)).toHaveLength(1);
