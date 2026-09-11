@@ -5,10 +5,12 @@ import {
     LabelCandidate,
     LabelFormat,
     LabelQuantityRow,
+    MIN_BAR_HEIGHT_MM,
     buildBatchZpl,
     buildQuantityRows,
     buildShipmentQuantityRows,
     computeLayout,
+    describeElements,
 } from '../lib/barcodeLabelHelpers';
 import {
     PrintableChannel,
@@ -243,8 +245,7 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
     // channel is set up, not something to re-confirm on every run.
     const format: LabelFormat = {
         symbology: channel.symbology,
-        annotation: channel.annotation,
-        annotationPlacement: channel.annotationPlacement,
+        elements: channel.elements,
         stock: LABEL_STOCKS[channel.defaultStock],
     };
 
@@ -332,6 +333,7 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
             stage: 'print',
             title: `Print ${totalLabels} label(s)`,
             content: [
+                ...elementsBanner(ctx, channel),
                 ...(worst.withinTolerance
                     ? []
                     : [
@@ -344,11 +346,25 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
                               mode: 'warning',
                           }),
                       ]),
+                ...(worst.barHeightWithinTolerance
+                    ? []
+                    : [
+                          ctx.ui.display.banner({
+                              title: 'Barcode is shorter than it should be on this label',
+                              description:
+                                  `What the label’s other elements leave the bars is ` +
+                                  `${worst.barHeightMm.toFixed(1)}mm, under the ${MIN_BAR_HEIGHT_MM}mm ` +
+                                  'a unit label should carry. Remove an element, drop the product name ' +
+                                  'to one line, or move this channel to a taller roll — under ' +
+                                  'Products → Barcode labels → Label specs.',
+                              mode: 'warning',
+                          }),
+                      ]),
                 ctx.ui.display.keyValue({
                     data: [
                         { key: 'Channel', value: channel.channelName },
                         { key: 'Symbology', value: channel.symbology === 'Ean13' ? 'EAN-13' : 'Code 128' },
-                        ...(channel.annotation ? [{ key: 'Annotation', value: channel.annotation }] : []),
+                        { key: 'Label layout', value: describeElements(channel.elements) },
                         { key: 'Products', value: printing.length },
                         { key: 'Labels in total', value: totalLabels },
                         { key: 'Label stock', value: format.stock.label },
@@ -402,8 +418,9 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
 // printable until a spec says how the label is built.
 const NO_SPEC_DESCRIPTION =
     'Add a channel label spec first — Products → Barcode labels → Add a label spec. ' +
-    'Pick the channel, its symbology (EAN-13 for Takealot, Code 128 for Amazon FNSKU), ' +
-    'the fixed annotation, and the label stock.';
+    'Pick the channel, its symbology (EAN-13 for Takealot, Code 128 for Amazon FNSKU) ' +
+    'and the label stock, then add the elements that go on the label — the barcode, ' +
+    'the product name, and any fixed text such as Amazon’s item condition.';
 
 // ctx.complete always renders as a success, tick and all, so a run that stopped
 // because something is missing has to say so in the body — otherwise "nothing
@@ -415,6 +432,27 @@ function noSpecBanner(ctx: any) {
             description:
                 'Product codes are synced separately from the label spec, so a channel can ' +
                 'carry a code for every product and still not be printable.',
+            mode: 'warning',
+        }),
+    ];
+}
+
+// A channel printing the fallback layout, or carrying element rows that do not
+// make a label, still prints — but silently plain labels are worse than plain
+// ones you were told about, so the print page says which and why.
+function elementsBanner(ctx: any, channel: PrintableChannel) {
+    if (!channel.usingDefaultElements) return [];
+    const why =
+        channel.elementProblems.length > 0
+            ? `Its own elements cannot be used: ${channel.elementProblems.join('; ')}. `
+            : 'It has no label elements yet. ';
+    return [
+        ctx.ui.display.banner({
+            title: `${channel.channelName} is printing the default label`,
+            description:
+                `${why}These labels carry the product name over the barcode and nothing else — ` +
+                'no item condition, no stacked marker. Add or fix the elements under Products → ' +
+                'Barcode labels → Label specs → the channel.',
             mode: 'warning',
         }),
     ];

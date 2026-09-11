@@ -1,0 +1,24 @@
+{
+  "id": "create-channel-label-element",
+  "action_name": "createChannelLabelElement",
+  "name": "Add a label element",
+  "icon": "emoji:➕",
+  "title": "Add a line to this channel's label",
+  "help_text": "Elements print top to bottom in position order. Takealot: Title (1), Barcode (2), Stacked text \"MP\" (3). Amazon FBA: Barcode (1), Title (2), Text \"New\" (3) — Amazon requires the item condition at the bottom of every unit label. Text is only used by Text and Stacked text; max lines only by Title. Adding elements shortens the barcode, and the print page warns if the bars end up under 6.35 mm.",
+  "inputs": {
+    "$.spec.id": { "display_name": "Label spec", "display_order": 1 },
+    "$.position": { "display_name": "Position", "display_order": 2 },
+    "$.kind": { "display_name": "Element", "display_order": 3 },
+    "$.text": { "display_name": "Text", "display_order": 4 },
+    "$.maxLines": { "display_name": "Max lines (title only)", "display_order": 5 }
+  },
+  "response": {
+    "$.specId": {
+      "link": {
+        "tool_id": "get-channel-label-spec",
+        "display_order": 0,
+        "data_mapping": [{ "key": "$.id", "path": { "path": "$.specId" } }]
+      }
+    }
+  }
+}

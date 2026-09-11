@@ -2,13 +2,16 @@
 // barcodeLabelHelpers so the ZPL/geometry logic there stays free of the SDK and
 // testable as plain functions.
 
-import { models, BarcodeSymbology, LabelStockSize, LabelAnnotationPlacement } from '@teamkeel/sdk';
+import { models, BarcodeSymbology, LabelStockSize } from '@teamkeel/sdk';
 import {
     CandidateLoad,
+    DEFAULT_ELEMENTS,
     LabelCandidate,
+    LabelElement,
     ShipmentLabelCandidate,
     UnprintableProduct,
     checkCode,
+    validateElements,
 } from './barcodeLabelHelpers';
 
 // A channel we can print labels for, flattened for the flow's picker.
@@ -17,8 +20,15 @@ export interface PrintableChannel {
     channelId: string;
     channelName: string;
     symbology: BarcodeSymbology;
-    annotation: string | null;
-    annotationPlacement: LabelAnnotationPlacement;
+    // What the label carries, in print order.
+    elements: LabelElement[];
+    // True when the spec has no element rows of its own and is falling back to
+    // DEFAULT_ELEMENTS. Surfaced rather than swallowed: a plain label prints
+    // fine, so nothing else would tell the operator the channel is only
+    // half set up.
+    usingDefaultElements: boolean;
+    // Why the channel's own elements cannot be used as they stand.
+    elementProblems: string[];
     defaultStock: LabelStockSize;
     // How many products already carry a code for this channel — the difference
     // between "ready to print" and "configured but empty" at a glance.
@@ -40,18 +50,42 @@ export async function loadPrintableChannels(): Promise<PrintableChannel[]> {
     const channels = await models.channel.findMany({});
     const channelName = new Map(channels.map((c) => [c.id, c.name]));
 
+    // Every spec's elements in one query, then grouped — one query per spec
+    // would be a handful more round trips for no benefit.
+    const elementRows = await models.channelLabelElement.findMany({
+        where: { specId: { oneOf: specs.map((s) => s.id) } },
+    });
+    const elementsBySpec = new Map<string, LabelElement[]>();
+    for (const row of elementRows
+        .slice()
+        // Position first, creation order as the tie-break — position is not
+        // unique, so two rows can legitimately share one.
+        .sort((a, b) => a.position - b.position || a.createdAt.getTime() - b.createdAt.getTime())) {
+        const list = elementsBySpec.get(row.specId) ?? [];
+        list.push({ kind: row.kind, text: row.text, maxLines: row.maxLines });
+        elementsBySpec.set(row.specId, list);
+    }
+
     const result: PrintableChannel[] = [];
     for (const spec of specs) {
         const codes = await models.productChannelCode.findMany({
             where: { channel: { id: { equals: spec.channelId } } },
         });
+        const own = elementsBySpec.get(spec.id) ?? [];
+        const elementProblems = own.length > 0 ? validateElements(own) : [];
+        // A spec whose own elements do not make a label falls back too, rather
+        // than printing something misshapen; the problems ride along so the
+        // flow can name them.
+        const usable = own.length > 0 && elementProblems.length === 0;
+
         result.push({
             specId: spec.id,
             channelId: spec.channelId,
             channelName: channelName.get(spec.channelId) ?? '—',
             symbology: spec.symbology,
-            annotation: spec.annotation,
-            annotationPlacement: spec.annotationPlacement,
+            elements: usable ? own : DEFAULT_ELEMENTS,
+            usingDefaultElements: !usable,
+            elementProblems,
             defaultStock: spec.defaultStock,
             productsWithCodes: codes.length,
         });

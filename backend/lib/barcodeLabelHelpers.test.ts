@@ -1,8 +1,9 @@
 import { test, expect, describe } from 'vitest';
-import { BarcodeSymbology, LabelStockSize, LabelAnnotationPlacement } from '@teamkeel/sdk';
+import { BarcodeSymbology, LabelElementKind, LabelStockSize } from '@teamkeel/sdk';
 import {
     computeEan13CheckDigit,
     checkCode,
+    describeElements,
     sanitiseZplText,
     totalModulesFor,
     pickModuleWidthDots,
@@ -12,12 +13,16 @@ import {
     buildBatchZpl,
     fitTitle,
     mmToDots,
+    validateElements,
+    DEFAULT_ELEMENTS,
     LABEL_STOCKS,
     LabelCandidate,
+    LabelElement,
     LabelFormat,
     EAN13_TOTAL_MODULES,
     EAN13_QUIET_LEFT_MODULES,
     CODE128_QUIET_MODULES,
+    MIN_BAR_HEIGHT_MM,
     MIN_X_DIMENSION_MM,
 } from './barcodeLabelHelpers';
 
@@ -27,23 +32,39 @@ const TAKEALOT_CODE = '9901043896425';
 // Amazon FNSKUs are 10 alphanumeric characters, conventionally X + 9.
 const FNSKU = 'X001ABCDEF';
 
-// The two shapes in production use.
+// The two shapes in production use, both on the 50 × 30 mm roll the warehouse
+// runs. Takealot: the product name over an EAN-13, "MP" stacked beside the bars.
+const takealotElements: LabelElement[] = [
+    { kind: LabelElementKind.Title, maxLines: 2 },
+    { kind: LabelElementKind.Barcode },
+    { kind: LabelElementKind.StackedText, text: 'MP' },
+];
+// Amazon FBA: the symbol at the top, the FNSKU under its own bars, the product
+// name below that, and the item condition at the very bottom.
+const amazonElements: LabelElement[] = [
+    { kind: LabelElementKind.Barcode },
+    { kind: LabelElementKind.Title, maxLines: 2 },
+    { kind: LabelElementKind.Text, text: 'New' },
+];
+
 const takealotFormat: LabelFormat = {
     symbology: BarcodeSymbology.Ean13,
-    annotation: 'MP',
-    annotationPlacement: LabelAnnotationPlacement.StackedLeft,
-    stock: LABEL_STOCKS[LabelStockSize.Size50x25],
+    elements: takealotElements,
+    stock: LABEL_STOCKS[LabelStockSize.Size50x30],
 };
 const amazonFormat: LabelFormat = {
     symbology: BarcodeSymbology.Code128,
-    annotation: 'New',
-    annotationPlacement: LabelAnnotationPlacement.BelowTitle,
-    stock: LABEL_STOCKS[LabelStockSize.Size67x25],
+    elements: amazonElements,
+    stock: LABEL_STOCKS[LabelStockSize.Size50x30],
 };
 
+const text = (value: string): LabelElement => ({ kind: LabelElementKind.Text, text: value });
+
 describe('fitTitle — the title block is a hard boundary', () => {
-    // The 50 × 30 mm Takealot shape: 384 dots of width at a 26-dot font over two
-    // lines, which works out at 29 characters per line.
+    // The budget that produced the overprint this function exists to prevent:
+    // 384 dots of width at a 26-dot font over two lines, i.e. 29 characters a
+    // line. Fixed here rather than read off a stock, so the regression stays
+    // pinned to the case that was actually printed.
     const WIDTH = 384;
     const FONT = 26;
     const LINES = 2;
@@ -285,13 +306,83 @@ describe('pickModuleWidthDots — tolerance differs by symbology', () => {
     });
 });
 
-describe('computeLayout — Takealot shape (EAN-13, stacked marker)', () => {
-    test('50 × 25 mm prints an in-tolerance symbol', () => {
+describe('validateElements — a label has to be buildable', () => {
+    test('accepts both shapes in production use', () => {
+        expect(validateElements(takealotElements)).toEqual([]);
+        expect(validateElements(amazonElements)).toEqual([]);
+        expect(validateElements(DEFAULT_ELEMENTS)).toEqual([]);
+    });
+
+    test('rejects a label with nothing to scan', () => {
+        expect(validateElements([{ kind: LabelElementKind.Title }])).toEqual([
+            'no barcode element — there would be nothing to scan',
+        ]);
+        expect(validateElements([])).toHaveLength(1);
+    });
+
+    test('rejects duplicates that would print on top of each other', () => {
+        const twoBarcodes = validateElements([
+            { kind: LabelElementKind.Barcode },
+            { kind: LabelElementKind.Barcode },
+        ]);
+        expect(twoBarcodes).toEqual(['2 barcode elements — a label can only carry one']);
+
+        const twoTitles = validateElements([
+            { kind: LabelElementKind.Barcode },
+            { kind: LabelElementKind.Title },
+            { kind: LabelElementKind.Title },
+        ]);
+        expect(twoTitles[0]).toMatch(/more than one title/);
+
+        const twoStacked = validateElements([
+            { kind: LabelElementKind.Barcode },
+            { kind: LabelElementKind.StackedText, text: 'MP' },
+            { kind: LabelElementKind.StackedText, text: 'XX' },
+        ]);
+        expect(twoStacked[0]).toMatch(/more than one stacked text/);
+    });
+
+    test('rejects a text element with nothing in it', () => {
+        // Including text that is nothing but ZPL control characters, which
+        // sanitising leaves empty.
+        for (const value of ['', '   ', '^^^']) {
+            expect(validateElements([{ kind: LabelElementKind.Barcode }, text(value)])).toEqual([
+                'a text element has no text',
+            ]);
+        }
+    });
+
+    test('reports every problem at once rather than the first', () => {
+        expect(validateElements([text(''), { kind: LabelElementKind.Title }, { kind: LabelElementKind.Title }]))
+            .toHaveLength(3);
+    });
+});
+
+describe('describeElements — the print page has to say what it will print', () => {
+    test('reads the label out in print order', () => {
+        expect(describeElements(amazonElements)).toBe('Barcode → Product name → “New”');
+    });
+
+    test('names stacked text separately, since it is beside the bars', () => {
+        expect(describeElements(takealotElements)).toBe('Product name → Barcode, “MP” stacked left');
+    });
+});
+
+describe('computeLayout — Takealot shape (product name over an EAN-13)', () => {
+    test('50 × 30 mm — the warehouse roll — prints an in-spec EAN-13', () => {
         const layout = computeLayout(takealotFormat, TAKEALOT_CODE);
         expect(layout.widthDots).toBe(400);
-        expect(layout.heightDots).toBe(200);
+        expect(layout.heightDots).toBe(240);
         expect(layout.moduleDots).toBe(3);
         expect(layout.withinTolerance).toBe(true);
+        expect(layout.barHeightWithinTolerance).toBe(true);
+    });
+
+    test('puts the product name above the bars', () => {
+        const layout = computeLayout(takealotFormat, TAKEALOT_CODE);
+        const title = layout.placements.find((p) => p.kind === LabelElementKind.Title)!;
+        expect(title.yDots).toBeLessThan(layout.barcodeYDots);
+        expect(title.lines).toBe(2);
     });
 
     test('40 × 25 mm cannot fit a 3-dot module, so it falls out of tolerance', () => {
@@ -307,57 +398,150 @@ describe('computeLayout — Takealot shape (EAN-13, stacked marker)', () => {
     test('keeps the stacked marker clear of the left quiet zone', () => {
         const layout = computeLayout(takealotFormat, TAKEALOT_CODE);
         const quietZoneStart = layout.symbolXDots - EAN13_QUIET_LEFT_MODULES * layout.moduleDots;
-        expect(quietZoneStart).toBeGreaterThanOrEqual(8 + layout.annotationFontDots);
+        expect(quietZoneStart).toBeGreaterThanOrEqual(8 + layout.textFontDots);
     });
 
-    test('50 × 30 mm — the warehouse roll — prints an in-spec EAN-13', () => {
-        const layout = computeLayout(
-            { ...takealotFormat, stock: LABEL_STOCKS[LabelStockSize.Size50x30] },
-            TAKEALOT_CODE
-        );
-        // Same 50mm width as the 25mm-tall roll, so the module width is
-        // unchanged and comfortably inside GS1's 0.264mm floor.
-        expect(layout.moduleDots).toBe(3);
-        expect(layout.withinTolerance).toBe(true);
-        // The extra 5mm of height goes to the bars, not the title.
-        const shorter = computeLayout(
+    test('the extra 5mm of a 30mm roll goes to the bars, not the title', () => {
+        const tall = computeLayout(takealotFormat, TAKEALOT_CODE);
+        const short = computeLayout(
             { ...takealotFormat, stock: LABEL_STOCKS[LabelStockSize.Size50x25] },
             TAKEALOT_CODE
         );
-        expect(layout.barHeightDots).toBeGreaterThan(shorter.barHeightDots);
-        expect(layout.titleLines).toBe(2);
-    });
-
-    test('keeps two title lines when the annotation is beside the barcode', () => {
-        expect(computeLayout(takealotFormat, TAKEALOT_CODE).titleLines).toBe(2);
+        expect(tall.moduleDots).toBe(short.moduleDots);
+        expect(tall.barHeightDots).toBeGreaterThan(short.barHeightDots);
+        expect(tall.titleLines).toBe(short.titleLines);
     });
 });
 
-describe('computeLayout — Amazon shape (Code 128, condition below title)', () => {
-    test("2⅝\" × 1\" stock prints an in-tolerance FNSKU symbol", () => {
+describe('computeLayout — Amazon shape (bars, FNSKU, name, condition)', () => {
+    test('stacks the elements in the order the channel lists them', () => {
         const layout = computeLayout(amazonFormat, FNSKU);
+        expect(layout.placements.map((p) => p.kind)).toEqual([
+            LabelElementKind.Barcode,
+            LabelElementKind.Title,
+            LabelElementKind.Text,
+        ]);
+        expect(layout.placements.map((p) => p.yDots)).toEqual(
+            [...layout.placements.map((p) => p.yDots)].sort((a, b) => a - b)
+        );
+    });
+
+    test('puts the product name below the bars and the FNSKU under them', () => {
+        const layout = computeLayout(amazonFormat, FNSKU);
+        const title = layout.placements.find((p) => p.kind === LabelElementKind.Title)!;
+        // The printer draws the interpretation line — the FNSKU itself —
+        // immediately below the bars, so the name has to start below that.
+        const interpretationBottom =
+            layout.barcodeYDots + layout.barHeightDots + layout.textFontDots;
+        expect(title.yDots).toBeGreaterThanOrEqual(interpretationBottom);
+    });
+
+    test('puts the item condition at the very bottom', () => {
+        const layout = computeLayout(amazonFormat, FNSKU);
+        const condition = layout.placements.find((p) => p.kind === LabelElementKind.Text)!;
+        const others = layout.placements.filter((p) => p !== condition);
+        for (const other of others) expect(condition.yDots).toBeGreaterThan(other.yDots);
+        // And still on the label.
+        expect(condition.yDots + condition.heightDots).toBeLessThanOrEqual(layout.heightDots);
+    });
+
+    test('50 × 30 mm fits a 10-character FNSKU at the Code 128 minimum', () => {
+        const layout = computeLayout(amazonFormat, FNSKU);
+        // 165 modules × 2 dots = 330, inside 384; a 3-dot module would need 495.
+        expect(layout.moduleDots).toBe(2);
+        expect(layout.xDimensionMm).toBeCloseTo(MIN_X_DIMENSION_MM[BarcodeSymbology.Code128], 3);
         expect(layout.withinTolerance).toBe(true);
-        // 165 modules × 3 dots = 495, which fits the 533-dot width.
-        expect(layout.moduleDots).toBe(3);
     });
 
-    test('drops the title to one line to make room for the condition', () => {
-        const layout = computeLayout(amazonFormat, FNSKU);
-        expect(layout.titleLines).toBe(1);
-        // The condition sits between the title and the barcode.
-        expect(layout.annotationYDots).toBeGreaterThan(8);
-        expect(layout.barcodeYDots).toBeGreaterThan(layout.annotationYDots);
+    test('12 characters is the ceiling before the module falls out of spec', () => {
+        // 11n + 55 modules at 2 dots has to fit 384: n = 12 needs 374, n = 13
+        // needs 396 and drops to a 1-dot module — 0.125mm, which will not scan.
+        expect(computeLayout(amazonFormat, 'A'.repeat(12)).withinTolerance).toBe(true);
+        const tooLong = computeLayout(amazonFormat, 'A'.repeat(13));
+        expect(tooLong.moduleDots).toBe(1);
+        expect(tooLong.withinTolerance).toBe(false);
     });
 
-    test('clears Amazon’s 6.35mm minimum barcode height', () => {
+    test('clears Amazon’s minimum barcode height with all four elements on', () => {
         const layout = computeLayout(amazonFormat, FNSKU);
-        expect(layout.barHeightDots).toBeGreaterThan(mmToDots(6.35, 203));
+        expect(layout.barHeightDots).toBeGreaterThan(mmToDots(MIN_BAR_HEIGHT_MM, 203));
+        expect(layout.barHeightWithinTolerance).toBe(true);
+    });
+
+    test('re-ordering the rows moves the name without touching anything else', () => {
+        const nameOnTop = computeLayout(
+            {
+                ...amazonFormat,
+                elements: [amazonElements[1], amazonElements[0], amazonElements[2]],
+            },
+            FNSKU
+        );
+        const asShipped = computeLayout(amazonFormat, FNSKU);
+        // Same heights, different order — the label is a stack, so moving a
+        // block cannot cost or gain space.
+        expect(nameOnTop.barHeightDots).toBe(asShipped.barHeightDots);
+        expect(nameOnTop.placements[0].kind).toBe(LabelElementKind.Title);
     });
 
     test('a longer code narrows the module rather than overflowing', () => {
         const short = computeLayout(amazonFormat, 'X001AB');
         const long = computeLayout(amazonFormat, 'A'.repeat(40));
         expect(long.moduleDots).toBeLessThan(short.moduleDots);
+    });
+});
+
+describe('computeLayout — text shrinks to fit before the bars are sacrificed', () => {
+    const crowd = (lines: number): LabelFormat => ({
+        ...amazonFormat,
+        stock: LABEL_STOCKS[LabelStockSize.Size50x25],
+        elements: [
+            { kind: LabelElementKind.Barcode },
+            { kind: LabelElementKind.Title, maxLines: 2 },
+            ...Array.from({ length: lines }, (_, i) => text(`Line ${i + 1}`)),
+        ],
+    });
+
+    test('leaves the nominal size alone when the label is not crowded', () => {
+        const roomy = computeLayout(amazonFormat, FNSKU);
+        // 50 × 30 mm: 20-dot title, 18-dot fixed text.
+        expect(roomy.titleFontDots).toBe(20);
+        expect(roomy.textFontDots).toBe(18);
+    });
+
+    test('shrinks the text rather than letting the bars fall short', () => {
+        const crowded = computeLayout(crowd(4), FNSKU);
+        const roomy = computeLayout(crowd(0), FNSKU);
+        expect(crowded.titleFontDots).toBeLessThan(roomy.titleFontDots);
+        expect(crowded.textFontDots).toBeLessThan(roomy.textFontDots);
+        // Which is the point: the barcode still clears its minimum.
+        expect(crowded.barHeightWithinTolerance).toBe(true);
+    });
+
+    test('stops at a readable floor and reports rather than shrinking forever', () => {
+        const impossible = computeLayout(crowd(9), FNSKU);
+        expect(impossible.titleFontDots).toBe(14);
+        expect(impossible.textFontDots).toBe(12);
+        expect(impossible.barHeightWithinTolerance).toBe(false);
+        // Still a drawable format — the operator is warned, not handed a
+        // negative bar height.
+        expect(impossible.barHeightDots).toBeGreaterThan(0);
+    });
+
+    test('one title line buys the bars about 2.7mm over two', () => {
+        const oneLine = computeLayout(
+            { ...amazonFormat, elements: [amazonElements[0], { kind: LabelElementKind.Title, maxLines: 1 }, amazonElements[2]] },
+            FNSKU
+        );
+        const twoLines = computeLayout(amazonFormat, FNSKU);
+        expect(oneLine.barHeightMm - twoLines.barHeightMm).toBeCloseTo(2.75, 1);
+    });
+
+    test('caps the title at three lines however the row is configured', () => {
+        const layout = computeLayout(
+            { ...amazonFormat, elements: [amazonElements[0], { kind: LabelElementKind.Title, maxLines: 9 }] },
+            FNSKU
+        );
+        expect(layout.titleLines).toBe(3);
     });
 });
 
@@ -381,11 +565,16 @@ describe('computeLayout — fits every stock and symbology', () => {
         expect(rightEdge).toBeLessThanOrEqual(layout.widthDots);
     });
 
-    test.each(cases)('%s fits vertically below the title', (_name, format, code) => {
+    test.each(cases)('%s stacks its elements without overlap or overflow', (_name, format, code) => {
         const layout = computeLayout(format, code);
-        expect(layout.barcodeYDots).toBeGreaterThan(layout.titleFontDots);
-        const bottom = layout.barcodeYDots + layout.barHeightDots + layout.annotationFontDots;
-        expect(bottom).toBeLessThanOrEqual(layout.heightDots);
+        let cursor = 0;
+        for (const placement of layout.placements) {
+            // Clears the leading edge, and starts where the last one ended.
+            expect(placement.yDots).toBeGreaterThanOrEqual(24);
+            expect(placement.yDots).toBeGreaterThanOrEqual(cursor);
+            cursor = placement.yDots + placement.heightDots;
+        }
+        expect(cursor).toBeLessThanOrEqual(layout.heightDots);
     });
 });
 
@@ -424,7 +613,7 @@ describe('buildLabelZpl', () => {
     test('sets the page geometry from the stock', () => {
         const zpl = buildLabelZpl({ code: TAKEALOT_CODE, title: 'W', quantity: 1 }, takealotFormat);
         expect(zpl).toContain(`^PW${mmToDots(50, 203)}`);
-        expect(zpl).toContain(`^LL${mmToDots(25, 203)}`);
+        expect(zpl).toContain(`^LL${mmToDots(30, 203)}`);
         expect(zpl).toContain('^CI28'); // UTF-8
     });
 
@@ -444,16 +633,17 @@ describe('buildLabelZpl', () => {
         expect(zpl).not.toContain('^BEN');
     });
 
-    test('runs the title full width from the left margin, past a stacked annotation', () => {
+    test('runs the title full width from the left margin, past stacked text', () => {
         const zpl = buildLabelZpl(
             { code: TAKEALOT_CODE, title: 'National Geographic Metal Detector Starter Kit', quantity: 1 },
             takealotFormat
         );
         const width = mmToDots(50, 203);
-        // Title and the stacked "MP" share the same left edge: the annotation is
-        // below the title, not beside it, so indenting the title would drop
-        // characters off a long product name for no reason. (The y differs — the
-        // top margin is larger than the sides; see the leading-edge test.)
+        // Title and the stacked "MP" share the same left edge: the stacked text
+        // is beside the bars, not beside the title, so indenting the title
+        // would drop characters off a long product name for no reason. (The y
+        // differs — the top margin is larger than the sides; see the
+        // leading-edge test.)
         expect(zpl).toMatch(/\^FO8,\d+\n\^A0N,\d+/);
         expect(zpl).toContain(`^FB${width - 16},2,2,L,0`);
     });
@@ -471,27 +661,56 @@ describe('buildLabelZpl', () => {
         }
     });
 
-    test('stacks the annotation one character per line when placed left', () => {
+    test('sets stacked text one character per line beside the bars', () => {
         const zpl = buildLabelZpl({ code: TAKEALOT_CODE, title: 'W', quantity: 1 }, takealotFormat);
         expect(zpl).toContain('^FDM^FS');
         expect(zpl).toContain('^FDP^FS');
         expect(zpl).not.toContain('^FDMP^FS');
     });
 
-    test('prints the annotation as one line when placed below the title', () => {
+    test('prints a text element as one line', () => {
         const zpl = buildLabelZpl({ code: FNSKU, title: 'W', quantity: 1 }, amazonFormat);
         // Amazon requires the item condition on every unit label.
         expect(zpl).toContain('^FDNew^FS');
         expect(zpl).not.toContain('^FDN^FS');
     });
 
-    test('omits the annotation entirely when the channel has none', () => {
+    test('emits the fields in the order the channel lists them', () => {
+        const zpl = buildLabelZpl({ code: FNSKU, title: 'Widget', quantity: 1 }, amazonFormat);
+        // Barcode, then the product name, then the condition — the order is the
+        // only thing that decides this, so it is worth asserting on the stream
+        // itself and not just on the coordinates.
+        expect(zpl.indexOf('^BCN')).toBeLessThan(zpl.indexOf('^FDWidget^FS'));
+        expect(zpl.indexOf('^FDWidget^FS')).toBeLessThan(zpl.indexOf('^FDNew^FS'));
+
+        const takealot = buildLabelZpl({ code: TAKEALOT_CODE, title: 'Widget', quantity: 1 }, takealotFormat);
+        expect(takealot.indexOf('^FDWidget^FS')).toBeLessThan(takealot.indexOf('^BEN'));
+    });
+
+    test('asks for the interpretation line below the bars, not above', () => {
+        // The fourth ^BC parameter is "interpretation line above code" — N is
+        // what puts the FNSKU directly beneath its own symbol.
+        const zpl = buildLabelZpl({ code: FNSKU, title: 'W', quantity: 1 }, amazonFormat);
+        expect(zpl).toMatch(/\^BCN,\d+,Y,N,N/);
+    });
+
+    test('prints a plain label for a channel with no elements of its own', () => {
         const zpl = buildLabelZpl(
             { code: FNSKU, title: 'Widget', quantity: 1 },
-            { ...amazonFormat, annotation: null }
+            { ...amazonFormat, elements: DEFAULT_ELEMENTS }
         );
         expect(zpl).toContain('^FDWidget^FS');
         expect(zpl).not.toContain('^FDNew^FS');
+        expect(zpl).toContain('^BCN');
+    });
+
+    test('refuses a format that could not make a label', () => {
+        expect(() =>
+            buildLabelZpl(
+                { code: FNSKU, title: 'W', quantity: 1 },
+                { ...amazonFormat, elements: [{ kind: LabelElementKind.Title }] }
+            )
+        ).toThrow(/nothing to scan/);
     });
 
     test('neutralises ZPL control characters in the product name', () => {

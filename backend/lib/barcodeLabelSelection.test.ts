@@ -2,8 +2,8 @@ import { models, resetDatabase } from '@teamkeel/testing';
 import {
     BarcodeSymbology,
     ChannelShipmentStatus,
+    LabelElementKind,
     LabelStockSize,
-    LabelAnnotationPlacement,
 } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { loadShipmentLabelCandidates } from './barcodeLabelSelection';
@@ -22,13 +22,29 @@ async function setup(options: { withSpec?: boolean } = {}) {
     const { withSpec = true } = options;
     const channel = await models.channel.create({ name: 'Takealot Marketplace' });
     if (withSpec) {
-        await models.channelLabelSpec.create({
+        const spec = await models.channelLabelSpec.create({
             channelId: channel.id,
             symbology: BarcodeSymbology.Ean13,
-            annotation: 'MP',
-            annotationPlacement: LabelAnnotationPlacement.StackedLeft,
             defaultStock: LabelStockSize.Size50x25,
             isEnabled: true,
+        });
+        // The Takealot shape: name over the symbol, "MP" stacked beside it.
+        await models.channelLabelElement.create({
+            specId: spec.id,
+            position: 1,
+            kind: LabelElementKind.Title,
+            maxLines: 2,
+        });
+        await models.channelLabelElement.create({
+            specId: spec.id,
+            position: 2,
+            kind: LabelElementKind.Barcode,
+        });
+        await models.channelLabelElement.create({
+            specId: spec.id,
+            position: 3,
+            kind: LabelElementKind.StackedText,
+            text: 'MP',
         });
     }
     const brand = await models.brand.create({ name: 'Acme' });

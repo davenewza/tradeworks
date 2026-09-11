@@ -67,7 +67,8 @@ worth a look.)
 ### Condition
 
 Amazon requires the item condition on every unit label, and the Amazon label
-spec prints **one fixed annotation** for the channel — `New`. A listing Amazon
+spec prints it as a **fixed text element** at the bottom of the label — `New`,
+the same on every unit. A listing Amazon
 holds as used or refurbished (`UsedLikeNew`, `Refurbished`, …) would therefore
 be labelled "New", so those are called out as a warning. The FNSKU is still
 right, so it is still synced. Amazon's own New variants (`NewItem`,
@@ -103,9 +104,10 @@ Codes and the label spec are set up separately, so the first sync can leave
 every product coded and still nothing printable. The completion page says so if
 the Amazon channel has no enabled **label spec**, with the shape to create under
 *Products → Barcode labels → Add a label spec*: channel *Amazon Marketplace*,
-symbology **Code 128**, annotation **New** placed **below the title**, stock
-**66.7 × 25.4 mm** (2⅝" × 1"). Once that exists, *Print barcodes* offers Amazon
-alongside Takealot.
+symbology **Code 128**, stock **50 × 30 mm**. Then add three elements to the
+spec, in this order: **Barcode**, **Title**, and the text **New** — Amazon wants
+the item condition at the bottom of the label, under the product name. Once that
+exists, *Print barcodes* offers Amazon alongside Takealot.
 
 ## Configuration
 
