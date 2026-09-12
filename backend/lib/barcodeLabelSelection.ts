@@ -106,37 +106,20 @@ export async function loadPrintableChannels(): Promise<PrintableChannel[]> {
  * Every enabled product carrying a code for this channel, split by whether that
  * code is printable under the channel's symbology.
  *
- * `productId` narrows to a single product — the entry-action path from a product
- * page. A product with no code for the channel comes back as unprintable rather
- * than as an empty list, so the flow can say why.
+ * One product at a time is not this function's job — see
+ * `loadProductLabelOptions`, which reads a single product across every channel
+ * instead of one channel across the catalogue.
  */
 export async function loadLabelCandidates(
     channelId: string,
-    symbology: BarcodeSymbology,
-    productId?: string
+    symbology: BarcodeSymbology
 ): Promise<CandidateLoad> {
     const codes = await models.productChannelCode.findMany({
-        where: {
-            channel: { id: { equals: channelId } },
-            ...(productId ? { product: { id: { equals: productId } } } : {}),
-        },
+        where: { channel: { id: { equals: channelId } } },
     });
 
     const candidates: LabelCandidate[] = [];
     const unprintable: UnprintableProduct[] = [];
-
-    if (codes.length === 0 && productId) {
-        // Asked for one specific product and it has no code for this channel.
-        const product = await models.product.findOne({ id: productId });
-        if (product) {
-            unprintable.push({
-                sku: product.sku,
-                name: product.name,
-                problem: 'no code captured for this channel',
-            });
-        }
-        return { candidates, unprintable };
-    }
 
     const products = await models.product.findMany({
         where: { id: { oneOf: codes.map((c) => c.productId) }, isEnabled: { equals: true } },
@@ -174,6 +157,89 @@ export async function loadLabelCandidates(
     unprintable.sort((a, b) => a.sku.localeCompare(b.sku));
 
     return { candidates, unprintable };
+}
+
+// ─── Single-product path ────────────────────────────────────────────────────
+
+// One channel a product can be labelled for, with the code that would be
+// printed. The channel carries its own symbology and stock, so this is
+// everything a run needs.
+export interface ProductLabelOption {
+    channel: PrintableChannel;
+    code: string;
+}
+
+// A product's labelling picture across every printable channel.
+export interface ProductLabelLoad {
+    productId: string;
+    sku: string;
+    name: string;
+    onHand: number;
+    options: ProductLabelOption[];
+    // Channels that cannot label this product, and why. Shown rather than
+    // silently omitted: "Amazon is missing" and "Amazon's code is malformed"
+    // have different fixes.
+    unprintable: { channelName: string; problem: string }[];
+}
+
+/**
+ * What one product can be labelled as, per channel.
+ *
+ * The inverse of `loadLabelCandidates`: one product across every channel rather
+ * than one channel across the catalogue. That is what the product page needs —
+ * with the answer in hand the flow only asks which channel when there is more
+ * than one, and never asks at all when there is one.
+ *
+ * Disabled products are included. The catalogue picker leaves them out because
+ * they are deliberately out of stock rotation, but arriving from a product's own
+ * page is an explicit request for that product, and refusing it would only read
+ * as "this product has no code".
+ *
+ * @example
+ * const load = await loadProductLabelOptions(productId, channels);
+ * if (load?.options.length === 1) // no channel question to ask
+ */
+export async function loadProductLabelOptions(
+    productId: string,
+    channels: PrintableChannel[]
+): Promise<ProductLabelLoad | null> {
+    const product = await models.product.findOne({ id: productId });
+    if (!product) return null;
+
+    const codes = await models.productChannelCode.findMany({
+        where: { product: { id: { equals: productId } } },
+    });
+    const codeByChannelId = new Map(codes.map((c) => [c.channelId, c.code]));
+
+    const load: ProductLabelLoad = {
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        onHand: Math.max(0, product.stockAvailable ?? 0),
+        options: [],
+        unprintable: [],
+    };
+
+    for (const channel of channels) {
+        const code = codeByChannelId.get(channel.channelId);
+        if (code === undefined) {
+            load.unprintable.push({
+                channelName: channel.channelName,
+                problem: 'no code captured for this channel',
+            });
+            continue;
+        }
+
+        const check = checkCode(channel.symbology, code);
+        if (!check.valid) {
+            load.unprintable.push({ channelName: channel.channelName, problem: check.reason });
+            continue;
+        }
+
+        load.options.push({ channel, code: check.code });
+    }
+
+    return load;
 }
 
 /** Units on hand for the given SKUs, for the quantity grid's reference column. */

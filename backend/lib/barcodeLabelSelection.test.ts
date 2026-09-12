@@ -6,7 +6,11 @@ import {
     LabelStockSize,
 } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { loadShipmentLabelCandidates } from './barcodeLabelSelection';
+import {
+    loadPrintableChannels,
+    loadProductLabelOptions,
+    loadShipmentLabelCandidates,
+} from './barcodeLabelSelection';
 import { buildShipmentQuantityRows } from './barcodeLabelHelpers';
 
 beforeEach(resetDatabase);
@@ -314,5 +318,124 @@ describe('buildShipmentQuantityRows', () => {
     test('floors negative or unknown stock for the reference column', () => {
         expect(buildShipmentQuantityRows([candidate], { 'ACME-001': -4 })[0].onHand).toBe(0);
         expect(buildShipmentQuantityRows([candidate])[0].onHand).toBe(0);
+    });
+});
+
+// ─── loadProductLabelOptions ────────────────────────────────────────────────
+
+// A second printable channel, so a product can be read across more than one.
+async function addAmazon() {
+    const channel = await models.channel.create({ name: 'Amazon' });
+    const spec = await models.channelLabelSpec.create({
+        channelId: channel.id,
+        symbology: BarcodeSymbology.Code128,
+        defaultStock: LabelStockSize.Size67x25,
+        isEnabled: true,
+    });
+    // The Amazon shape: name, symbol, then the item condition.
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 1,
+        kind: LabelElementKind.Title,
+        maxLines: 1,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 2,
+        kind: LabelElementKind.Barcode,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 3,
+        kind: LabelElementKind.Text,
+        text: 'New',
+    });
+    return channel;
+}
+
+describe('loadProductLabelOptions', () => {
+    test('returns null for a product that no longer exists', async () => {
+        const channels = await loadPrintableChannels();
+        expect(await loadProductLabelOptions('2Zx000000000000000000000000', channels)).toBeNull();
+    });
+
+    test('one option per channel whose code is printable', async () => {
+        const { channel, brand } = await setup();
+        const amazon = await addAmazon();
+        const widget = await addProduct(brand.id, 'ACME-001', 'Widget', channel.id, EAN_A);
+        await models.productChannelCode.create({
+            productId: widget.id,
+            channelId: amazon.id,
+            code: 'X001ABCDEF',
+        });
+
+        const load = (await loadProductLabelOptions(widget.id, await loadPrintableChannels()))!;
+
+        expect(load).toMatchObject({ productId: widget.id, sku: 'ACME-001', name: 'Widget' });
+        expect(load.options.map((o) => [o.channel.channelName, o.code])).toEqual([
+            ['Amazon', 'X001ABCDEF'],
+            ['Takealot Marketplace', EAN_A],
+        ]);
+        expect(load.unprintable).toEqual([]);
+    });
+
+    test('names the channels that cannot label it, and why', async () => {
+        const { channel, brand } = await setup();
+        const amazon = await addAmazon();
+        // Right length, wrong check digit — never silently corrected.
+        const widget = await addProduct(brand.id, 'ACME-001', 'Widget', channel.id, '6001234567890');
+        await models.productChannelCode.create({
+            productId: widget.id,
+            channelId: amazon.id,
+            code: '',
+        });
+
+        const load = (await loadProductLabelOptions(widget.id, await loadPrintableChannels()))!;
+
+        expect(load.options).toEqual([]);
+        expect(load.unprintable.map((u) => u.channelName)).toEqual(['Amazon', 'Takealot Marketplace']);
+        expect(load.unprintable[1].problem).toMatch(/check digit/);
+    });
+
+    test('a channel with no code for the product is reported as missing, not malformed', async () => {
+        const { channel, brand } = await setup();
+        await addAmazon();
+        const widget = await addProduct(brand.id, 'ACME-001', 'Widget', channel.id, EAN_A);
+
+        const load = (await loadProductLabelOptions(widget.id, await loadPrintableChannels()))!;
+
+        expect(load.options.map((o) => o.channel.channelName)).toEqual(['Takealot Marketplace']);
+        expect(load.unprintable).toEqual([
+            { channelName: 'Amazon', problem: 'no code captured for this channel' },
+        ]);
+    });
+
+    test('a disabled product is still printable from its own page', async () => {
+        const { channel, brand } = await setup();
+        const widget = await models.product.create({
+            name: 'Widget',
+            sku: 'ACME-001',
+            brandId: brand.id,
+            isEnabled: false,
+        });
+        await models.productChannelCode.create({
+            productId: widget.id,
+            channelId: channel.id,
+            code: EAN_A,
+        });
+
+        const load = (await loadProductLabelOptions(widget.id, await loadPrintableChannels()))!;
+        expect(load.options.map((o) => o.code)).toEqual([EAN_A]);
+    });
+
+    test('floors negative or unknown stock for the reference figure', async () => {
+        const { channel, brand } = await setup();
+        const widget = await addProduct(brand.id, 'ACME-001', 'Widget', channel.id, EAN_A);
+        const channels = await loadPrintableChannels();
+
+        expect((await loadProductLabelOptions(widget.id, channels))!.onHand).toBe(0);
+
+        await models.product.update({ id: widget.id }, { stockAvailable: -4 });
+        expect((await loadProductLabelOptions(widget.id, channels))!.onHand).toBe(0);
     });
 });

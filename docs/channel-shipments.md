@@ -194,7 +194,9 @@ Neither channel's API draws on the shared **Zoho** daily quota.
 channel — a Takealot consignment is labelled with Takealot's codes and nothing
 else — so the channel picker is skipped, and the label count for each line is
 seeded from the units being sent rather than starting at 1. The label stock comes
-off the channel's spec, so the operator only reviews the counts and prints.
+off the channel's spec, so the operator only reviews the counts and prints — two
+pages, with the consignment's summary and any excluded lines shown above the
+counts rather than on a page of their own.
 
 Lines are left out of the run, with the reason shown, when they are:
 

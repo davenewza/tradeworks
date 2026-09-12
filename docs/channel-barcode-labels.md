@@ -12,10 +12,11 @@ one, is a row rather than a deploy.
 
 ## Where to find it
 
-- **Products → Barcode labels → Print barcodes** — pick a channel, then products,
-  set label counts, print.
-- **A product page → Print barcode label** — same flow for one product; it skips
-  the picker and goes straight to that product's label count.
+- **Products → Barcode labels → Print barcodes** — pick products, set label
+  counts, print. The channel is asked first only when more than one is printable.
+- **A product page → Print barcode label** — same flow for one product, on a
+  single page: how many labels, and which channel if the product carries more
+  than one code. It prints as the print page opens.
 - **A channel shipment → Print barcode labels** — same flow for a whole
   consignment; the shipment fixes the channel and seeds a label count per line
   from the units being sent. See [channel-shipments.md](channel-shipments.md).
@@ -281,6 +282,31 @@ Takealot's own PDF uses a 0.330 mm X-dimension — GS1 nominal, and unreachable 
 whole dots at 203 dpi (2.68 dots) — which is why our label is not a pixel-exact
 copy of theirs.
 
+## What the flow asks
+
+**A question is only asked when the data cannot answer it.** Printing one
+product's label used to take four pages — channel, confirm the product, count,
+print — for a run whose only unknown was the count. Each page is now earned:
+
+| Question | When it is asked |
+| --- | --- |
+| Which channel? | Only when more than one channel can print what is in front of you. From the Products space that is more than one label spec; from a product page it is more than one *printable code on that product*, and the choice sits on the counts page as a dropdown rather than a page of its own. |
+| Which products? | Only on the catalogue path. A product page and a shipment both already say what is being labelled. |
+| How many? | Always — the one thing nothing else can supply. One product gets a single number; a batch gets the grid. |
+
+So a product page's label is **one page and one click**: set the count, press
+Print. The print page then fires the job as it opens (`autoPrint`), so the labels
+come out without a second press.
+
+`autoPrint` is deliberately **not** set on the batch paths. A single product is
+a handful of labels and a duplicate costs a label; a catalogue or consignment run
+is tens or hundreds, and anything that re-fires the job costs a roll.
+
+A product's own page will also print a product that is **disabled**. The
+catalogue picker leaves those out — they are deliberately out of rotation — but
+arriving from a product's page is an explicit request for that product, and
+refusing it only ever read as "this product has no code".
+
 ## Quantities
 
 Counts start at **1**, with each product's units **on hand** shown beside them for
@@ -311,9 +337,11 @@ boundaries.
 The trade for a single job is that you can no longer reprint one product's job in
 isolation, so the print page has an **Adjust counts and print again** action
 instead. It returns to the counts grid with what you last entered: set the
-products that came out fine to 0, leave the one that jammed, and print again.
-Each pass is a fresh pair of page keys (`quantities-N` / `print-N`), capped at 20
-passes, since step and page keys have to be unique within a run.
+products that came out fine to 0, leave the one that jammed, and print again. On
+the single-product path the same action reads **Print another count** and returns
+to the one number. Each pass is a fresh pair of page keys (`quantities-N` /
+`print-N`), capped at 20 passes, since step and page keys have to be unique within
+a run.
 
 The flow closes itself when you press **Done** — there is no summary screen; the
 print page already lists exactly what was sent.
@@ -339,8 +367,8 @@ Console.
 | --- | --- |
 | `schemas/labels.keel` | `ChannelLabelSpec`, `ChannelLabelElement`, `ProductChannelCode`, the symbology / stock / element-kind enums, and the print and sync flows. |
 | `lib/barcodeLabelHelpers.ts` | Code validation, label geometry, ZPL generation, row building. Pure apart from the generated enums — no DB, no printer. |
-| `lib/barcodeLabelSelection.ts` | The DB queries (printable channels, candidates, a shipment's lines, stock on hand). |
-| `flows/printChannelBarcodes.ts` | UI orchestration only: channel → products (or a shipment) → counts → print. |
+| `lib/barcodeLabelSelection.ts` | The DB queries. `loadLabelCandidates` reads one channel across the catalogue; `loadProductLabelOptions` is its inverse — one product across every channel, which is what lets the product page skip the channel question. Plus a shipment's lines and stock on hand. |
+| `flows/printChannelBarcodes.ts` | UI orchestration only: counts → print, preceded by a channel and/or product picker where the data leaves one open. |
 | `lib/channelCodeSync.ts` | The plan/apply pair both channel syncs run on. |
 | `lib/takealotOfferHelpers.ts`, `flows/syncTakealotBarcodes.ts` | Takealot codes from the Marketplace API ([takealot-barcodes.md](takealot-barcodes.md)). |
 | `lib/amazonFnskuHelpers.ts`, `flows/syncAmazonFnskus.ts` | Amazon FNSKUs from the Selling Partner API ([amazon-fnskus.md](amazon-fnskus.md)). |
