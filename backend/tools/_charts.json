@@ -36,10 +36,10 @@
   },
   {
     "id": "chart_3I2QmXbT9nKvFdR4sLwZpHc7Yj2",
-    "name": "Cumulative Sales Worm",
-    "config": "{\"query\":{\"measures\":[\"cumulative_sales.cumulative_sales_sum\"],\"dimensions\":[\"cumulative_sales.day_of_month\",\"cumulative_sales.month_label\"],\"limit\":5000},\"settings\":{\"chartType\":\"line\",\"xField\":\"cumulative_sales_day_of_month\",\"yField\":\"cumulative_sales_cumulative_sales_sum\",\"pivotField\":\"cumulative_sales_month_label\",\"xAxis\":{\"title\":\"Day of Month\",\"type\":\"quantitative\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"Cumulative sales (excl VAT)\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":false,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "name": "Cumulative sales (excl VAT)",
+    "config": "{\"query\":{\"measures\":[\"cumulative_sales.cumulative_sales_sum\"],\"dimensions\":[\"cumulative_sales.day_of_month\",\"cumulative_sales.month_label\"],\"limit\":5000},\"settings\":{\"chartType\":\"line\",\"xField\":\"cumulative_sales_day_of_month\",\"yField\":\"cumulative_sales_cumulative_sales_sum\",\"pivotField\":\"cumulative_sales_month_label\",\"xAxis\":{\"title\":\"Day of Month\",\"type\":\"ordinal\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\" \",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"bottom\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
     "createdAt": "2026-08-20T09:00:00.000000Z",
-    "updatedAt": "2026-09-12T09:00:00.000000Z"
+    "updatedAt": "2026-09-12T11:00:00.000000Z"
   },
   {
     "id": "chart_3I2RpZcV7mLwHfS5tNxBqKe8Zm4",

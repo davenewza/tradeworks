@@ -102,15 +102,16 @@ model CumulativeSales {
         brand Brand
         date Date
         // First day of this row's month. Rows are rebuilt a month at a time on
-        // this column, and the "Cumulative sales" dashboard filters its date
-        // range against it.
+        // this column, and The Worm dashboard filters its date range against it.
         monthStart Date
         // The chart's series label and pivot key ("Aug 2026"). Deliberately a
         // plain string dimension rather than the monthStart time dimension: the
         // Console derives the x-axis date formatting from the query's first time
         // dimension whatever field is actually on that axis, so a monthly one
         // rendered the day-of-month numbers as timestamps — every tick Jan 1970.
-        // The cost is that series sort alphabetically rather than chronologically.
+        // The cost is order: the legend lists months alphabetically, because
+        // Vega-Lite sorts a nominal colour domain by its own value and the chart
+        // config has no way to give it a different sort key.
         monthLabel Text
         // 1–31. The chart's x-axis, so each month's line overlays the others.
         dayOfMonth Number
