@@ -18,9 +18,9 @@
   {
     "id": "dashboard_3I2RnYcU8mLwGeS5tMxAqJd9Zk3",
     "name": "The Worm",
-    "items": "[{\"id\":\"item-1787220000000-cumsales\",\"chartId\":\"chart_3I2QmXbT9nKvFdR4sLwZpHc7Yj2\",\"layout\":{\"i\":\"item-1787220000000-cumsales\",\"x\":0,\"y\":0,\"w\":24,\"h\":11,\"minW\":4,\"minH\":3}}]",
+    "items": "[{\"id\":\"item-1787220000000-cumsales\",\"chartId\":\"chart_3I2QmXbT9nKvFdR4sLwZpHc7Yj2\",\"layout\":{\"i\":\"item-1787220000000-cumsales\",\"x\":0,\"y\":0,\"w\":24,\"h\":11,\"minW\":4,\"minH\":3}},{\"id\":\"item-1789214400000-dailysales\",\"chartId\":\"chart_3I2TrBeX9oNyJhU7vPzDsMg0Bp6\",\"layout\":{\"i\":\"item-1789214400000-dailysales\",\"x\":0,\"y\":11,\"w\":24,\"h\":7,\"minW\":4,\"minH\":3}}]",
     "filters": "[{\"id\":\"f_cumsalesmonth\",\"name\":\"Month\",\"type\":\"date\",\"member\":\"cumulative_sales.month_start\",\"defaultOperator\":\"inDateRange\"},{\"id\":\"f_cumsalesbrand\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\"},{\"id\":\"f_cumsaleschannel\",\"name\":\"Channel\",\"type\":\"text\",\"member\":\"channel.name\",\"defaultOperator\":\"equals\"}]",
     "createdAt": "2026-08-20T10:00:00.000000Z",
-    "updatedAt": "2026-08-20T10:00:00.000000Z"
+    "updatedAt": "2026-09-12T12:00:00.000000Z"
   }
 ]

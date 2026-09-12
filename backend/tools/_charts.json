@@ -54,5 +54,12 @@
     "config": "{\"query\":{\"measures\":[\"sale.quantity_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"limit\":500,\"dimensions\":[]},\"settings\":{\"chartType\":\"bar\",\"xField\":\"sale_date_month\",\"yField\":\"sale_quantity_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":true,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":true,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
     "createdAt": "2026-09-12T09:00:00.000000Z",
     "updatedAt": "2026-09-12T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I2TrBeX9oNyJhU7vPzDsMg0Bp6",
+    "name": "Revenue by day (this month)",
+    "config": "{\"query\":{\"measures\":[\"cumulative_sales.daily_sales_sum\"],\"timeDimensions\":[{\"dimension\":\"cumulative_sales.date\",\"granularity\":\"day\",\"dateRange\":\"this month\"}],\"limit\":500,\"dimensions\":[]},\"settings\":{\"chartType\":\"bar\",\"xField\":\"cumulative_sales_date_day\",\"yField\":\"cumulative_sales_daily_sales_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\" \",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":false,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-09-12T12:00:00.000000Z",
+    "updatedAt": "2026-09-12T12:00:00.000000Z"
   }
 ]

@@ -94,6 +94,13 @@ flow ScheduledSyncSales {
 // brand → product → sale, fanning each row out across every sale of that brand
 // and inflating the totals. It reads as plausible numbers, not as an error.
 //
+// The Worm also carries a "Revenue by day (this month)" bar chart off
+// `dailySales`, the per-day figure the running total is built from. It pins its
+// own window with a `dateRange` of "this month", which is ANDed with — never
+// overridden by — the dashboard's Month filter, so narrowing that filter to a
+// past month leaves the daily chart empty. Its title says which month it shows,
+// and the worm is what the Month filter is really there for.
+//
 // Rebuilt wholesale per month by RebuildCumulativeSales — never incrementally
 // updated, so a re-run always converges on the current Sale data.
 model CumulativeSales {
