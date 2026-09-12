@@ -102,7 +102,7 @@
             "link": {
               "tool_id": "print-channel-barcodes",
               "title": "Print barcodes",
-              "description": "Pick a channel and products, set label counts, print",
+              "description": "Pick products, set label counts, print",
               "display_order": 0
             },
             "hidden": false

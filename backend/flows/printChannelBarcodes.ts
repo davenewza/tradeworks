@@ -1,4 +1,4 @@
-import { PrintChannelBarcodes, FlowConfig } from '@teamkeel/sdk';
+import { PrintChannelBarcodes, FlowConfig, BarcodeSymbology } from '@teamkeel/sdk';
 import {
     LABEL_STOCKS,
     CandidateLoad,
@@ -12,9 +12,11 @@ import {
 } from '../lib/barcodeLabelHelpers';
 import {
     PrintableChannel,
+    ProductLabelLoad,
     ShipmentLabelLoad,
     loadPrintableChannels,
     loadLabelCandidates,
+    loadProductLabelOptions,
     loadShipmentLabelCandidates,
     loadStockBySku,
 } from '../lib/barcodeLabelSelection';
@@ -43,10 +45,19 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
     // and the label counts, so it skips both pickers.
     const shipmentId = inputs?.shipmentId ?? undefined;
 
+    // The channel this run prints on. Settled before the counts page on the
+    // shipment and catalogue paths; on the single-product path the counts page
+    // settles it, and this holds the only candidate until then.
     let channel: PrintableChannel;
+    // Set only on the single-product path: the product, and every channel it can
+    // be labelled for.
+    let single: ProductLabelLoad | undefined;
+    // Set only on the shipment path, so the counts page can show where the run
+    // came from and what it is leaving out.
+    let shipmentLoad: ShipmentLabelLoad | undefined;
     // Seeded label counts for the grid, and a one-line description of where the
     // run came from for the completion page.
-    let seededRows: LabelQuantityRow[];
+    let seededRows: LabelQuantityRow[] = [];
     let source: string;
 
     if (shipmentId) {
@@ -72,7 +83,6 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
                 content: noSpecBanner(ctx),
             });
         }
-        channel = load.channel;
 
         if (load.candidates.length === 0) {
             return ctx.complete({
@@ -83,38 +93,8 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
             });
         }
 
-        const totalUnits = load.candidates.reduce((sum, c) => sum + c.quantity, 0);
-        await ctx.ui.page('shipment', {
-            stage: 'select',
-            title: `Shipment ${load.reference} — ${channel.channelName}`,
-            content: [
-                ...(load.unprintable.length > 0
-                    ? [
-                          ctx.ui.display.banner({
-                              title: `${load.unprintable.length} line(s) cannot be labelled`,
-                              description: describeShipmentProblems(load),
-                              mode: 'warning',
-                          }),
-                      ]
-                    : []),
-                ctx.ui.display.keyValue({
-                    data: [
-                        { key: 'Shipment', value: load.externalId },
-                        { key: 'Channel', value: channel.channelName },
-                        { key: 'Lines to label', value: load.candidates.length },
-                        { key: 'Units going in', value: totalUnits },
-                        { key: 'Label stock', value: LABEL_STOCKS[channel.defaultStock].label },
-                    ],
-                }),
-                ctx.ui.display.markdown({
-                    content:
-                        'Label counts are seeded from the units this consignment is sending. ' +
-                        'You can still adjust them on the next screen.',
-                }),
-                ...unprintableTable(ctx, load),
-            ],
-            actions: [{ label: 'Set label counts', value: 'next', mode: 'primary' }],
-        });
+        shipmentLoad = load;
+        channel = load.channel;
 
         seededRows = (await ctx.step('seed-shipment-quantities', async () => {
             const stockBySku = await loadStockBySku(load.candidates.map((c) => c.sku));
@@ -123,7 +103,7 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
 
         source = `shipment ${load.reference}`;
     } else {
-        // ── Product paths: whole catalogue, or one product ───────────────────
+        // ── Product paths: one product, or the whole catalogue ───────────────
         const channels = (await ctx.step('load-channels', async () => {
             return await loadPrintableChannels();
         })) as unknown as PrintableChannel[];
@@ -137,61 +117,76 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
             });
         }
 
-        const channelChoice = await ctx.ui.page('channel', {
-            stage: 'channel',
-            title: 'Which channel are these labels for?',
-            content: [
-                ctx.ui.select.one('channelId', {
-                    label: 'Channel',
-                    options: channels.map((c) => ({
-                        label: `${c.channelName} — ${c.symbology === 'Ean13' ? 'EAN-13' : 'Code 128'}, ${c.productsWithCodes} product(s) coded`,
-                        value: c.channelId,
-                    })),
-                    defaultValue: channels[0].channelId,
-                }),
-            ],
-            actions: [{ label: 'Continue', value: 'next', mode: 'primary' }],
-        });
-
-        channel = channels.find((c) => c.channelId === channelChoice.data.channelId)!;
-
-        const { candidates, unprintable } = (await ctx.step('load-candidates', async () => {
-            return await loadLabelCandidates(channel.channelId, channel.symbology, singleProductId);
-        })) as unknown as CandidateLoad;
-
-        if (candidates.length === 0) {
-            const why = unprintable.length > 0 ? ` — ${unprintable[0].problem}` : '';
-            return ctx.complete({
-                title: 'Nothing to print',
-                stage: 'print',
-                description: singleProductId
-                    ? `This product has no printable ${channel.channelName} code${why}. Add one under Channel codes on the product page.`
-                    : `No product carries a printable ${channel.channelName} code yet. Add them under Channel codes on each product page.`,
-                content: [],
-            });
-        }
-
-        let selected: LabelCandidate[];
-
         if (singleProductId) {
-            // One product: no picker, but the stock still has to be confirmed.
-            selected = candidates;
-            await ctx.ui.page('confirm-product', {
-                stage: 'select',
-                title: `${candidates[0].name} — ${channel.channelName}`,
-                content: [
-                    ctx.ui.display.keyValue({
-                        data: [
-                            { key: 'SKU', value: candidates[0].sku },
-                            { key: 'Code', value: candidates[0].code },
-                            { key: 'Channel', value: channel.channelName },
-                            { key: 'Label stock', value: LABEL_STOCKS[channel.defaultStock].label },
-                        ],
-                    }),
-                ],
-                actions: [{ label: 'Set label count', value: 'next', mode: 'primary' }],
-            });
+            // One product, read across every channel at once. Which channel to
+            // print is then a question the data usually answers on its own, so
+            // it never gets a page: it is either settled here, or it rides on
+            // the counts page as a dropdown.
+            const load = (await ctx.step('load-product', async () => {
+                return await loadProductLabelOptions(singleProductId, channels);
+            })) as unknown as ProductLabelLoad | null;
+
+            if (!load) {
+                return ctx.complete({
+                    title: 'Product not found',
+                    stage: 'print',
+                    description: 'It may have been deleted since this page was opened.',
+                    content: [],
+                });
+            }
+
+            if (load.options.length === 0) {
+                return ctx.complete({
+                    title: 'Nothing to print for this product',
+                    stage: 'print',
+                    description: describeProductProblems(load),
+                    content: productProblemTable(ctx, load),
+                });
+            }
+
+            single = load;
+            channel = load.options[0].channel;
+            source = load.name;
         } else {
+            // One printable channel is not a question. Asking anyway spent a
+            // page on every run for an answer that could not have differed.
+            if (channels.length === 1) {
+                channel = channels[0];
+            } else {
+                const channelChoice = await ctx.ui.page('channel', {
+                    stage: 'channel',
+                    title: 'Which channel are these labels for?',
+                    content: [
+                        ctx.ui.select.one('channelId', {
+                            label: 'Channel',
+                            options: channels.map((c) => ({
+                                label: `${c.channelName} — ${symbologyLabel(c.symbology)}, ${c.productsWithCodes} product(s) coded`,
+                                value: c.channelId,
+                            })),
+                            defaultValue: channels[0].channelId,
+                        }),
+                    ],
+                    actions: [{ label: 'Continue', value: 'next', mode: 'primary' }],
+                });
+
+                channel = channels.find((c) => c.channelId === channelChoice.data.channelId)!;
+            }
+
+            const { candidates, unprintable } = (await ctx.step('load-candidates', async () => {
+                return await loadLabelCandidates(channel.channelId, channel.symbology);
+            })) as unknown as CandidateLoad;
+
+            if (candidates.length === 0) {
+                return ctx.complete({
+                    title: 'Nothing to print',
+                    stage: 'print',
+                    description:
+                        `No product carries a printable ${channel.channelName} code yet. ` +
+                        'Add them under Channel codes on each product page.',
+                    content: [],
+                });
+            }
+
             const selection = await ctx.ui.page('select', {
                 stage: 'select',
                 title: `Which products need ${channel.channelName} labels?`,
@@ -224,90 +219,229 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
             // Re-sorted by name: the picker hands back the rows the operator
             // ticked, not necessarily in the order they were shown, and the
             // grid, the screen and the printed stack all have to agree.
-            selected = ((selection.data.products ?? []) as LabelCandidate[])
+            const selected = ((selection.data.products ?? []) as LabelCandidate[])
                 .slice()
                 .sort((a, b) => a.name.localeCompare(b.name));
+
+            // A fixed step key: the pages above are already persisted by the time
+            // the body re-runs, so `selected` is stable for the run.
+            seededRows = (await ctx.step('seed-quantities', async () => {
+                const stockBySku = await loadStockBySku(selected.map((s) => s.sku));
+                return buildQuantityRows(selected, stockBySku);
+            })) as unknown as LabelQuantityRow[];
+
+            source = channel.channelName;
         }
-
-        // A fixed step key: the pages above are already persisted by the time the
-        // body re-runs, so `selected` is stable for the run.
-        seededRows = (await ctx.step('seed-quantities', async () => {
-            const stockBySku = await loadStockBySku(selected.map((s) => s.sku));
-            return buildQuantityRows(selected, stockBySku);
-        })) as unknown as LabelQuantityRow[];
-
-        source = channel.channelName;
     }
 
-    // Read straight off the channel's label spec — the roll is part of how the
-    // channel is set up, not something to re-confirm on every run.
-    const format: LabelFormat = {
-        symbology: channel.symbology,
-        annotation: channel.annotation,
-        annotationPlacement: channel.annotationPlacement,
-        stock: LABEL_STOCKS[channel.defaultStock],
-    };
-
     // ── Label counts → print, repeatable ────────────────────────────────────
-    // The print page can hand control back to the counts grid so a jammed or
-    // short label can be re-run on its own: zero the rows that came out fine,
-    // leave the one that did not, print again. Each pass is a fresh pair of page
-    // keys, since keys have to be unique within a run.
+    // The print page can hand control back to the counts page so a jammed or
+    // short label can be re-run: on a batch, zero the rows that came out fine
+    // and leave the one that did not; on a single product, just print again.
+    // Each pass is a fresh pair of page keys, since keys have to be unique
+    // within a run.
     const MAX_PASSES = 20;
     let rows = seededRows;
+    let labels = 1;
     let passesPrinted = 0;
 
     for (let pass = 0; pass < MAX_PASSES; pass++) {
-        const quantities = await ctx.ui.page(`quantities-${pass}`, {
-            stage: 'quantities',
-            title: pass === 0 ? 'How many labels of each?' : 'Adjust the counts and print again',
-            content: [
-                ctx.ui.display.markdown({
-                    content:
-                        pass > 0
-                            ? 'Set the products you have already labelled to **0** — only rows with a ' +
-                              'count of 1 or more are printed. Remove a row entirely to leave it out.'
-                            : shipmentId
-                              ? 'One label per unit going into the fulfilment centre. Counts come from the ' +
-                                'consignment; **on hand** is shown for reference.'
-                              : 'One label per unit going into the fulfilment centre. **On hand** is shown ' +
-                                'for reference — counts start at 1 so a stray click cannot commit a whole roll.',
-                }),
-                ctx.ui.inputs.dataGrid('rows', {
-                    data: rows,
-                    columns: [
-                        { key: 'productId', type: 'hidden' },
-                        { key: 'code', label: 'Code', type: 'text', editable: false },
-                        { key: 'sku', label: 'SKU', type: 'text', editable: false },
-                        { key: 'name', label: 'Product', type: 'text', editable: false },
-                        { key: 'onHand', label: 'On hand', type: 'number', editable: false },
-                        { key: 'labels', label: 'Labels', type: 'number', editable: true },
-                    ],
-                    allowAddRows: false,
-                    allowDeleteRows: true,
-                }),
-            ],
-            validate: (data) => {
-                const entered = (data.rows ?? []) as LabelQuantityRow[];
-                if (entered.length === 0) return 'Nothing left to print — every row was removed.';
-                const bad = entered.find(
-                    (r) => !Number.isInteger(Number(r.labels)) || Number(r.labels) < 0
-                );
-                if (bad) return `"${bad.sku}" needs a whole label count of 0 or more.`;
-                if (!entered.some((r) => Number(r.labels) > 0)) {
-                    return 'Every count is 0 — set at least one row to 1 or more.';
-                }
-                return true;
-            },
-            actions: [{ label: 'Continue to print', value: 'next', mode: 'primary' }],
-        });
+        if (single) {
+            // One product needs one number, not a grid — and with no grid to
+            // build, the channel can be chosen on this same page. That is what
+            // makes a product page's label one page and one click.
+            const entered = await ctx.ui.page(`quantities-${pass}`, {
+                stage: 'quantities',
+                title: pass === 0 ? single.name : 'Print this label again',
+                content: [
+                    ...(pass === 0 && single.unprintable.length > 0
+                        ? [
+                              ctx.ui.display.banner({
+                                  title: `${single.unprintable.length} other channel(s) cannot label this product`,
+                                  description: describeProductProblems(single),
+                                  mode: 'warning',
+                              }),
+                          ]
+                        : []),
+                    ctx.ui.display.keyValue({
+                        data: [
+                            { key: 'SKU', value: single.sku },
+                            { key: 'On hand', value: single.onHand },
+                            // Only when there is nothing to choose — otherwise
+                            // the dropdown below carries the same facts per
+                            // channel, and stating one of them here would go
+                            // stale the moment the operator picks the other.
+                            ...(single.options.length === 1
+                                ? [
+                                      { key: 'Channel', value: channel.channelName },
+                                      { key: 'Code', value: single.options[0].code },
+                                      {
+                                          key: 'Label stock',
+                                          value: LABEL_STOCKS[channel.defaultStock].label,
+                                      },
+                                  ]
+                                : []),
+                        ],
+                    }),
+                    ...(single.options.length > 1
+                        ? [
+                              ctx.ui.select.one('channelId', {
+                                  label: 'Channel',
+                                  options: single.options.map((o) => ({
+                                      label:
+                                          `${o.channel.channelName} — ${o.code} · ` +
+                                          `${symbologyLabel(o.channel.symbology)} on ` +
+                                          `${LABEL_STOCKS[o.channel.defaultStock].label}`,
+                                      value: o.channel.channelId,
+                                  })),
+                                  // No default on the first pass: with a real
+                                  // choice to make, an arbitrary one that the
+                                  // print page then fires on its own is a
+                                  // wrong-channel label nobody read. The
+                                  // runtime requires a pick. A re-run defaults
+                                  // to the channel just printed.
+                                  defaultValue: pass === 0 ? undefined : channel.channelId,
+                              }),
+                          ]
+                        : []),
+                    ctx.ui.inputs.number('labels', {
+                        label: 'Labels',
+                        defaultValue: labels,
+                        min: 1,
+                        helpText:
+                            'One label per unit going into the fulfilment centre. Starts at 1 so a ' +
+                            'stray click cannot commit a whole roll.',
+                    }),
+                ],
+                validate: (data) => {
+                    const count = Number((data as { labels?: unknown }).labels);
+                    if (!Number.isInteger(count) || count < 1) {
+                        return 'Set a whole number of labels, 1 or more.';
+                    }
+                    return true;
+                },
+                actions: [{ label: 'Print', value: 'next', mode: 'primary' }],
+            });
 
-        // Carried into the next pass so the grid comes back with what was last
-        // entered rather than resetting to the original seed.
-        rows = ((quantities.data.rows ?? []) as LabelQuantityRow[]).map((r) => ({
-            ...r,
-            labels: Number(r.labels),
-        }));
+            const answer = entered.data as { channelId?: string; labels: number };
+            // The fallback is the one-option case, where there is no dropdown on
+            // the page to answer with; where there is one, it is required.
+            const option =
+                single.options.find((o) => o.channel.channelId === answer.channelId) ??
+                single.options[0];
+            channel = option.channel;
+            labels = Number(answer.labels);
+            rows = [
+                {
+                    productId: single.productId,
+                    code: option.code,
+                    sku: single.sku,
+                    name: single.name,
+                    onHand: single.onHand,
+                    labels,
+                },
+            ];
+        } else {
+            const quantities = await ctx.ui.page(`quantities-${pass}`, {
+                stage: 'quantities',
+                title:
+                    pass > 0
+                        ? 'Adjust the counts and print again'
+                        : shipmentLoad
+                          ? `Shipment ${shipmentLoad.reference} — ${channel.channelName}`
+                          : 'How many labels of each?',
+                content: [
+                    // The shipment summary. It was a page of its own until it
+                    // became clear it only ever preceded this one — the same
+                    // facts, one click cheaper.
+                    ...(pass === 0 && shipmentLoad
+                        ? [
+                              ...(shipmentLoad.unprintable.length > 0
+                                  ? [
+                                        ctx.ui.display.banner({
+                                            title: `${shipmentLoad.unprintable.length} line(s) cannot be labelled`,
+                                            description: describeShipmentProblems(shipmentLoad),
+                                            mode: 'warning',
+                                        }),
+                                    ]
+                                  : []),
+                              ctx.ui.display.keyValue({
+                                  data: [
+                                      { key: 'Shipment', value: shipmentLoad.externalId },
+                                      { key: 'Channel', value: channel.channelName },
+                                      { key: 'Lines to label', value: shipmentLoad.candidates.length },
+                                      {
+                                          key: 'Units going in',
+                                          value: shipmentLoad.candidates.reduce(
+                                              (sum, c) => sum + c.quantity,
+                                              0
+                                          ),
+                                      },
+                                      {
+                                          key: 'Label stock',
+                                          value: LABEL_STOCKS[channel.defaultStock].label,
+                                      },
+                                  ],
+                              }),
+                              ...unprintableTable(ctx, shipmentLoad),
+                          ]
+                        : []),
+                    ctx.ui.display.markdown({
+                        content:
+                            pass > 0
+                                ? 'Set the products you have already labelled to **0** — only rows with a ' +
+                                  'count of 1 or more are printed. Remove a row entirely to leave it out.'
+                                : shipmentLoad
+                                  ? 'One label per unit going into the fulfilment centre. Counts come from the ' +
+                                    'consignment; **on hand** is shown for reference.'
+                                  : 'One label per unit going into the fulfilment centre. **On hand** is shown ' +
+                                    'for reference — counts start at 1 so a stray click cannot commit a whole roll.',
+                    }),
+                    ctx.ui.inputs.dataGrid('rows', {
+                        data: rows,
+                        columns: [
+                            { key: 'productId', type: 'hidden' },
+                            { key: 'code', label: 'Code', type: 'text', editable: false },
+                            { key: 'sku', label: 'SKU', type: 'text', editable: false },
+                            { key: 'name', label: 'Product', type: 'text', editable: false },
+                            { key: 'onHand', label: 'On hand', type: 'number', editable: false },
+                            { key: 'labels', label: 'Labels', type: 'number', editable: true },
+                        ],
+                        allowAddRows: false,
+                        allowDeleteRows: true,
+                    }),
+                ],
+                validate: (data) => {
+                    const entered = (data.rows ?? []) as LabelQuantityRow[];
+                    if (entered.length === 0) return 'Nothing left to print — every row was removed.';
+                    const bad = entered.find(
+                        (r) => !Number.isInteger(Number(r.labels)) || Number(r.labels) < 0
+                    );
+                    if (bad) return `"${bad.sku}" needs a whole label count of 0 or more.`;
+                    if (!entered.some((r) => Number(r.labels) > 0)) {
+                        return 'Every count is 0 — set at least one row to 1 or more.';
+                    }
+                    return true;
+                },
+                actions: [{ label: 'Continue to print', value: 'next', mode: 'primary' }],
+            });
+
+            // Carried into the next pass so the grid comes back with what was
+            // last entered rather than resetting to the original seed.
+            rows = ((quantities.data.rows ?? []) as LabelQuantityRow[]).map((r) => ({
+                ...r,
+                labels: Number(r.labels),
+            }));
+        }
+
+        // Read straight off the channel's label spec — the roll is part of how
+        // the channel is set up, not something to re-confirm on every run.
+        const format: LabelFormat = {
+            symbology: channel.symbology,
+            annotation: channel.annotation,
+            annotationPlacement: channel.annotationPlacement,
+            stock: LABEL_STOCKS[channel.defaultStock],
+        };
 
         // A count of 0 means "already done" — kept visible in the grid for the
         // next pass, but not printed.
@@ -330,7 +464,9 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
 
         const outcome = await ctx.ui.page(`print-${pass}`, {
             stage: 'print',
-            title: `Print ${totalLabels} label(s)`,
+            title: single
+                ? `Printing ${totalLabels} label(s)`
+                : `Print ${totalLabels} label(s)`,
             content: [
                 ...(worst.withinTolerance
                     ? []
@@ -347,7 +483,7 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
                 ctx.ui.display.keyValue({
                     data: [
                         { key: 'Channel', value: channel.channelName },
-                        { key: 'Symbology', value: channel.symbology === 'Ean13' ? 'EAN-13' : 'Code 128' },
+                        { key: 'Symbology', value: symbologyLabel(channel.symbology) },
                         ...(channel.annotation ? [{ key: 'Annotation', value: channel.annotation }] : []),
                         { key: 'Products', value: printing.length },
                         { key: 'Labels in total', value: totalLabels },
@@ -365,9 +501,10 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
                 }),
                 ctx.ui.interactive.print({
                     title: `${channel.channelName} unit barcodes`,
-                    description:
-                        'The whole run is one job, so it prints without a pause between products. ' +
-                        'If a label jams, go back and re-run just that product.',
+                    description: single
+                        ? 'Printing as this page opens. Press print again if the label comes out short.'
+                        : 'The whole run is one job, so it prints without a pause between products. ' +
+                          'If a label jams, go back and re-run just that product.',
                     jobs: [
                         {
                             name: `${printing.length} product(s) × ${totalLabels} label(s)`,
@@ -376,11 +513,20 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
                             data,
                         },
                     ],
+                    // Fires the job as the page opens, so one product is a single
+                    // click from its page to a label in hand. Deliberately not
+                    // done for the batch paths: a run there is tens or hundreds
+                    // of labels, and anything that re-fires the job costs a roll
+                    // rather than a label.
+                    autoPrint: single !== undefined,
                     allowReprint: true,
                 }),
             ],
             actions: [
-                { label: 'Adjust counts and print again', value: 'again' },
+                {
+                    label: single ? 'Print another count' : 'Adjust counts and print again',
+                    value: 'again',
+                },
                 { label: 'Done', value: 'done', mode: 'primary' },
             ],
         });
@@ -393,9 +539,12 @@ export default PrintChannelBarcodes(config, async (ctx, inputs) => {
         stage: 'print',
         autoClose: true,
         title: 'Labels sent to the printer',
-        description: `${source} — ${passesPrinted} print run(s) on ${format.stock.label}.`,
+        description: `${source} — ${passesPrinted} print run(s) on ${LABEL_STOCKS[channel.defaultStock].label}.`,
     });
 });
+
+const symbologyLabel = (symbology: BarcodeSymbology): string =>
+    symbology === BarcodeSymbology.Ean13 ? 'EAN-13' : 'Code 128';
 
 // Both entry paths dead-end the same way when the channel has no label spec:
 // the codes can be synced and sitting on every product, but nothing is
@@ -448,6 +597,31 @@ function unprintableTable(ctx: any, load: ShipmentLabelLoad) {
             data: load.unprintable.map((u) => ({
                 Line: u.sku,
                 Product: u.name,
+                Problem: u.problem,
+            })),
+        }),
+    ];
+}
+
+// Which channels cannot label this product, in one sentence. Named rather than
+// counted, since with two channels in play "one of them is missing a code" is
+// not enough to act on.
+function describeProductProblems(load: ProductLabelLoad): string {
+    if (load.unprintable.length === 0) {
+        return 'No channel is set up to label this product.';
+    }
+    return (
+        `${load.unprintable.map((u) => u.channelName).join(', ')} cannot label it — see below. ` +
+        'A missing or invalid code is fixed under Channel codes on the product page.'
+    );
+}
+
+function productProblemTable(ctx: any, load: ProductLabelLoad) {
+    if (load.unprintable.length === 0) return [];
+    return [
+        ctx.ui.display.table({
+            data: load.unprintable.map((u) => ({
+                Channel: u.channelName,
                 Problem: u.problem,
             })),
         }),
