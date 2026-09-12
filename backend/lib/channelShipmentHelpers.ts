@@ -1,15 +1,22 @@
 // Channel-generic syncing of inbound fulfilment-centre consignments.
 //
-// A platform adapter (lib/takealotShipmentHelpers today) turns that platform's
-// payload into `ExternalShipment[]`; everything below is shared. The split is
-// what keeps a second platform to one new file: nothing here knows what
-// Takealot is, and nothing there touches the database.
+// A platform adapter (lib/takealotShipmentHelpers, lib/amazonShipmentHelpers)
+// turns that platform's payload into `ExternalShipment[]`; everything below is
+// shared. The split is what keeps a further platform to one new file: nothing
+// here knows what Takealot or Amazon is, and nothing there touches the
+// database.
 //
 // Two passes, matching the barcode sync's shape: a read-only `computeSyncPlan`
 // the flow shows for review, then `applyShipmentSync`. See
 // docs/channel-shipments.md.
 
 import { models, ChannelShipmentStatus } from '@teamkeel/sdk';
+import {
+    ChannelCodeEntry,
+    ChannelCodeSyncPlan,
+    applyChannelCodeSync,
+    planChannelCodeSync,
+} from './channelCodeSync';
 import { getOrCreateChannel } from './zohoSalesHelpers';
 import { ProgressReporter } from './progress';
 
@@ -26,6 +33,16 @@ export interface ExternalShipmentItem {
     quantityRequired: number;
     quantitySending: number;
     cancelled: boolean;
+    // The channel puts the unit label on these units itself, or they carry the
+    // manufacturer's own barcode — see the schema field of the same name.
+    labelledByChannel: boolean;
+    // The unit-label code the channel's own consignment says these units will
+    // carry (Amazon's FNSKU). Null where the platform does not state one on the
+    // line, as Takealot does not. When present and the line matches a product,
+    // the sync keeps that product's channel code in step with it — the
+    // consignment is the most authoritative source for the code that has to be
+    // on the units actually going in.
+    code: string | null;
 }
 
 // Dates are ISO 8601 strings, not Date objects, because a plan built by an
@@ -35,6 +52,9 @@ export interface ExternalShipmentItem {
 // toDate() below, rather than silently at the boundary.
 export interface ExternalShipment {
     externalId: string;
+    // The channel's id for the batch this consignment belongs to, where the
+    // platform nests them (Amazon's inbound plan). Null where it does not.
+    externalGroupId: string | null;
     reference: string | null;
     status: ChannelShipmentStatus;
     statusDescription: string | null;
@@ -86,6 +106,14 @@ export function toDateOnly(date: Date | null): string | null {
 type StoredShipment = Awaited<ReturnType<typeof models.channelShipment.findMany>>[number];
 type StoredShipmentItem = Awaited<ReturnType<typeof models.channelShipmentItem.findMany>>[number];
 
+// How to address one consignment we already track on the channel. The group id
+// rides along because a platform that nests consignments cannot be asked for one
+// without it.
+export interface TrackedShipmentRef {
+    externalId: string;
+    externalGroupId: string | null;
+}
+
 export interface ShipmentFetchOptions {
     // Pull consignments the channel has already dispatched. Off by default: the
     // reason to sync is to label what is still going out, and a channel keeps
@@ -94,13 +122,14 @@ export interface ShipmentFetchOptions {
     // Pull consignments the channel has archived as well. Off by default for the
     // same reason.
     includeArchived?: boolean;
-    // Channel-side ids to fetch regardless of the filters above — see
-    // openShipmentExternalIds.
-    alsoFetchIds?: string[];
+    // Consignments to fetch regardless of the filters above — see
+    // openShipmentRefs.
+    alsoFetch?: TrackedShipmentRef[];
 }
 
 /**
- * The channel-side ids of consignments we track that have not finished.
+ * The consignments we track that have not finished, as the channel addresses
+ * them.
  *
  * These are fetched even when the sync is filtered to unshipped consignments.
  * Without that, a shipment that has since been dispatched simply stops coming
@@ -110,7 +139,7 @@ export interface ShipmentFetchOptions {
  * `Received` and `Cancelled` are terminal, so they drop out and stop costing a
  * lookup.
  */
-export async function openShipmentExternalIds(channelName: string): Promise<string[]> {
+export async function openShipmentRefs(channelName: string): Promise<TrackedShipmentRef[]> {
     const channels = await models.channel.findMany({ where: { name: { equals: channelName } } });
     if (channels.length === 0) return [];
 
@@ -122,7 +151,7 @@ export async function openShipmentExternalIds(channelName: string): Promise<stri
             },
         },
     });
-    return stored.map((s) => s.externalId);
+    return stored.map((s) => ({ externalId: s.externalId, externalGroupId: s.externalGroupId }));
 }
 
 // ─── Plan pass ──────────────────────────────────────────────────────────────
@@ -152,6 +181,12 @@ export interface ShipmentSyncPlan {
     // Lines whose listing the channel could not name at all (no SKU behind the
     // listing id). Reported as listing refs, since that is all we have.
     unresolvedListings: string[];
+    // Unit-label codes the consignments state for their lines, diffed against
+    // the stored ProductChannelCode rows. Empty on a channel whose lines carry
+    // no code. Built from *every* fetched consignment rather than only the
+    // changed ones: a code that has drifted is worth fixing even in a sync where
+    // no consignment itself moved.
+    codePlan: ChannelCodeSyncPlan;
     warnings: string[];
 }
 
@@ -268,15 +303,75 @@ export async function computeShipmentSyncPlan(
         });
     }
 
+    const codes = codeEntries([...byExternalId.values()]);
+    warnings.push(...codes.warnings);
+    const codePlan = await planChannelCodeSync(channelName, channelName, codes.entries);
+
     return {
         channelName,
         changes,
         unchanged,
         unmatchedSkus: [...unmatchedSkus].sort(),
         unresolvedListings: [...unresolvedListings].sort(),
+        codePlan,
         warnings,
     };
 }
+
+/**
+ * The unit-label codes a set of consignments states, one entry per SKU.
+ *
+ * Lines with no SKU or no code are left out entirely rather than handed over
+ * with an empty code: an empty code means "the channel lists this SKU but holds
+ * nothing for it", which would put the SKU in the code plan's
+ * `skusWithoutCode`. On a consignment that is not news — most channels never
+ * state a code on a line at all.
+ *
+ * De-duplicated here rather than in planChannelCodeSync, which warns on every
+ * repeat: one SKU appearing across several consignments is ordinary, and the
+ * warning is only earned when those consignments disagree about the code.
+ *
+ * Consignments are read **oldest first** so that the last write, which is the
+ * one that stands, is the most recent statement of the code. Adapters return
+ * newest first, so taking them as they come would let a consignment from months
+ * ago overwrite the code for the one going out this week.
+ */
+function codeEntries(shipments: ExternalShipment[]): {
+    entries: ChannelCodeEntry[];
+    warnings: string[];
+} {
+    const codeBySku = new Map<string, string>();
+    const conflicts = new Set<string>();
+
+    // A consignment the channel gave no date for sorts oldest: it cannot
+    // out-rank one we can actually place in time.
+    const oldestFirst = [...shipments].sort(
+        (a, b) => placedTime(a.placedAt) - placedTime(b.placedAt)
+    );
+
+    for (const shipment of oldestFirst) {
+        for (const item of shipment.items) {
+            if (!item.sku || !item.code) continue;
+            const seen = codeBySku.get(item.sku);
+            if (seen !== undefined && seen !== item.code) conflicts.add(item.sku);
+            codeBySku.set(item.sku, item.code);
+        }
+    }
+
+    return {
+        entries: [...codeBySku].map(([sku, code]) => ({ sku, code })),
+        warnings: [...conflicts]
+            .sort()
+            .map(
+                (sku) =>
+                    `Consignments disagree on the label code for ${sku} — using the most recent one (${codeBySku.get(sku)})`
+            ),
+    };
+}
+
+// A consignment's placed date as a sortable number; the epoch for one with no
+// date, so it sorts oldest.
+const placedTime = (placedAt: string | null): number => toDate(placedAt)?.getTime() ?? 0;
 
 // Whether a stored consignment already says exactly what the channel says —
 // header *and* every line. Compared in full rather than on a timestamp: channels
@@ -290,6 +385,7 @@ function shipmentMatchesStored(
 ): boolean {
     const headerMatches =
         stored.reference === shipment.reference &&
+        stored.externalGroupId === shipment.externalGroupId &&
         stored.status === shipment.status &&
         stored.statusDescription === shipment.statusDescription &&
         stored.destination === shipment.destination &&
@@ -312,7 +408,8 @@ function shipmentMatchesStored(
             storedItem.productId === (item.sku ? (productBySku.get(item.sku) ?? null) : null) &&
             storedItem.quantityRequired === item.quantityRequired &&
             storedItem.quantitySending === item.quantitySending &&
-            storedItem.cancelled === item.cancelled
+            storedItem.cancelled === item.cancelled &&
+            storedItem.labelledByChannel === item.labelledByChannel
         );
     });
 }
@@ -324,6 +421,9 @@ export interface ShipmentApplyResult {
     updated: number;
     linesWritten: number;
     linesRemoved: number;
+    // Product channel codes set from the codes the consignments state.
+    codesCreated: number;
+    codesUpdated: number;
 }
 
 /**
@@ -336,6 +436,11 @@ export interface ShipmentApplyResult {
  * Lines the channel no longer lists on a synced consignment *are* deleted — the
  * channel owns what is on its own consignment, and a stale line would otherwise
  * keep printing labels for units that are not going in.
+ *
+ * Finishes by applying the plan's code changes, so a consignment whose lines
+ * state a unit-label code leaves the products it names printable. That runs on
+ * the shared channel-code core, and so keeps its rules: only this channel's
+ * codes are touched, and none is ever deleted or blanked.
  */
 export async function applyShipmentSync(
     plan: ShipmentSyncPlan,
@@ -346,13 +451,21 @@ export async function applyShipmentSync(
     const products = await models.product.findMany();
     const productBySku = new Map(products.map((p) => [p.sku, p.id]));
 
-    const result: ShipmentApplyResult = { created: 0, updated: 0, linesWritten: 0, linesRemoved: 0 };
+    const result: ShipmentApplyResult = {
+        created: 0,
+        updated: 0,
+        linesWritten: 0,
+        linesRemoved: 0,
+        codesCreated: 0,
+        codesUpdated: 0,
+    };
 
     progress?.set({ current: 0, total: plan.changes.length, unit: 'shipments', counter: 'count' });
 
     for (const change of plan.changes) {
         const shipment = change.shipment;
         const fields = {
+            externalGroupId: shipment.externalGroupId,
             reference: shipment.reference,
             status: shipment.status,
             statusDescription: shipment.statusDescription,
@@ -397,6 +510,7 @@ export async function applyShipmentSync(
                 quantityRequired: item.quantityRequired,
                 quantitySending: item.quantitySending,
                 cancelled: item.cancelled,
+                labelledByChannel: item.labelledByChannel,
             };
 
             const storedItem = storedByExternalId.get(item.externalId);
@@ -424,6 +538,13 @@ export async function applyShipmentSync(
             `${existing.length > 0 ? 'Updated' : 'Added'} shipment ${shipment.externalId}` +
                 `${shipment.reference ? ` (${shipment.reference})` : ''} — ${shipment.items.length} line(s)`
         );
+    }
+
+    if (plan.codePlan.changes.length > 0) {
+        progress?.set({ message: 'Updating label codes from the consignments…' });
+        const codes = await applyChannelCodeSync(plan.codePlan, progress);
+        result.codesCreated = codes.created;
+        result.codesUpdated = codes.updated;
     }
 
     return result;

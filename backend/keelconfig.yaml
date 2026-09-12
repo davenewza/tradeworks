@@ -27,7 +27,9 @@ environment:
     value: "https://marketplace-api.takealot.com"
 
   # Amazon Selling Partner API. Read for each FBA listing's FNSKU, the code on
-  # Amazon unit labels (docs/amazon-fnskus.md). Amazon.co.za is served by the
+  # Amazon unit labels (docs/amazon-fnskus.md), and for the FBA inbound
+  # consignments those labels are printed for (docs/channel-shipments.md). Both
+  # need the app's Amazon Fulfillment role. Amazon.co.za is served by the
   # EU regional endpoint; the marketplace ID is Amazon South Africa's. Login
   # with Amazon issues the access tokens; the client ID is the seller's own
   # SP-API app's, and like the Zoho client ID it is an identifier rather than

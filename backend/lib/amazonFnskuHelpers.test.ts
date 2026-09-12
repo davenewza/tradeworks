@@ -1,5 +1,5 @@
 import { models, resetDatabase } from '@teamkeel/testing';
-import { BarcodeSymbology, LabelAnnotationPlacement, LabelStockSize } from '@teamkeel/sdk';
+import { BarcodeSymbology, LabelStockSize } from '@teamkeel/sdk';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
     AMAZON_CHANNEL_NAME,
@@ -381,9 +381,7 @@ describe('amazonLabelSpecExists', () => {
         await models.channelLabelSpec.create({
             channelId: channel.id,
             symbology: BarcodeSymbology.Code128,
-            annotation: 'New',
-            annotationPlacement: LabelAnnotationPlacement.BelowTitle,
-            defaultStock: LabelStockSize.Size67x25,
+            defaultStock: LabelStockSize.Size50x30,
             isEnabled: false,
         });
         expect(await amazonLabelSpecExists()).toBe(false);
@@ -394,9 +392,7 @@ describe('amazonLabelSpecExists', () => {
         await models.channelLabelSpec.create({
             channelId: channel.id,
             symbology: BarcodeSymbology.Code128,
-            annotation: 'New',
-            annotationPlacement: LabelAnnotationPlacement.BelowTitle,
-            defaultStock: LabelStockSize.Size67x25,
+            defaultStock: LabelStockSize.Size50x30,
             isEnabled: true,
         });
 

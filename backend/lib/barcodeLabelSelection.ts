@@ -2,13 +2,16 @@
 // barcodeLabelHelpers so the ZPL/geometry logic there stays free of the SDK and
 // testable as plain functions.
 
-import { models, BarcodeSymbology, LabelStockSize, LabelAnnotationPlacement } from '@teamkeel/sdk';
+import { models, BarcodeSymbology, LabelStockSize } from '@teamkeel/sdk';
 import {
     CandidateLoad,
+    DEFAULT_ELEMENTS,
     LabelCandidate,
+    LabelElement,
     ShipmentLabelCandidate,
     UnprintableProduct,
     checkCode,
+    validateElements,
 } from './barcodeLabelHelpers';
 
 // A channel we can print labels for, flattened for the flow's picker.
@@ -17,8 +20,15 @@ export interface PrintableChannel {
     channelId: string;
     channelName: string;
     symbology: BarcodeSymbology;
-    annotation: string | null;
-    annotationPlacement: LabelAnnotationPlacement;
+    // What the label carries, in print order.
+    elements: LabelElement[];
+    // True when the spec has no element rows of its own and is falling back to
+    // DEFAULT_ELEMENTS. Surfaced rather than swallowed: a plain label prints
+    // fine, so nothing else would tell the operator the channel is only
+    // half set up.
+    usingDefaultElements: boolean;
+    // Why the channel's own elements cannot be used as they stand.
+    elementProblems: string[];
     defaultStock: LabelStockSize;
     // How many products already carry a code for this channel — the difference
     // between "ready to print" and "configured but empty" at a glance.
@@ -40,18 +50,50 @@ export async function loadPrintableChannels(): Promise<PrintableChannel[]> {
     const channels = await models.channel.findMany({});
     const channelName = new Map(channels.map((c) => [c.id, c.name]));
 
+    // Every spec's elements in one query, then grouped — one query per spec
+    // would be a handful more round trips for no benefit.
+    const elementRows = await models.channelLabelElement.findMany({
+        where: { specId: { oneOf: specs.map((s) => s.id) } },
+    });
+    const elementsBySpec = new Map<string, LabelElement[]>();
+    for (const row of elementRows
+        .slice()
+        // Position first, creation order as the tie-break — position is not
+        // unique, so two rows can legitimately share one.
+        .sort((a, b) => a.position - b.position || a.createdAt.getTime() - b.createdAt.getTime())) {
+        const list = elementsBySpec.get(row.specId) ?? [];
+        list.push({
+            kind: row.kind,
+            text: row.text,
+            maxLines: row.maxLines,
+            maxHeightMm: row.maxHeightMm,
+            fontSizeMm: row.fontSizeMm,
+            paddingMm: row.paddingMm,
+            align: row.align,
+        });
+        elementsBySpec.set(row.specId, list);
+    }
+
     const result: PrintableChannel[] = [];
     for (const spec of specs) {
         const codes = await models.productChannelCode.findMany({
             where: { channel: { id: { equals: spec.channelId } } },
         });
+        const own = elementsBySpec.get(spec.id) ?? [];
+        const elementProblems = own.length > 0 ? validateElements(own) : [];
+        // A spec whose own elements do not make a label falls back too, rather
+        // than printing something misshapen; the problems ride along so the
+        // flow can name them.
+        const usable = own.length > 0 && elementProblems.length === 0;
+
         result.push({
             specId: spec.id,
             channelId: spec.channelId,
             channelName: channelName.get(spec.channelId) ?? '—',
             symbology: spec.symbology,
-            annotation: spec.annotation,
-            annotationPlacement: spec.annotationPlacement,
+            elements: usable ? own : DEFAULT_ELEMENTS,
+            usingDefaultElements: !usable,
+            elementProblems,
             defaultStock: spec.defaultStock,
             productsWithCodes: codes.length,
         });
@@ -222,6 +264,10 @@ export interface ShipmentLabelLoad {
     // Lines the channel has cancelled, excluded from the run. Counted rather
     // than listed: they are not a problem to fix, just not being sent.
     cancelledLines: number;
+    // Lines whose unit label the channel applies itself, or whose units carry
+    // the manufacturer's own barcode. Counted for the same reason — nothing to
+    // fix, just nothing for us to print.
+    channelLabelledLines: number;
 }
 
 /**
@@ -233,6 +279,9 @@ export interface ShipmentLabelLoad {
  * Label counts come from `quantitySending`, falling back to `quantityRequired`
  * for a consignment the channel has asked for but that has not been packed yet
  * (everything still sending zero). A line with neither has nothing to print.
+ *
+ * Cancelled lines and lines the channel labels itself are counted and left out
+ * rather than reported as problems — neither is something to go and fix.
  */
 export async function loadShipmentLabelCandidates(
     shipmentId: string
@@ -250,6 +299,7 @@ export async function loadShipmentLabelCandidates(
         candidates: [],
         unprintable: [],
         cancelledLines: 0,
+        channelLabelledLines: 0,
     };
     if (!channel) return load;
 
@@ -276,6 +326,14 @@ export async function loadShipmentLabelCandidates(
     for (const item of items) {
         if (item.cancelled) {
             load.cancelledLines++;
+            continue;
+        }
+
+        // Checked before the product and code checks below: a line the channel
+        // labels itself has no business being reported as missing a code, and
+        // on a manufacturer-barcode listing there deliberately is none.
+        if (item.labelledByChannel) {
+            load.channelLabelledLines++;
             continue;
         }
 

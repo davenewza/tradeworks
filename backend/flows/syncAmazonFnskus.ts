@@ -183,7 +183,9 @@ function noSpecBanner(ctx: any) {
             description:
                 'The codes are in place, but nothing prints until the channel has a label spec. ' +
                 'Products → Barcode labels → Add a label spec: channel Amazon Marketplace, ' +
-                'symbology Code 128, annotation “New” below the title, and the 66.7 × 25.4 mm stock.',
+                'symbology Code 128, 50 × 30 mm stock. Then give it three elements, in this ' +
+                'order: the barcode, the product name, and the text “New” — Amazon requires the ' +
+                'item condition at the bottom of every unit label.',
             mode: 'warning',
         }),
     ];

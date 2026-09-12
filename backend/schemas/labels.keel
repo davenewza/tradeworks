@@ -3,11 +3,13 @@
 //
 // Channels differ in every part of the label, so none of it is hardcoded:
 //   - Takealot wants the product's EAN-13 with an "MP" marker stacked at the
-//     left of the symbol.
-//   - Amazon FBA wants the FNSKU as Code 128, plus the item condition ("New"),
-//     which Amazon requires on every unit label.
-// A channel is printable once it has a ChannelLabelSpec; adding another is a
-// row, not a code change.
+//     left of the symbol, under the product name.
+//   - Amazon FBA wants the FNSKU as Code 128 at the top, the product name
+//     under it, and the item condition ("New") — which Amazon requires on
+//     every unit label — at the very bottom.
+// A channel is printable once it has a ChannelLabelSpec; what goes on the
+// label, and in what order, is a list of ChannelLabelElement rows. Both are
+// data, so a new channel or a new line of text is a row, not a code change.
 
 enum BarcodeSymbology {
     // Fixed 95-module symbol, digits only, 13th digit a check digit. Used where
@@ -32,22 +34,45 @@ enum LabelStockSize {
     Size100x50
 }
 
-// Where the channel's fixed annotation sits. Takealot stacks "MP" vertically
-// beside the symbol; Amazon's condition reads as a normal line under the title.
-enum LabelAnnotationPlacement {
-    StackedLeft
-    BelowTitle
+// What one line of a label is. Everything except StackedText is stacked down
+// the label in `position` order, which is what lets the two shapes differ:
+// Takealot runs Title then Barcode, Amazon runs Barcode then Title then the
+// condition.
+enum LabelElementKind {
+    // The product name, wrapped and truncated to the space it is given.
+    Title
+    // The symbol, plus the human-readable interpretation line the printer
+    // draws directly beneath the bars. Exactly one per spec — it is the label.
+    // It takes whatever height the other elements leave.
+    Barcode
+    // A fixed line of text — Amazon's item condition.
+    Text
+    // Fixed text set one character per line down the left of the symbol —
+    // Takealot's "MP". Out of the vertical flow, so `position` does not apply.
+    // Printed larger than the label's other text: it is a marker read across a
+    // receiving bay, not a line anyone reads up close.
+    StackedText
 }
 
-// How one channel's unit label is built. One row per channel we label for.
+// How text sits in the width it is given. Stacked text ignores it — it is a
+// column of single characters beside the bars.
+enum LabelTextAlign {
+    Left
+    Centre
+    Right
+}
+
+// How one channel's unit label is built. One row per channel we label for,
+// with the label's contents hanging off it as ChannelLabelElement rows.
 model ChannelLabelSpec {
     fields {
         channel Channel @unique
         symbology BarcodeSymbology
-        // Fixed text printed on every label for this channel — Takealot's "MP",
-        // Amazon's item condition. Not per-product.
-        annotation Text?
-        annotationPlacement LabelAnnotationPlacement @default(LabelAnnotationPlacement.BelowTitle)
+        // What is printed, and in what order. A spec with no elements still
+        // prints — product name over the barcode, the shape every channel
+        // shares — and the print flow says it is falling back to that, so a
+        // half-configured channel is visible rather than silently plain.
+        elements ChannelLabelElement[]
         // The roll this channel's labels are printed on. The print flow reads it
         // straight off the spec and never asks — the roll is a property of how
         // the channel is set up, not a per-run decision, and asking every time
@@ -62,21 +87,91 @@ model ChannelLabelSpec {
         list listChannelLabelSpecs(channel.id?, isEnabled?) {
             @orderBy(createdAt: asc)
         }
-        create createChannelLabelSpec() with (
-            channel.id,
-            symbology,
-            annotation?,
-            annotationPlacement?,
-            defaultStock?,
-        )
-        update updateChannelLabelSpec(id) with (
-            symbology,
-            annotation?,
-            annotationPlacement?,
-            defaultStock?,
-            isEnabled?,
-        )
+        create createChannelLabelSpec() with (channel.id, symbology, defaultStock?)
+        update updateChannelLabelSpec(id) with (symbology, defaultStock?, isEnabled?)
         delete deleteChannelLabelSpec(id)
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, create, update, delete]
+    )
+}
+
+// One line of a channel's label.
+//
+// Deliberately rows rather than a fixed set of fields on the spec: the two
+// shapes in use disagree about where the *product name* goes, not just about
+// the fixed text, so no arrangement of named slots covers both. As rows, a new
+// line of text — a condition, a batch note, a country of origin — is something
+// the Console adds, and the renderer never learns another special case.
+model ChannelLabelElement {
+    fields {
+        spec ChannelLabelSpec
+        // Top-to-bottom order. Sparse and duplicable on purpose: no unique
+        // constraint, so re-ordering two rows does not have to dodge one.
+        // Ties break on creation order.
+        position Number @default(1)
+        kind LabelElementKind
+        // Required for Text and StackedText; unused by Title and Barcode.
+        text Text?
+        // Title only: how many lines the product name may wrap to before it is
+        // truncated. Two fits most names on the warehouse roll; one buys the
+        // barcode about 2.7mm of extra height.
+        maxLines Number @default(2)
+        // Barcode only: how tall the bars may grow. The barcode takes whatever
+        // the other elements leave, which on a tall roll is more height than it
+        // needs — 17.5mm of bars on a 30mm label reads as all barcode. Capping
+        // it leaves the difference as white space at the foot of the label.
+        // Empty means no cap, which is the shape every label had before this
+        // existed. Taller bars never scan worse, so this is about how the label
+        // looks, not whether it works.
+        maxHeightMm Decimal?
+        // Cap height for this element's text, in millimetres. Empty means the
+        // size the layout derives from the label height — which is the better
+        // default, because it follows the label to a different roll where a
+        // fixed millimetre figure would not. Set it to overrule that for one
+        // element. On a barcode it sets the interpretation line under the bars.
+        //
+        // An explicit size is never shrunk: the fit search that keeps the bars
+        // above their minimum only has the derived sizes to work with, so an
+        // over-specified label reports a short barcode rather than quietly
+        // undoing what was asked for.
+        fontSizeMm Decimal?
+        // Blank space below this element, in millimetres. There is no padding
+        // above: put it below the element before instead. Comes out of the
+        // barcode's share, like any other height on the label.
+        paddingMm Decimal?
+        align LabelTextAlign @default(LabelTextAlign.Left)
+    }
+
+    actions {
+        get getChannelLabelElement(id)
+        list listChannelLabelElements(spec.id?) {
+            @orderBy(position: asc)
+        }
+        create createChannelLabelElement() with (
+            spec.id,
+            kind,
+            position?,
+            text?,
+            maxLines?,
+            maxHeightMm?,
+            fontSizeMm?,
+            paddingMm?,
+            align?,
+        )
+        update updateChannelLabelElement(id) with (
+            kind,
+            position?,
+            text?,
+            maxLines?,
+            maxHeightMm?,
+            fontSizeMm?,
+            paddingMm?,
+            align?,
+        )
+        delete deleteChannelLabelElement(id)
     }
 
     @permission(

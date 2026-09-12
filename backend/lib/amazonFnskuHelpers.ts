@@ -1,4 +1,13 @@
 import { models } from '@teamkeel/sdk';
+import {
+    AmazonCtx,
+    FetchOptions,
+    PAGE_PAUSE_MS,
+    amazonApiBase,
+    amazonGet,
+    getAmazonAccessToken,
+    sleeper,
+} from './amazonApi';
 import { ChannelCodeEntry, ChannelCodeSyncPlan, planChannelCodeSync } from './channelCodeSync';
 import { ProgressReporter } from './progress';
 
@@ -11,27 +20,18 @@ import { ProgressReporter } from './progress';
 // Two calls per sync: a Login with Amazon token exchange, then the FBA
 // Inventory summaries listing paged to the end. Neither touches the shared
 // Zoho quota.
+//
+// The token exchange and the throttle-aware GET live in amazonApi, shared with
+// the inbound shipment sync (amazonShipmentHelpers). They are re-exported here
+// so this module stays the one import the FNSKU flow needs.
+export type { AmazonCtx, FetchOptions };
+export { getAmazonAccessToken };
 
 // The channel the views import lands Amazon traffic on, and the Zoho sales
 // sync names Amazon sales with, so codes, views and sales sit on one row.
 export const AMAZON_CHANNEL_NAME = 'Amazon Marketplace';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-
-// The subset of ctx needed for Amazon calls, satisfied by flow, function and
-// subscriber contexts alike (mirrors TakealotCtx).
-export interface AmazonCtx {
-    env: {
-        AMAZON_SP_API_BASE_URL: string;
-        AMAZON_LWA_TOKEN_URL: string;
-        AMAZON_MARKETPLACE_ID: string;
-        AMAZON_LWA_CLIENT_ID: string;
-    };
-    secrets: {
-        AMAZON_LWA_CLIENT_SECRET: string;
-        AMAZON_LWA_REFRESH_TOKEN: string;
-    };
-}
 
 // One FBA listing as the sync sees it — the slice of an inventory summary that
 // matters for labels.
@@ -59,80 +59,7 @@ interface InventorySummariesResponse {
     errors?: { code?: string; message?: string; details?: string }[] | null;
 }
 
-// ─── Authentication ─────────────────────────────────────────────────────────
-
-/**
- * Exchange the long-lived LWA refresh token for an access token. SP-API no
- * longer needs AWS request signing; this token in `x-amz-access-token` is the
- * whole of it.
- */
-export async function getAmazonAccessToken(ctx: AmazonCtx): Promise<string> {
-    const body = new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: ctx.secrets.AMAZON_LWA_REFRESH_TOKEN,
-        client_id: ctx.env.AMAZON_LWA_CLIENT_ID,
-        client_secret: ctx.secrets.AMAZON_LWA_CLIENT_SECRET,
-    });
-
-    const response = await fetch(ctx.env.AMAZON_LWA_TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-        body: body.toString(),
-    });
-
-    if (!response.ok) {
-        // LWA's error body is `{ error, error_description }` — no credentials in it.
-        const errorText = await response.text();
-        throw new Error(`Failed to get Amazon access token: ${response.status} - ${errorText}`);
-    }
-
-    const tokenData = (await response.json()) as { access_token?: string };
-    if (!tokenData.access_token) {
-        throw new Error('Amazon token response missing access_token');
-    }
-    return tokenData.access_token;
-}
-
 // ─── Fetch ──────────────────────────────────────────────────────────────────
-
-// The FBA Inventory API allows 2 requests a second with a burst of 2, and a
-// nextToken dies 30 seconds after it is issued. Pacing the pages keeps a full
-// walk under the limit; the retries cover a throttle that lands anyway and are
-// short enough that the token is still alive when the retry goes out.
-const PAGE_PAUSE_MS = 500;
-const THROTTLE_BACKOFF_MS = [1000, 2000, 4000];
-
-const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-export interface FetchOptions {
-    // Injected by tests so retries and pacing do not actually wait.
-    sleep?: (ms: number) => Promise<void>;
-}
-
-async function getSummariesPage(
-    url: string,
-    accessToken: string,
-    sleep: (ms: number) => Promise<void>
-): Promise<InventorySummariesResponse> {
-    for (let attempt = 0; ; attempt++) {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: { 'x-amz-access-token': accessToken, Accept: 'application/json' },
-        });
-
-        if (response.status === 429 && attempt < THROTTLE_BACKOFF_MS.length) {
-            await sleep(THROTTLE_BACKOFF_MS[attempt]);
-            continue;
-        }
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch Amazon FBA inventory: ${response.status} - ${errorText}`);
-        }
-
-        return (await response.json()) as InventorySummariesResponse;
-    }
-}
 
 /**
  * Every FBA listing in the marketplace, with its FNSKU. Walks the FBA Inventory
@@ -148,9 +75,9 @@ export async function fetchFbaInventory(
     progress?: ProgressReporter,
     options: FetchOptions = {}
 ): Promise<AmazonListing[]> {
-    const sleep = options.sleep ?? realSleep;
+    const sleep = sleeper(options);
     const accessToken = await getAmazonAccessToken(ctx);
-    const base = ctx.env.AMAZON_SP_API_BASE_URL.replace(/\/$/, '');
+    const base = amazonApiBase(ctx);
     const marketplaceId = ctx.env.AMAZON_MARKETPLACE_ID;
 
     const listings: AmazonListing[] = [];
@@ -164,9 +91,10 @@ export async function fetchFbaInventory(
         });
         if (nextToken) params.set('nextToken', nextToken);
 
-        const page: InventorySummariesResponse = await getSummariesPage(
+        const page = await amazonGet<InventorySummariesResponse>(
             `${base}/fba/inventory/v1/summaries?${params.toString()}`,
             accessToken,
+            'FBA inventory',
             sleep
         );
 

@@ -7,6 +7,9 @@
 import { ExternalShipment, ShipmentFetchOptions } from './channelShipmentHelpers';
 
 export type { ShipmentFetchOptions };
+import { AmazonCtx, amazonIsConfigured } from './amazonApi';
+import { AMAZON_CHANNEL_NAME } from './amazonFnskuHelpers';
+import { fetchAmazonShipments } from './amazonShipmentHelpers';
 import { TakealotCtx } from './takealotOfferHelpers';
 import { fetchTakealotShipments } from './takealotShipmentHelpers';
 import { TAKEALOT_CHANNEL_NAME } from './zohoChannelFeeHelpers';
@@ -14,8 +17,8 @@ import { ProgressReporter } from './progress';
 
 // The slice of ctx the adapters need — the intersection of every platform's env
 // vars and secrets. A flow, function or subscriber ctx satisfies it
-// structurally. As adapters are added this becomes `TakealotCtx & AmazonCtx`.
-export type ShipmentSyncCtx = TakealotCtx;
+// structurally.
+export type ShipmentSyncCtx = TakealotCtx & AmazonCtx;
 
 
 export interface ChannelShipmentAdapter {
@@ -38,7 +41,15 @@ const takealotAdapter: ChannelShipmentAdapter = {
     fetch: (ctx, options, progress) => fetchTakealotShipments(ctx, options, progress),
 };
 
-export const SHIPMENT_ADAPTERS: ChannelShipmentAdapter[] = [takealotAdapter];
+// The same channel the FNSKU sync and the views import use, so a product's
+// Amazon codes, traffic and consignments all sit on one row.
+const amazonAdapter: ChannelShipmentAdapter = {
+    channelName: AMAZON_CHANNEL_NAME,
+    isConfigured: (ctx) => amazonIsConfigured(ctx),
+    fetch: (ctx, options, progress) => fetchAmazonShipments(ctx, options, progress),
+};
+
+export const SHIPMENT_ADAPTERS: ChannelShipmentAdapter[] = [takealotAdapter, amazonAdapter];
 
 /** The adapter for a channel name, or undefined if we cannot pull its shipments. */
 export function adapterFor(channelName: string): ChannelShipmentAdapter | undefined {

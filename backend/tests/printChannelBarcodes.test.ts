@@ -7,7 +7,7 @@ import { flows, models, resetDatabase } from '@teamkeel/testing';
 import {
     BarcodeSymbology,
     ChannelShipmentStatus,
-    LabelAnnotationPlacement,
+    LabelElementKind,
     LabelStockSize,
     Team,
 } from '@teamkeel/sdk';
@@ -30,28 +30,60 @@ async function operator() {
     return await models.identity.create({ email, userId: user.id });
 }
 
+// The Takealot shape: name over the symbol, "MP" stacked beside it.
 async function takealot() {
     const channel = await models.channel.create({ name: 'Takealot' });
-    await models.channelLabelSpec.create({
+    const spec = await models.channelLabelSpec.create({
         channelId: channel.id,
         symbology: BarcodeSymbology.Ean13,
-        annotation: 'MP',
-        annotationPlacement: LabelAnnotationPlacement.StackedLeft,
         defaultStock: LabelStockSize.Size50x30,
         isEnabled: true,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 1,
+        kind: LabelElementKind.Title,
+        maxLines: 2,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 2,
+        kind: LabelElementKind.Barcode,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 3,
+        kind: LabelElementKind.StackedText,
+        text: 'MP',
     });
     return channel;
 }
 
+// The Amazon shape: name, symbol, then the item condition.
 async function amazon() {
     const channel = await models.channel.create({ name: 'Amazon' });
-    await models.channelLabelSpec.create({
+    const spec = await models.channelLabelSpec.create({
         channelId: channel.id,
         symbology: BarcodeSymbology.Code128,
-        annotation: 'New',
-        annotationPlacement: LabelAnnotationPlacement.BelowTitle,
         defaultStock: LabelStockSize.Size67x25,
         isEnabled: true,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 1,
+        kind: LabelElementKind.Title,
+        maxLines: 1,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 2,
+        kind: LabelElementKind.Barcode,
+    });
+    await models.channelLabelElement.create({
+        specId: spec.id,
+        position: 3,
+        kind: LabelElementKind.Text,
+        text: 'New',
     });
     return channel;
 }
@@ -135,7 +167,7 @@ describe('PrintChannelBarcodes — from a product page', () => {
         expect(keyValues(page.ui)).toMatchObject({
             Channel: 'Takealot',
             Symbology: 'EAN-13',
-            Annotation: 'MP',
+            'Label layout': 'Product name \u2192 Barcode, \u201cMP\u201d stacked left',
             Products: 1,
             'Labels in total': 3,
             Printer: 'Barcode labels',
@@ -200,7 +232,7 @@ describe('PrintChannelBarcodes — from a product page', () => {
         expect(keyValues(page.ui)).toMatchObject({
             Channel: 'Amazon',
             Symbology: 'Code 128',
-            Annotation: 'New',
+            'Label layout': 'Product name \u2192 Barcode \u2192 \u201cNew\u201d',
             'Labels in total': 2,
             'Label stock': '66.7 × 25.4 mm (2⅝" × 1")',
         });
