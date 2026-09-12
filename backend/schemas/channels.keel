@@ -14,6 +14,19 @@ model Channel {
         expression: ctx.isAuthenticated,
         actions: [get, list, create]
     )
+
+    // Redundant for the API — the expression above already admits any signed-in
+    // user, and @permission rules are OR'd — but reporting reads roles only.
+    // Cube access is resolved from role-bearing `list` rules alone; an
+    // expression-only rule contributes nothing, so without this the `channel`
+    // cube is missing from the allowed-cubes JWT claim and any chart or
+    // dashboard filter touching channel.* fails with "Access denied to
+    // table(s): channel". Local `keel run` hides this when it bypasses
+    // permissions, which allows every cube.
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
 }
 
 // How a fee's value is applied to a sale.
