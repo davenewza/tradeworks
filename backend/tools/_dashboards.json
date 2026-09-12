@@ -1,7 +1,7 @@
 [
   {
     "id": "dashboard_3HwSw5F1W8NFwHglBS1P0cKt873",
-    "name": "Sales overview",
+    "name": "Revenue over time",
     "items": "[{\"id\":\"item-1786778171230-q5yrgc5\",\"chartId\":\"chart_3HwTVmEMAdueG0MtxhoZyj3e89A\",\"layout\":{\"i\":\"item-1786778171230-q5yrgc5\",\"x\":0,\"y\":0,\"w\":24,\"h\":7,\"minW\":4,\"minH\":3}},{\"id\":\"item-1786942774656-uvj73ol\",\"chartId\":\"chart_3I1r4Ny4KjPw3hrzIquFYHzIjTo\",\"layout\":{\"i\":\"item-1786942774656-uvj73ol\",\"x\":0,\"y\":7,\"w\":24,\"h\":9,\"minW\":4,\"minH\":3}},{\"id\":\"item-1789084800000-chansales\",\"chartId\":\"chart_3I2RpZcV7mLwHfS5tNxBqKe8Zm4\",\"layout\":{\"i\":\"item-1789084800000-chansales\",\"x\":0,\"y\":16,\"w\":24,\"h\":9,\"minW\":4,\"minH\":3}}]",
     "filters": "[{\"id\":\"f_msvbopwsmpmx\",\"name\":\"Order Date\",\"type\":\"date\",\"member\":\"sale.date\",\"defaultOperator\":\"inDateRange\"},{\"id\":\"f_mswrlvnrwrdr\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\",\"name\":\"Brand\"}]",
     "createdAt": "2026-08-15T07:11:13.811926Z",
@@ -9,15 +9,15 @@
   },
   {
     "id": "dashboard_3I1tD2JSru5Lq5Ie2IYdtWsYfy2",
-    "name": "Product Sales Quantities",
-    "items": "[{\"id\":\"item-1786943781044-ynggzrj\",\"chartId\":\"chart_3I1tBYq44PDZsEOPsah9JJLmYvR\",\"layout\":{\"i\":\"item-1786943781044-ynggzrj\",\"x\":0,\"y\":0,\"w\":24,\"h\":11,\"minW\":4,\"minH\":3}}]",
-    "filters": "[{\"id\":\"f_msws77pvr5k4\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\",\"defaultValue\":[\"Makerzoid\"]},{\"id\":\"f_msws7sn5sv91\",\"type\":\"date\",\"member\":\"sale.date\",\"defaultOperator\":\"inDateRange\",\"name\":\"Date\"}]",
+    "name": "Product sales quantities",
+    "items": "[{\"id\":\"item-1789171200000-qtypermonth\",\"chartId\":\"chart_3I2SqAdW8nMxIgT6uOyCrLf9Ao5\",\"layout\":{\"i\":\"item-1789171200000-qtypermonth\",\"x\":0,\"y\":0,\"w\":24,\"h\":7,\"minW\":4,\"minH\":3}},{\"id\":\"item-1786943781044-ynggzrj\",\"chartId\":\"chart_3I1tBYq44PDZsEOPsah9JJLmYvR\",\"layout\":{\"i\":\"item-1786943781044-ynggzrj\",\"x\":0,\"y\":7,\"w\":24,\"h\":11,\"minW\":4,\"minH\":3}}]",
+    "filters": "[{\"id\":\"f_msws77pvr5k4\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\",\"defaultValue\":[\"Makerzoid\"]},{\"id\":\"f_msws7sn5sv91\",\"type\":\"date\",\"member\":\"sale.date\",\"defaultOperator\":\"inDateRange\",\"name\":\"Date\"},{\"id\":\"f_psqchannel\",\"name\":\"Channel\",\"type\":\"text\",\"member\":\"channel.name\",\"defaultOperator\":\"equals\"}]",
     "createdAt": "2026-08-17T05:16:18.577282Z",
-    "updatedAt": "2026-08-17T05:17:12.902197Z"
+    "updatedAt": "2026-09-12T09:00:00.000000Z"
   },
   {
     "id": "dashboard_3I2RnYcU8mLwGeS5tMxAqJd9Zk3",
-    "name": "Cumulative sales",
+    "name": "The Worm",
     "items": "[{\"id\":\"item-1787220000000-cumsales\",\"chartId\":\"chart_3I2QmXbT9nKvFdR4sLwZpHc7Yj2\",\"layout\":{\"i\":\"item-1787220000000-cumsales\",\"x\":0,\"y\":0,\"w\":24,\"h\":11,\"minW\":4,\"minH\":3}}]",
     "filters": "[{\"id\":\"f_cumsalesmonth\",\"name\":\"Month\",\"type\":\"date\",\"member\":\"cumulative_sales.month_start\",\"defaultOperator\":\"inDateRange\"},{\"id\":\"f_cumsalesbrand\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\"},{\"id\":\"f_cumsaleschannel\",\"name\":\"Channel\",\"type\":\"text\",\"member\":\"channel.name\",\"defaultOperator\":\"equals\"}]",
     "createdAt": "2026-08-20T10:00:00.000000Z",

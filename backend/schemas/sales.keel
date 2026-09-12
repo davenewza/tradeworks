@@ -87,9 +87,9 @@ flow ScheduledSyncSales {
 //
 // Only ever put this on a dashboard whose filters resolve against THIS cube —
 // its own fields, or channel/brand, which it joins many-to-one and so can be
-// filtered on without adding rows. The "Cumulative sales" dashboard is built
-// that way. Do NOT add it to a dashboard carrying a sale.* filter (both the
-// existing ones do): dashboard filters are appended to every chart's query
+// filtered on without adding rows. "The Worm" dashboard is built that way. Do
+// NOT add it to a dashboard carrying a sale.* filter (both the existing ones
+// do): dashboard filters are appended to every chart's query
 // unconditionally, and Cube would resolve sale.date over the one-to-many path
 // brand → product → sale, fanning each row out across every sale of that brand
 // and inflating the totals. It reads as plausible numbers, not as an error.
