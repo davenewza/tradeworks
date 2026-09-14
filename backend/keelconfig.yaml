@@ -1,6 +1,10 @@
 environment:
+  # The Courier Guy moved off the shared ShipLogic host in May 2026. Keys issued
+  # by the TCG portal are rejected by api.shiplogic.com with a 401; they only
+  # work against TCG's own ShipLogic-powered API, which has the same rates schema.
+  # thecourierguy.co.za/api-docs documents /rates; /v2/rates also answers identically.
   - name: SHIPLOGIC_API_URL
-    value: "https://api.shiplogic.com/v2/rates"
+    value: "https://api.portal.thecourierguy.co.za/rates"
   - name: ZOHO_BOOKS_BASE_URL
     value: "https://www.zohoapis.com/books/v3"
   - name: ZOHO_BOOKS_ORG_ID
