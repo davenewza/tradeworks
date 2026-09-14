@@ -17,7 +17,7 @@ This is a full-stack quote management application built with Keel (backend frame
 
 **External APIs:**
 - Zoho Books API v3 for accounting integration (OpenAPI schema at `docs/zoho-books-api/`)
-- ShipLogic API for delivery rate calculations
+- ShipLogic API for delivery rate calculations, reached via The Courier Guy's own host (`api.portal.thecourierguy.co.za`); TCG-portal keys are rejected by `api.shiplogic.com`
 
 **IMPORTANT — shared Zoho API quota:** this app shares the Zoho org's daily API
 quota with the separate Takealot→Zoho webhook app
