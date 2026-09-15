@@ -2,8 +2,8 @@
   "id": "create-product-price",
   "action_name": "createProductPrice",
   "inputs": {
-    "$.price": {
-      "display_name": "Price (excl VAT)"
+    "$.priceInclVat": {
+      "display_name": "Price incl VAT"
     },
     "$.priceList": {
       "visible": false

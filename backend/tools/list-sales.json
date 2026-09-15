@@ -1,6 +1,6 @@
 {
-  "id": "list-orders",
-  "action_name": "listOrders",
+  "id": "list-sales",
+  "action_name": "listSales",
   "response": {
     "$.results[*].channelId": {
       "display_order": 4
