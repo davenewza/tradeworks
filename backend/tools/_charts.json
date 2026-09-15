@@ -23,9 +23,9 @@
   {
     "id": "chart_3I1tBYq44PDZsEOPsah9JJLmYvR",
     "name": "Product Sales Quantities",
-    "config": "{\"query\":{\"limit\":500,\"measures\":[\"sale.quantity_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"dimensions\":[\"product.sku\",\"product.name\"]},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{},\"pageSize\":25,\"pivot\":{\"x\":[\"product.sku\",\"product.name\",\"measures\"],\"y\":[\"sale.date.month\"]}},\"version\":3}",
+    "config": "{\"query\":{\"limit\":500,\"measures\":[\"sale.quantity_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"dimensions\":[\"product.sku\",\"product.name\"]},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{},\"pageSize\":25,\"pivot\":{\"x\":[\"product.sku\",\"product.name\",\"measures\"],\"y\":[\"sale.date.month\"],\"fillDateFields\":[\"sale.date.month\"]}},\"version\":3}",
     "createdAt": "2026-08-17T05:16:07.155783Z",
-    "updatedAt": "2026-08-17T05:16:07.155783Z"
+    "updatedAt": "2026-09-15T09:00:00.000000Z"
   },
   {
     "id": "chart_3I1tbdW7gvem4Wkx8QKjGP0iGLQ",
