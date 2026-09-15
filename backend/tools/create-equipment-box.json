@@ -12,7 +12,7 @@
     "$.lengthInCm": {
       "display_order": 4
     },
-    "$.price": {
+    "$.priceInclVat": {
       "help_text": "Should be 0 for cardboard boxes"
     },
     "$.volumeUtilisationQuotient": {
