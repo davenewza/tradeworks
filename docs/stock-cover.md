@@ -9,8 +9,13 @@ matters, not just how close it is to running out.
 
 ## Where to find it
 
-- **Per brand** — open a brand and click **View stock & cover** for a read-only
-  grid of that brand's products (the primary reorder view).
+- **Inventory → View stock and cover** — the reorder view: every enabled
+  product's figures in one grid. Filter by brand, SKU, name, ABC class, status,
+  and current or total cover (any comparison — less than, at least, between);
+  click any column heading to sort by it. Brand is the one column that can't be
+  sorted, because it is a relation.
+- **Per brand** — open a brand and click **View stock & cover** to open that
+  same grid filtered to the brand.
 - **Per product** — the **Stock & cover** section on any product page.
 
 ## The figures
@@ -101,9 +106,9 @@ the Console.
 
 | Concern | Files |
 | --- | --- |
-| Schema | `backend/schemas/products.keel` — `Product` stock/cover fields, `stockCoverStatus`, `abcClass`, `Brand.leadTimeInDays` |
+| Schema | `backend/schemas/products.keel` — `Product` stock/cover fields, `stockCoverStatus`, `abcClass`, the `listStockAndCover` action, `Brand.leadTimeInDays` |
 | Daily sync | `backend/flows/scheduledSyncStock.ts`, `backend/lib/stockCoverHelpers.ts`, `backend/lib/zohoStockHelpers.ts` |
-| Console | `backend/tools/list-product-stock.json`, `get-brand.json`, `get-product.json`, `_fields.json` |
+| Console | `backend/tools/list-stock-and-cover.json` (the Inventory space's grid, in `_spaces.json`), `get-brand.json`, `get-product.json`, `_fields.json` |
 
 > **Roadmap — Stock on way (Phase 2):** populate `stockOnWay` from future-dated
 > supplier bills (those dated after today), so Total cover reflects incoming

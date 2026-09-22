@@ -124,6 +124,34 @@ model Product {
             )
             @orderBy(name: asc)
         }
+        // The reorder view (Inventory → View stock and cover): every enabled
+        // product's stock and cover figures, filterable by brand, SKU, name, ABC
+        // class, status and either cover, and sortable on every column. Brand
+        // is a relation, which @sortable can't order by.
+        list listStockAndCover(
+            name?,
+            sku?,
+            brand.id?,
+            abcClass?,
+            stockCoverStatus?,
+            currentStockCover?,
+            totalStockCover?,
+        ) {
+            @where(product.isEnabled)
+            @sortable(
+                sku,
+                name,
+                abcClass,
+                totalUnitsSold,
+                stockAvailable,
+                stockOnWay,
+                estimatedMonthlySale,
+                currentStockCover,
+                totalStockCover,
+                stockCoverStatus
+            )
+            @orderBy(name: asc)
+        }
         update updateProductDimensions(id) with (
             lengthInCm,
             widthInCm,

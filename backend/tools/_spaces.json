@@ -175,6 +175,30 @@
     "charts": null
   },
   {
+    "id": "space-inventory",
+    "name": "Inventory",
+    "icon": "warehouse",
+    "display_order": 1,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-stock-and-cover",
+        "link": {
+          "tool_id": "list-stock-and-cover",
+          "title": "View stock and cover",
+          "description": "Stock on hand and months of cover for every product — filter by brand, class or status, sort any column",
+          "display_order": 0
+        },
+        "hidden": false
+      }
+    ],
+    "groups": null,
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": null
+  },
+  {
     "id": "space-sales",
     "name": "Sales",
     "icon": "sack-dollar",
@@ -220,7 +244,7 @@
     "id": "space-logistics",
     "name": "Logistics",
     "icon": "truck",
-    "display_order": 1,
+    "display_order": 2,
     "hidden": false,
     "actions": [
       {
