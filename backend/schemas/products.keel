@@ -107,6 +107,17 @@ model Product {
         abcClass AbcClass?
     }
 
+    // Read-time aggregates for the Stock cover dashboard's charts.
+    measures {
+        // Months of cover for a group of products taken as a whole: total stock
+        // ÷ total monthly sales. Averaging per-product covers would let one
+        // slow seller with years of stock drown out the rest of the group.
+        stockCover @computed(SUM(product.stockAvailable) / SUM(product.estimatedMonthlySale))
+        // Capital tied up in stock on hand, at weighted landed cost. Negative
+        // stock (billed ahead of receipt) holds no capital, so it is left out.
+        stockValue @computed(SUMIF(product.stockAvailable * product.weightedLandedCost, product.stockAvailable > 0))
+    }
+
     actions {
         get getProduct(id)
         list listProducts(name?, sku?, brand.id?, abcClass?) {
@@ -152,6 +163,13 @@ model Product {
             )
             @orderBy(name: asc)
         }
+        // Pooled cover and stock value per ABC class — the Stock cover
+        // dashboard's figures, over the same measures its charts use.
+        aggregate stockCoverByClass(brand.id?) over (abcClass) {
+            @measures(stockCover, stockValue)
+            @where(product.isEnabled)
+            @orderBy(abcClass: asc)
+        }
         update updateProductDimensions(id) with (
             lengthInCm,
             widthInCm,
@@ -171,7 +189,7 @@ model Product {
 
     @permission(
         roles: [Operator],
-        actions: [get, list, update, delete]
+        actions: [get, list, aggregate, update, delete]
     )
 }
 

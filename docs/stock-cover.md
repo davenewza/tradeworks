@@ -14,6 +14,9 @@ matters, not just how close it is to running out.
   and current or total cover (any comparison — less than, at least, between);
   click any column heading to sort by it. Brand is the one column that can't be
   sorted, because it is a relation.
+- **Stock cover dashboard** — charts of cover by ABC class; see
+  [the dashboard](#stock-cover-dashboard). Its four headline figures are also
+  pinned to the top of the Inventory space.
 - **Per brand** — open a brand and click **View stock & cover** to open that
   same grid filtered to the brand.
 - **Per product** — the **Stock & cover** section on any product page.
@@ -80,6 +83,37 @@ Details worth knowing:
 - Recomputed by the nightly `ScheduledSyncStock` run alongside the cover
   figures; the stock grid can be sorted and filtered by class.
 
+## Stock cover dashboard
+
+The **Stock cover** dashboard shows the catalogue's cover split by ABC class, so
+you can check that the A products — the ones carrying 80% of revenue — are the
+best stocked. Filter it by **Brand**, **ABC class** or **Status**. Every chart
+counts enabled products only.
+
+| Chart | What it shows |
+| --- | --- |
+| **Products in shortfall** / **Products running low** | How many products are in each at-risk status. |
+| **Months of stock cover** | Overall cover: all stock ÷ all monthly sales. |
+| **Stock value on hand** | Stock on hand × weighted landed cost. |
+| **Products by cover status and class** | Product counts per class, split by status. |
+| **Months of cover by class** | Overall cover for each class. |
+| **Stock value by class and status** | Where the money in stock sits. Oversupplied B and C stock is money you could free up. |
+| **Months of cover by brand and class** | A brand × class grid of overall cover. |
+| **Products to reorder** | Every Shortfall and Low product, A class first, lowest cover first. |
+| **Oversupplied stock** | Every Oversupply product, highest stock value first. |
+
+How the group figures are worked out:
+
+- **Cover for a group** (a class, a brand, the whole catalogue) is the group's
+  total stock ÷ its total monthly sales. It is **not** the average of each
+  product's cover, because one slow seller with years of stock would drag an
+  average up. Negative stock reduces the group's cover.
+- **Stock value** uses each product's weighted landed cost (cost of goods plus
+  freight-in, averaged over its supplier bills). Negative stock is left out,
+  and a product with no supplier bills counts as 0.
+- Both are declared as `measures` on `Product`. The `stockCoverByClass`
+  aggregate action returns the same figures through the API.
+
 ## Lead time
 
 Each **brand** carries a **lead time** (`leadTimeInDays`, default **60**). Set it
@@ -109,6 +143,7 @@ the Console.
 | Schema | `backend/schemas/products.keel` — `Product` stock/cover fields, `stockCoverStatus`, `abcClass`, the `listStockAndCover` action, `Brand.leadTimeInDays` |
 | Daily sync | `backend/flows/scheduledSyncStock.ts`, `backend/lib/stockCoverHelpers.ts`, `backend/lib/zohoStockHelpers.ts` |
 | Console | `backend/tools/list-stock-and-cover.json` (the Inventory space's grid, in `_spaces.json`), `get-brand.json`, `get-product.json`, `_fields.json` |
+| Dashboard | `backend/tools/_dashboards.json` ("Stock cover") and `_charts.json`, over the `stockCover` / `stockValue` measures in `products.keel` |
 
 > **Roadmap — Stock on way (Phase 2):** populate `stockOnWay` from future-dated
 > supplier bills (those dated after today), so Total cover reflects incoming
