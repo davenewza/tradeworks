@@ -59,6 +59,16 @@
               "display_order": 0
             },
             "hidden": false
+          },
+          {
+            "id": "action-sync-products",
+            "link": {
+              "tool_id": "sync-products",
+              "title": "Sync Products from Zoho",
+              "description": "Add new products from Zoho Books and update existing ones whose name or brand has changed",
+              "display_order": 1
+            },
+            "hidden": false
           }
         ]
       },
@@ -126,45 +136,6 @@
               "display_order": 2
             },
             "hidden": false
-          },
-          {
-            "id": "action-list-channel-label-specs",
-            "link": {
-              "tool_id": "list-channel-label-specs",
-              "title": "Label specs",
-              "description": "How each channel’s label is built — symbology, stock, and what it carries",
-              "display_order": 3
-            },
-            "hidden": false
-          },
-          {
-            "id": "action-create-channel-label-spec",
-            "link": {
-              "tool_id": "create-channel-label-spec",
-              "title": "Add a label spec",
-              "description": "Make a channel printable — symbology and label stock, then its elements",
-              "display_order": 4
-            },
-            "hidden": false
-          }
-        ]
-      },
-      {
-        "id": "group-purchasing",
-        "name": "Purchasing",
-        "description": "What to reorder from a brand, and how many, so every product lands with the same months of cover",
-        "display_order": 4,
-        "hidden": false,
-        "actions": [
-          {
-            "id": "action-plan-purchase",
-            "link": {
-              "tool_id": "plan-purchase",
-              "title": "Plan a purchase",
-              "description": "Pick a brand, set the purchase date and lead time, review the suggested quantities",
-              "display_order": 0
-            },
-            "hidden": false
           }
         ]
       }
@@ -188,6 +159,16 @@
           "title": "View stock and cover",
           "description": "Stock on hand and months of cover for every product — filter by brand, class or status, sort any column",
           "display_order": 0
+        },
+        "hidden": false
+      },
+      {
+        "id": "action-plan-purchase",
+        "link": {
+          "tool_id": "plan-purchase",
+          "title": "Plan a purchase",
+          "description": "Pick a brand, set the purchase date and lead time, review the suggested quantities",
+          "display_order": 1
         },
         "hidden": false
       }
