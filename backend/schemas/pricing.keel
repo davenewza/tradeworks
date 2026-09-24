@@ -10,7 +10,9 @@ model PriceList {
         // (incl VAT) for every R1 of advertising. Optional — leave it unset on
         // price lists we don't advertise on and their ad spend resolves to zero.
         targetAdvertisingRoi Decimal?
-        numberOfProducts Number @computed(COUNT(priceList.products.id))
+        // Only active products count — an inactive one is out of the catalogue,
+        // so its leftover price row should not inflate the list's size.
+        numberOfProducts Number @computed(COUNTIF(priceList.products, priceList.products.product.isActive))
         products ProductPrice[]
         discounts DiscountTier[]
     }
@@ -101,6 +103,9 @@ model ProductPrice {
             productSku?,
             product.brand.id?,
         ) {
+            // A price for a product that is no longer in the catalogue is not
+            // something to price, quote or act on — keep it out of the view.
+            @where(productPrice.product.isActive)
             @searchable(
                 productName,
                 productSku

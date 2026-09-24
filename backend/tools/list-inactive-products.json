@@ -1,7 +1,9 @@
 {
-  "id": "list-products",
-  "action_name": "listProducts",
-  "icon": "emoji:🤖",
+  "id": "list-inactive-products",
+  "action_name": "listInactiveProducts",
+  "name": "Inactive products",
+  "icon": "emoji:🗄️",
+  "help_text": "Products that are out of the catalogue — hidden from the products list, and left out of pricing, quoting, purchase planning, labelling and delivery. Their sales and costs are still recorded, which is why retired items are kept here rather than dropped.\n\nA product's active status belongs to Zoho: **Sync Products** switches one off when its Zoho item goes inactive, and brings it back when the item is active again. To return a product to the catalogue, make its item active in Zoho and run the sync — there is nothing to change here.",
   "response": {
     "$.results[*].sku": {
       "display_order": 1
@@ -10,7 +12,16 @@
       "display_order": 2
     },
     "$.results[*].brandId": {
+      "display_name": "Brand",
       "display_order": 3
+    },
+    "$.results[*].stockAvailable": {
+      "display_name": "Stock on hand",
+      "display_order": 4
+    },
+    "$.results[*].synchronisedAt": {
+      "display_name": "Last synced",
+      "display_order": 5
     },
     "$.results[*].id": {
       "display_order": 12,
@@ -72,9 +83,6 @@
     "$.results[*].abcClass": {
       "visible": false
     },
-    "$.results[*].stockAvailable": {
-      "visible": false
-    },
     "$.results[*].stockOnWay": {
       "visible": false
     },
@@ -87,10 +95,10 @@
     "$.results[*].totalStockCover": {
       "visible": false
     },
-    "$.results[*].stockSynchronisedAt": {
+    "$.results[*].stockCoverStatus": {
       "visible": false
     },
-    "$.results[*].synchronisedAt": {
+    "$.results[*].stockSynchronisedAt": {
       "visible": false
     },
     "$.results[*].views": {
@@ -108,6 +116,9 @@
     "$.results[*].prices": {
       "visible": false
     },
+    "$.results[*].channelCodes": {
+      "visible": false
+    },
     "$.results[*].createdAt": {
       "visible": false
     },
@@ -123,14 +134,6 @@
       "tool_id": "get-product",
       "title": "View product",
       "display_order": 0
-    },
-    {
-      "tool_id": "update-product",
-      "display_order": 2
-    },
-    {
-      "tool_id": "update-product-dimensions",
-      "display_order": 3
     }
   ],
   "filter_config": {

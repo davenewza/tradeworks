@@ -47,7 +47,7 @@ function buildNotes(plan: BarcodeSyncPlan): string[] {
 
     if (plan.productsWithoutOffer.length > 0) {
         notes.push(
-            `${plan.productsWithoutOffer.length} enabled product(s) have no Takealot offer: ${capped(plan.productsWithoutOffer)}`
+            `${plan.productsWithoutOffer.length} active product(s) have no Takealot offer: ${capped(plan.productsWithoutOffer)}`
         );
     }
 

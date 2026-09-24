@@ -4,11 +4,21 @@
   "name": "Stock & cover",
   "icon": "emoji:📦",
   "inputs": {
-    "$.where.brand": { "visible": false },
-    "$.where.brand.id": { "visible": false },
-    "$.where.brand.id.equals": { "visible": false },
-    "$.where.brand.id.notEquals": { "visible": false },
-    "$.where.brand.id.oneOf": { "visible": false }
+    "$.where.brand": {
+      "visible": false
+    },
+    "$.where.brand.id": {
+      "visible": false
+    },
+    "$.where.brand.id.equals": {
+      "visible": false
+    },
+    "$.where.brand.id.notEquals": {
+      "visible": false
+    },
+    "$.where.brand.id.oneOf": {
+      "visible": false
+    }
   },
   "response": {
     "$.results[*].sku": {
@@ -65,30 +75,79 @@
         ]
       }
     },
-    "$.results[*].brandId": { "display_order": 30, "visible": false },
-    "$.results[*].views": { "visible": false },
-    "$.results[*].sales": { "visible": false },
-    "$.results[*].channelFees": { "visible": false },
-    "$.results[*].costLines": { "visible": false },
-    "$.results[*].prices": { "visible": false },
-    "$.results[*].image": { "visible": false },
-    "$.results[*].isEnabled": { "visible": false },
-    "$.results[*].lengthInCm": { "visible": false },
-    "$.results[*].widthInCm": { "visible": false },
-    "$.results[*].heightInCm": { "visible": false },
-    "$.results[*].weightInGrams": { "visible": false },
-    "$.results[*].volumeInLitres": { "visible": false },
-    "$.results[*].weightedUnitCost": { "visible": false },
-    "$.results[*].weightedFreightIn": { "visible": false },
-    "$.results[*].weightedLandedCost": { "visible": false },
-    "$.results[*].totalSupplierBills": { "visible": false },
-    "$.results[*].totalUnitsPurchased": { "visible": false },
-    "$.results[*].totalSalesValue": { "visible": false },
-    "$.results[*].averageSalePrice": { "visible": false },
-    "$.results[*].synchronisedAt": { "visible": false },
-    "$.results[*].stockSynchronisedAt": { "visible": false },
-    "$.results[*].createdAt": { "visible": false },
-    "$.results[*].updatedAt": { "visible": false }
+    "$.results[*].brandId": {
+      "display_order": 30,
+      "visible": false
+    },
+    "$.results[*].views": {
+      "visible": false
+    },
+    "$.results[*].sales": {
+      "visible": false
+    },
+    "$.results[*].channelFees": {
+      "visible": false
+    },
+    "$.results[*].costLines": {
+      "visible": false
+    },
+    "$.results[*].prices": {
+      "visible": false
+    },
+    "$.results[*].image": {
+      "visible": false
+    },
+    "$.results[*].lengthInCm": {
+      "visible": false
+    },
+    "$.results[*].widthInCm": {
+      "visible": false
+    },
+    "$.results[*].heightInCm": {
+      "visible": false
+    },
+    "$.results[*].weightInGrams": {
+      "visible": false
+    },
+    "$.results[*].volumeInLitres": {
+      "visible": false
+    },
+    "$.results[*].weightedUnitCost": {
+      "visible": false
+    },
+    "$.results[*].weightedFreightIn": {
+      "visible": false
+    },
+    "$.results[*].weightedLandedCost": {
+      "visible": false
+    },
+    "$.results[*].totalSupplierBills": {
+      "visible": false
+    },
+    "$.results[*].totalUnitsPurchased": {
+      "visible": false
+    },
+    "$.results[*].totalSalesValue": {
+      "visible": false
+    },
+    "$.results[*].averageSalePrice": {
+      "visible": false
+    },
+    "$.results[*].synchronisedAt": {
+      "visible": false
+    },
+    "$.results[*].stockSynchronisedAt": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    },
+    "$.results[*].isActive": {
+      "visible": false
+    }
   },
   "pagination": {
     "page_size": {
@@ -96,10 +155,19 @@
     }
   },
   "entry_activity_actions": [
-    { "tool_id": "get-product", "title": "View product", "display_order": 0 },
-    { "tool_id": "update-product", "deleted": true },
-    { "tool_id": "update-product-dimensions", "deleted": true },
-    { "tool_id": "disable-product", "deleted": true }
+    {
+      "tool_id": "get-product",
+      "title": "View product",
+      "display_order": 0
+    },
+    {
+      "tool_id": "update-product",
+      "deleted": true
+    },
+    {
+      "tool_id": "update-product-dimensions",
+      "deleted": true
+    }
   ],
   "filter_config": {
     "quick_search_field": "$.where.name.contains"

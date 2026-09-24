@@ -16,7 +16,7 @@ directly, so a plan costs no API calls and can be re-run freely.
 
 ## The flow
 
-1. **Brand** (skipped when launched from a brand). Only brands with enabled
+1. **Brand** (skipped when launched from a brand). Only brands with active
    products are offered.
 2. **Order details**
    - **Purchase date** — when the order goes to the supplier. Defaults to today.
@@ -25,7 +25,7 @@ directly, so a plan costs no API calls and can be re-run freely.
    - **Cover on arrival (months)** — how many months of sales every product
      should have in stock the day the order lands. Defaults to **2 × the lead
      time** (in months), the middle of the *Good* status band.
-3. **Review** — an editable grid of every enabled product in the brand with its
+3. **Review** — an editable grid of every active product in the brand with its
    suggested quantity, sorted so the products in trouble come first. Change any
    **Order** quantity and press **Recalculate cover** to see what it does to that
    product's cover on arrival; **Finish** produces the plan.

@@ -80,6 +80,26 @@ describe('loadSaleAggregates', () => {
         expect(num(byId.get(p2.id)!.revenueLast365)).toBeCloseTo(26.7, 6);
         expect(byId.get(p2.id)!.firstSaleDate!.getTime()).toBeGreaterThanOrEqual(windowStart.getTime());
     });
+
+    test('leaves inactive products out entirely, sales and all', async () => {
+        // ABC is a Pareto cut over whatever this returns, so an inactive
+        // product left in would spend A/B share on something out of the
+        // catalogue and push a live product down a grade.
+        const brand = await models.brand.create({ name: 'B' });
+        const live = await models.product.create({ name: 'Live', sku: 'ACT-1', brandId: brand.id });
+        const off = await models.product.create({ name: 'Off', sku: 'ACT-2', brandId: brand.id, isActive: false });
+        const channel = await models.channel.create({ name: 'C' });
+
+        const windowStart = new Date(NOW.getTime() - 365 * 24 * 60 * 60 * 1000);
+        await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: new Date('2026-06-01'), productId: live.id, quantity: 5, price: 1, netAmount: 40 });
+        await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: new Date('2026-06-01'), productId: off.id, quantity: 500, price: 1, netAmount: 9000 });
+
+        const productIds = (await loadSaleAggregates(windowStart)).map((a) => a.productId);
+        expect(productIds).toEqual([live.id]);
+
+        // Also gone when the caller narrows to it explicitly.
+        expect(await loadSaleAggregates(windowStart, [off.id])).toEqual([]);
+    });
 });
 
 describe('classifyAbc', () => {

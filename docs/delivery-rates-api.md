@@ -98,7 +98,7 @@ Missing required fields are rejected by schema validation (HTTP 400) before the 
 
 Understanding the pipeline helps interpret the response:
 
-1. Each SKU is looked up in the Tradeworks catalogue for its physical dimensions and weight. **All SKUs must be known, enabled, and have complete physical data**, or the request is rejected with a detailed error (§6.2).
+1. Each SKU is looked up in the Tradeworks catalogue for its physical dimensions and weight. **All SKUs must be known, active, and have complete physical data**, or the request is rejected with a detailed error (§6.2).
 2. The total product volume is packed into shipping boxes (cardboard or plastic equipment boxes, per `includeEquipmentBox`) using Tradeworks' bin-packing rules. The chosen boxes are returned in the response so you can see — and price — what the quote is based on.
 3. Each box becomes a courier parcel; the total product weight is distributed evenly across the boxes and added to each box's own weight.
 4. Live rates for those parcels are obtained from Tradeworks' courier partner for the given destination, and returned sorted cheapest first.
@@ -243,7 +243,7 @@ Errors return a JSON body:
 | `each line item must have a sku` | A line had a blank SKU. |
 | `SKU "X": quantity must be a whole number of 1 or more (got N)` | Zero, negative, or fractional quantity. |
 | `SKU "X": no product with this SKU exists` | Unknown SKU. |
-| `SKU "X": product is disabled` | The product is no longer sold. |
+| `SKU "X": product is inactive` | The product is no longer sold. |
 | `SKU "X": product is missing dimensions (length, width and height must be set)` | Catalogue data incomplete — contact Tradeworks. |
 | `SKU "X": product is missing a weight (weightInGrams must be greater than 0)` | Catalogue data incomplete — contact Tradeworks. |
 | `no <BoxType> equipment boxes are configured` | No packaging configured for the requested box type — contact Tradeworks. |

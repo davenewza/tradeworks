@@ -304,13 +304,13 @@ describe('loading', () => {
             netAmount: quantity * 10,
         });
 
-    test('loadPlannableBrands lists brands with enabled products, with their lead times and counts', async () => {
+    test('loadPlannableBrands lists brands with active products, with their lead times and counts', async () => {
         const acme = await models.brand.create({ name: 'Acme', leadTimeInDays: 45 });
         const zeta = await models.brand.create({ name: 'Zeta' });
         await models.brand.create({ name: 'Empty' });
         await models.product.create({ name: 'A1', sku: 'A1', brandId: acme.id });
         await models.product.create({ name: 'A2', sku: 'A2', brandId: acme.id });
-        await models.product.create({ name: 'A3', sku: 'A3', brandId: acme.id, isEnabled: false });
+        await models.product.create({ name: 'A3', sku: 'A3', brandId: acme.id, isActive: false });
         await models.product.create({ name: 'Z1', sku: 'Z1', brandId: zeta.id });
 
         expect(await loadPlannableBrands()).toEqual([
@@ -319,7 +319,7 @@ describe('loading', () => {
         ]);
     });
 
-    test('loadPlanCandidates builds each enabled product of the brand with an unrounded rate and its latest cost', async () => {
+    test('loadPlanCandidates builds each active product of the brand with an unrounded rate and its latest cost', async () => {
         const acme = await models.brand.create({ name: 'Acme' });
         const other = await models.brand.create({ name: 'Other' });
         const channel = await models.channel.create({ name: 'Shop' });
@@ -329,7 +329,7 @@ describe('loading', () => {
         });
         const trickle = await models.product.create({ name: 'Trickle', sku: 'T-1', brandId: acme.id, stockAvailable: 3 });
         const dormant = await models.product.create({ name: 'Dormant', sku: 'D-1', brandId: acme.id });
-        await models.product.create({ name: 'Retired', sku: 'R-1', brandId: acme.id, isEnabled: false });
+        await models.product.create({ name: 'Retired', sku: 'R-1', brandId: acme.id, isActive: false });
         await models.product.create({ name: 'Elsewhere', sku: 'E-1', brandId: other.id, stockAvailable: 9 });
 
         // Widget: established (first sale years ago → 12 months active), 120 in
@@ -363,9 +363,9 @@ describe('loading', () => {
         expect(byId.get(dormant.id)).toMatchObject({ monthlyDemand: null, stockAvailable: null, abcClass: null });
     });
 
-    test('loadPlanCandidates is empty for a brand with nothing enabled', async () => {
+    test('loadPlanCandidates is empty for a brand with nothing active', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
-        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isEnabled: false });
+        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isActive: false });
         expect(await loadPlanCandidates(brand.id, NOW)).toEqual([]);
     });
 

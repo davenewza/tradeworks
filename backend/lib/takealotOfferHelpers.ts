@@ -190,7 +190,7 @@ export async function computeBarcodeSyncPlan(offers: TakealotOffer[]): Promise<B
     }
 
     const productsWithoutOffer = products
-        .filter((p) => p.isEnabled && !offerBySku.has(p.sku))
+        .filter((p) => p.isActive && !offerBySku.has(p.sku))
         .map((p) => p.sku)
         .sort();
 

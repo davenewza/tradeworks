@@ -59,6 +59,15 @@
               "display_order": 0
             },
             "hidden": false
+          },
+          {
+            "id": "action-list-inactive-products",
+            "link": {
+              "tool_id": "list-inactive-products",
+              "title": "Inactive",
+              "display_order": 1
+            },
+            "hidden": false
           }
         ]
       },
