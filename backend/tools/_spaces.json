@@ -159,7 +159,24 @@
       }
     ],
     "links": null,
-    "metrics": null,
+    "metrics": [
+      {
+        "id": "metric-active-products",
+        "label": "Active products",
+        "tool_id": "list-products",
+        "facet_location": "$.pageInfo.totalCount",
+        "display_order": 1,
+        "hidden": false
+      },
+      {
+        "id": "metric-inactive-products",
+        "label": "Inactive products",
+        "tool_id": "list-inactive-products",
+        "facet_location": "$.pageInfo.totalCount",
+        "display_order": 2,
+        "hidden": false
+      }
+    ],
     "topics": null,
     "charts": null
   },
