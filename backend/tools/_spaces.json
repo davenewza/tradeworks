@@ -196,7 +196,32 @@
     "links": null,
     "metrics": null,
     "topics": null,
-    "charts": null
+    "charts": [
+      {
+        "id": "chart-attach-products-in-shortfall",
+        "chart_id": "chart_3I5aKq2NcVtRw8LmXe4PbHs6Uj1",
+        "display_order": 0,
+        "hidden": false
+      },
+      {
+        "id": "chart-attach-products-running-low",
+        "chart_id": "chart_3I5aLr3OdWuSx9MnYf5QcIt7Vk2",
+        "display_order": 1,
+        "hidden": false
+      },
+      {
+        "id": "chart-attach-months-of-stock-cover",
+        "chart_id": "chart_3I5aMs4PeXvTy0NoZg6RdJu8Wl3",
+        "display_order": 2,
+        "hidden": false
+      },
+      {
+        "id": "chart-attach-stock-value-on-hand",
+        "chart_id": "chart_3I5aNt5QfYwUz1OpAh7SeKv9Xm4",
+        "display_order": 3,
+        "hidden": false
+      }
+    ]
   },
   {
     "id": "space-sales",
