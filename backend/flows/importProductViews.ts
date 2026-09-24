@@ -1,4 +1,6 @@
 import { ImportProductViews, models, ViewsImportType } from '@teamkeel/sdk';
+import { AMAZON_CHANNEL_NAME } from '../lib/amazonFnskuHelpers';
+import { TAKEALOT_CHANNEL_NAME } from '../lib/zohoChannelFeeHelpers';
 
 interface ParsedRow {
     sku: string;
@@ -159,9 +161,9 @@ function parseCreatespaceShopifyExport(fileContent: string): ParsedRow[] {
 function getChannelName(type: ViewsImportType): string {
     switch (type) {
         case ViewsImportType.TakealotProductSalesExport:
-            return "Takealot Marketplace";
+            return TAKEALOT_CHANNEL_NAME;
         case ViewsImportType.AmazonDetailPageSalesTraffic:
-            return "Amazon Marketplace";
+            return AMAZON_CHANNEL_NAME;
         case ViewsImportType.CreatespaceShopifyExport:
             return "Createspace Shopify";
         default:

@@ -5,38 +5,85 @@ fulfilment centre, straight to the warehouse Zebra as ZPL. It replaces
 downloading each channel's barcode PDF and printing it n-up on A4.
 
 Nothing about the label is channel-specific in code. A channel becomes printable
-once it has a **label spec**, so adding one is a row rather than a deploy.
+once it has a **label spec**, and what its label carries — the barcode, the
+product name, any fixed text — is a list of **label element** rows hanging off
+that spec. Both are data, so a new channel, or a new line of text on an existing
+one, is a row rather than a deploy.
 
 ## Where to find it
 
-- **Products → Barcode labels → Print barcodes** — pick a channel, then products,
-  set label counts, print.
-- **A product page → Print barcode label** — same flow for one product; it skips
-  the picker and goes straight to that product's label count.
+- **Products → Barcode labels → Print barcodes** — pick products, set label
+  counts, print. The channel is asked first only when more than one is printable.
+- **A product page → Print barcode label** — same flow for one product, on a
+  single page: how many labels, and which channel if the product carries more
+  than one code. It prints as the print page opens.
 - **A channel shipment → Print barcode labels** — same flow for a whole
   consignment; the shipment fixes the channel and seeds a label count per line
   from the units being sent. See [channel-shipments.md](channel-shipments.md).
-- **Products → Barcode labels → Label specs** — how each channel's label is built.
+- **Products → Barcode labels → Sync Amazon FNSKUs** — pull each FBA listing's
+  FNSKU from the Selling Partner API. See [amazon-fnskus.md](amazon-fnskus.md).
+- **Products → Barcode labels → Sync Takealot barcodes** — pull each offer's
+  label barcode from the Marketplace API. See
+  [takealot-barcodes.md](takealot-barcodes.md).
+- **Products → Barcode labels → Label specs** — how each channel's label is
+  built; open one to edit the elements it carries.
 - **A product page → Channel codes** — the per-channel codes for that product.
 
-## The two shapes in use
+## What a label is made of
+
+A label is a stack of **elements**, printed top to bottom in `position` order.
+There are four kinds:
+
+| Kind | What it prints |
+| --- | --- |
+| **Barcode** | The symbol, plus the human-readable interpretation line the printer draws directly beneath the bars. Exactly one per spec. It takes whatever height the other elements leave, up to `maxHeightMm`. |
+| **Title** | The product name, wrapped to its `maxLines` and truncated to fit. |
+| **Text** | A fixed line — Amazon's item condition. |
+| **Stacked text** | Fixed text set one character per line down the left of the symbol — Takealot's `MP`. Out of the vertical flow, so `position` does not apply to it. Set larger than the label's body text, since it is a marker read across a receiving bay. |
+
+Every element also takes an optional **`fontSizeMm`**, **`paddingMm`** (blank space
+below it) and **`align`** (left, centre, right). All three are optional, and all
+three come out of the barcode's share of the height.
+
+That the *barcode and the title are themselves elements* is the point. The two
+shapes in use disagree about where the product name goes, not just about the
+fixed text, so no arrangement of named slots — "above the barcode", "below the
+barcode" — covers both:
 
 |  | Takealot | Amazon FBA |
 | --- | --- | --- |
 | **Symbology** | EAN-13 | Code 128 |
 | **Code** | the product's GTIN, as held against the offer | the **FNSKU** Amazon assigns |
-| **Annotation** | `MP`, stacked beside the symbol | the **item condition** (`New`), below the title |
-| **Label stock** | 50 × 30 mm — the warehouse roll | 66.7 × 25.4 mm (2⅝" × 1") |
+| **Elements** | Title → Barcode, with `MP` stacked beside the bars | Barcode → Title → Text `New` |
+| **Label stock** | 50 × 30 mm — the warehouse roll | 50 × 30 mm |
 
-Amazon requires the item condition on every unit label, which is what the
-annotation carries.
+Amazon requires the **item condition** on every unit label and wants it at the
+bottom, under the product name — hence the order. The FNSKU itself needs no
+element: it is the barcode's own interpretation line, which `^BC`'s fourth
+parameter puts directly beneath the bars.
 
-The **title always runs the full width of the label from the left margin**, on
-both shapes. A stacked annotation sits beside the *bars*, which start well below
-the title block, so it never reaches the title — indenting the title to clear
-that column would only drop characters off a long product name. On a Takealot
-label the title, the stacked `MP` and the EAN's lead digit therefore share one
-left edge.
+A spec with **no elements still prints** — the product name over the barcode,
+the shape every channel shares — and the print page says so in a banner. The
+same fallback catches a spec whose elements do not make a label (no barcode, two
+titles, a text element with no text); the banner names the problem. A plain
+label beats a blank one when the run is a consignment that is already packed,
+but it should never pass for a configured one.
+
+The **title always runs the full width of the label from the left margin**,
+wherever it sits in the stack; `align` moves the text within that block rather
+than indenting the block. Stacked text sits beside the *bars*, not beside the
+title, so it never reaches it — indenting the title to clear that column would
+only drop characters off a long product name. On a Takealot label the title, the
+stacked `MP` and the EAN's lead digit therefore share one left edge.
+
+The marker column reserves a **whole character cell** — the width `^A0N,f,f`
+declares, which no glyph can exceed — rather than a measured average. Being
+wrong there would not look untidy, it would put ink in the symbol's quiet zone
+and stop the label scanning. The column is snug because the pad either side is
+2 dots and because a label with a marker **pushes the symbol against the column
+instead of centring it**: the quiet zone is already 4 mm of mandatory white, and
+centring added a couple of millimetres more, which read as the marker floating
+away from the code it marks.
 
 The Takealot geometry was measured off a Seller Portal
 barcode sheet (`product_labels_<date>_<DC>.pdf`); the bar pattern our EAN-13 path
@@ -70,8 +117,14 @@ just being silently absent.
 `product_label` (the EAN on Takealot's own label sheets; *not* the merchant
 `barcode` field, which is often an `MPTAL…` placeholder), on product create /
 SKU change and via the *Sync Takealot Barcodes* flow (see
-[takealot-barcodes.md](takealot-barcodes.md)). Manual capture remains for
-channels without an API sync, such as Amazon's FNSKUs.
+[takealot-barcodes.md](takealot-barcodes.md)).
+
+**Amazon FNSKUs are synced too** — from each FBA listing via the Selling
+Partner API's FBA Inventory summaries, through the *Sync Amazon FNSKUs* flow
+(see [amazon-fnskus.md](amazon-fnskus.md)). Both syncs run on the same
+plan → review → apply core (`lib/channelCodeSync.ts`) and share its rules:
+matched by SKU, only that channel's rows touched, nothing ever deleted. Manual
+capture on the product page remains for any other channel.
 
 ## Label stock, and why the symbology changes the answer
 
@@ -104,7 +157,15 @@ is exactly in spec:
 | 3 dots | 0.375 mm | 61.9 mm | ✓ |
 
 So Amazon labels are *easier* on this printer than Takealot's, despite the longer
-symbol. On 66.7 mm stock a 10-character FNSKU gets a comfortable 3-dot module.
+symbol. On the 50 mm roll a 10-character FNSKU gets a 2-dot module — in spec, but
+exactly at the floor, which puts a **hard ceiling of 12 characters** on an FBA
+code before the symbol drops to a 1-dot module and stops scanning:
+
+| Code length | modules | at 2 dots | |
+| --- | --- | --- | --- |
+| 10 chars (a standard FNSKU) | 165 | 41.3 mm | fits |
+| 12 chars | 187 | 46.8 mm | fits, at the limit |
+| 13 chars | 198 | 49.5 mm | falls to a 1-dot module, out of spec |
 
 Because Code 128 grows with the code, the print page checks **every** row and
 warns on the tightest one — a long code in the batch is what decides whether the
@@ -118,11 +179,72 @@ specs* when the warehouse changes stock; the print page shows which roll the run
 assumed. `computeLayout` derives every coordinate from the stock, symbology and
 code, so adding a roll size is one entry in `LABEL_STOCKS` plus one enum value.
 
+## Text size, and how the height is shared
+
+Every element takes the height its text needs; **the barcode gets what is
+left**. On the 50 × 30 mm roll (400 × 240 dots at 203 dpi) that works out at:
+
+| | Takealot | Amazon FBA |
+| --- | --- | --- |
+| Elements | Title (2 lines) → Barcode | Barcode → Title (2 lines) → Text |
+| Title / text font | 20 / 18 dots | 20 / 18 dots |
+| Characters per title line | 38 | 38 |
+| Bar height | 17.5 mm | 15.0 mm |
+
+The fonts are **20 and 18 dots** — 2.5 mm and 2.2 mm of cap height, about 7 pt
+and 6.5 pt — derived as a fraction of the label height so a different roll
+scales with it. That is smaller than the label carried before elements existed:
+a 26-dot title fitted 29 characters a line on this roll and a 20-dot one fits
+38, which is what pays for a second title line once the barcode, the name and a
+condition all share the height. The Amazon label went from one 29-character line
+to two 38-character ones at no cost to the bars.
+
+When a spec is crowded enough that the bars would fall under **6.35 mm** (0.25",
+Amazon's floor for a unit label), both fonts **shrink a dot at a time** until
+they clear it, stopping at 14 / 12 dots — below that the warehouse cannot read
+the label and a shorter barcode is the better trade. If even the floor does not
+fit, the print page says so in a banner, the same way it warns on a too-narrow
+module. Both searches exist for the same reason: ZPL only takes whole dots, so
+the answer has to be found rather than calculated.
+
+A size set on an element with **`fontSizeMm` is never shrunk**. The fit search
+only has the derived sizes to work with, so a label that names all of its sizes
+simply never shrinks and reports a short barcode instead — undoing what was
+asked for would be worse than saying it does not fit. Leaving `fontSizeMm` empty
+is the better default anyway: the derived size is a fraction of the label
+height, so it follows the label to a different roll where a fixed millimetre
+figure would not.
+
+There is **no weight or face to choose.** The ZD220's resident scalable font is
+CG Triumvirate Bold Condensed, which is why the printed title looks heavier than
+Takealot's PDF-set one. Getting a different face means downloading a TrueType
+font to the printer's flash and aliasing it with `^CW` — possible, but a
+different job from this.
+
+### Capping the barcode
+
+The barcode is the flexible element, so on a tall roll it absorbs every dot
+nothing else claims — 17.5 mm of bars on a 30 mm label, which reads as all
+barcode next to Takealot's own sheet. **`maxHeightMm` on the barcode element**
+caps it and leaves the difference as white space **at the foot of the label**:
+capping the bars moves everything below them up, rather than opening a gap
+mid-stack. Taller bars never scan worse, so this is about how the label looks,
+not whether it works — and a cap set below 6.35 mm is reported like any other
+short barcode, without sending the font search shrinking text that would not
+help.
+
+A **barcode's interpretation line** is reserved as part of the barcode's own
+block — the font height plus 6 dots. The gap is larger than the 2 dots between
+ordinary lines on purpose: the firmware adds a little space of its own, which
+the bottom margin used to absorb, and with a product name now sitting directly
+under an FNSKU there is nothing left to absorb it.
+
 ## The title block
 
-Two lines on Takealot's shape, one on Amazon's (the item condition takes the
-other). **Long product names are truncated in software**, with a trailing `...`,
-before the ZPL is built.
+Up to `maxLines` per the Title element — two on both shapes today; one buys the
+bars about 2.7 mm, and three is the cap whatever the row says. **Long product
+names are truncated in software**, with a trailing `...`, before the ZPL is
+built.
 
 That is not belt-and-braces. `^FB`'s max-lines parameter is documented as
 truncating, but the ZD220 prints the overflow **on top of the last line** — a
@@ -160,6 +282,31 @@ Takealot's own PDF uses a 0.330 mm X-dimension — GS1 nominal, and unreachable 
 whole dots at 203 dpi (2.68 dots) — which is why our label is not a pixel-exact
 copy of theirs.
 
+## What the flow asks
+
+**A question is only asked when the data cannot answer it.** Printing one
+product's label used to take four pages — channel, confirm the product, count,
+print — for a run whose only unknown was the count. Each page is now earned:
+
+| Question | When it is asked |
+| --- | --- |
+| Which channel? | Only when more than one channel can print what is in front of you. From the Products space that is more than one label spec; from a product page it is more than one *printable code on that product*, and the choice sits on the counts page as a dropdown rather than a page of its own. |
+| Which products? | Only on the catalogue path. A product page and a shipment both already say what is being labelled. |
+| How many? | Always — the one thing nothing else can supply. One product gets a single number; a batch gets the grid. |
+
+So a product page's label is **one page and one click**: set the count, press
+Print. The print page then fires the job as it opens (`autoPrint`), so the labels
+come out without a second press.
+
+`autoPrint` is deliberately **not** set on the batch paths. A single product is
+a handful of labels and a duplicate costs a label; a catalogue or consignment run
+is tens or hundreds, and anything that re-fires the job costs a roll.
+
+A product's own page will also print a product that is **disabled**. The
+catalogue picker leaves those out — they are deliberately out of rotation — but
+arriving from a product's page is an explicit request for that product, and
+refusing it only ever read as "this product has no code".
+
 ## Quantities
 
 Counts start at **1**, with each product's units **on hand** shown beside them for
@@ -190,9 +337,11 @@ boundaries.
 The trade for a single job is that you can no longer reprint one product's job in
 isolation, so the print page has an **Adjust counts and print again** action
 instead. It returns to the counts grid with what you last entered: set the
-products that came out fine to 0, leave the one that jammed, and print again.
-Each pass is a fresh pair of page keys (`quantities-N` / `print-N`), capped at 20
-passes, since step and page keys have to be unique within a run.
+products that came out fine to 0, leave the one that jammed, and print again. On
+the single-product path the same action reads **Print another count** and returns
+to the one number. Each pass is a fresh pair of page keys (`quantities-N` /
+`print-N`), capped at 20 passes, since step and page keys have to be unique within
+a run.
 
 The flow closes itself when you press **Done** — there is no summary screen; the
 print page already lists exactly what was sent.
@@ -216,28 +365,57 @@ Console.
 
 | File | Role |
 | --- | --- |
-| `schemas/labels.keel` | `ChannelLabelSpec`, `ProductChannelCode`, the symbology / stock / placement enums, and the flow. |
+| `schemas/labels.keel` | `ChannelLabelSpec`, `ChannelLabelElement`, `ProductChannelCode`, the symbology / stock / element-kind enums, and the print and sync flows. |
 | `lib/barcodeLabelHelpers.ts` | Code validation, label geometry, ZPL generation, row building. Pure apart from the generated enums — no DB, no printer. |
-| `lib/barcodeLabelSelection.ts` | The DB queries (printable channels, candidates, a shipment's lines, stock on hand). |
-| `flows/printChannelBarcodes.ts` | UI orchestration only: channel → products (or a shipment) → counts → print. |
+| `lib/barcodeLabelSelection.ts` | The DB queries. `loadLabelCandidates` reads one channel across the catalogue; `loadProductLabelOptions` is its inverse — one product across every channel, which is what lets the product page skip the channel question. Plus a shipment's lines and stock on hand. |
+| `flows/printChannelBarcodes.ts` | UI orchestration only: counts → print, preceded by a channel and/or product picker where the data leaves one open. |
+| `lib/channelCodeSync.ts` | The plan/apply pair both channel syncs run on. |
+| `lib/takealotOfferHelpers.ts`, `flows/syncTakealotBarcodes.ts` | Takealot codes from the Marketplace API ([takealot-barcodes.md](takealot-barcodes.md)). |
+| `lib/amazonFnskuHelpers.ts`, `flows/syncAmazonFnskus.ts` | Amazon FNSKUs from the Selling Partner API ([amazon-fnskus.md](amazon-fnskus.md)). |
 
 ## Setting up a new channel
 
 1. Create the `Channel` if it does not exist.
 2. **Products → Barcode labels → Label specs → Add a label spec**: pick the
-   channel, its symbology, the fixed annotation and placement, and the default
-   stock.
-3. Add a **channel code** per product you intend to label (product page → Add
-   channel code).
+   channel, its symbology and the label stock.
+3. Open the spec and **add its elements** — the barcode, the product name, and
+   any fixed text, in the order they should print. Until you do, the channel
+   prints the product name over the barcode and the print page says so.
+4. Add a **channel code** per product you intend to label — synced for
+   Takealot and Amazon, or per product on its page → Add channel code for any
+   other channel.
+
+The two shapes in use, as rows:
+
+| Channel | Position | Kind | Text | Max lines | Max bar height |
+| --- | --- | --- | --- | --- | --- |
+| Takealot | 1 | Title | | 2 | |
+| | 2 | Barcode | | | 13 mm |
+| | 3 | Stacked text | `MP` | | |
+| Amazon | 1 | Barcode | | | |
+| | 2 | Title | | 2 | |
+| | 3 | Text | `New` | | |
+
+Font size, padding and alignment are left empty on both — the derived sizes are
+what you want unless a particular label needs overruling.
 
 ## Known gaps
 
-- **Bulk code capture for non-Takealot channels.** Takealot codes are now synced
-  from the Marketplace API ([takealot-barcodes.md](takealot-barcodes.md)), which
-  covers the catalogue for that channel. Other channels' codes — Amazon FNSKUs in
-  particular — are still entered one product-channel pair at a time; a bulk path
-  would want a CSV import off the channel's own offer export, the same shape as
-  the existing `ImportProductViews` flow.
+- **Amazon codes are only synced on demand.** Takealot codes are also picked
+  up per product on create / SKU change; Amazon's deliberately are not, since
+  the FNSKU only exists once the listing is created on Amazon, normally after
+  the product exists here ([amazon-fnskus.md](amazon-fnskus.md)). Run the sync
+  after listing new products, or add a nightly scheduled sync if that becomes a
+  chore. Any further channel's codes are still entered one product-channel pair
+  at a time; a bulk path for it is a fetcher feeding the shared
+  `channelCodeSync` core, as both syncs do.
+- **Padding is below only.** There is no padding above an element; put it below
+  the element before instead. With three or four rows that covers everything
+  except space above the first element, which is what the 3 mm top margin is.
+- **Element order is a number you type.** Re-ordering a label means editing
+  `position` on two rows; there is no drag handle, because the Console's list
+  tools do not offer one. With three or four rows per channel that is a
+  30-second job, but it would not scale to a label with a dozen lines.
 - **No print preview in the Console.** The label is generated as native ZPL and
   rendered by the printer, so there is no on-screen proof before it prints. A
   preview would mean rasterising server-side (the approach klira takes for its

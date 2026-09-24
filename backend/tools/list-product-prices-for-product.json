@@ -1,30 +1,67 @@
 {
   "id": "list-product-prices-for-product",
   "action_name": "listProductPricesForProduct",
-  "response": {
-    "$.results[*].alwaysCommissionPercentage": {
+  "name": "Prices by channel",
+  "title": "Prices by channel",
+  "icon": "tag",
+  "inputs": {
+    "$.where.product.id.notEquals": {
       "visible": false
     },
-    "$.results[*].alwaysFlatTotal": {
+    "$.where.product.id.oneOf": {
+      "visible": false
+    }
+  },
+  "response": {
+    "$.results[*].priceListChannelName": {
+      "display_name": "Channel",
+      "display_order": 1
+    },
+    "$.results[*].priceListName": {
+      "display_name": "Price list",
+      "display_order": 2
+    },
+    "$.results[*].priceInclVat": {
+      "display_name": "Price incl VAT",
+      "display_order": 3
+    },
+    "$.results[*].price": {
+      "display_name": "Price excl VAT",
+      "display_order": 4
+    },
+    "$.results[*].unitCost": {
+      "display_name": "Cost price",
+      "display_order": 5
+    },
+    "$.results[*].unitFreightIn": {
+      "display_name": "Freight-in",
+      "display_order": 6
+    },
+    "$.results[*].landedUnitCost": {
+      "display_name": "Landed cost",
+      "display_order": 7,
       "visible": false
     },
     "$.results[*].channelFees": {
-      "display_order": 5
+      "display_order": 8
     },
-    "$.results[*].createdAt": {
-      "visible": false
+    "$.results[*].adSpend": {
+      "display_name": "Ad spend",
+      "display_order": 9
     },
-    "$.results[*].flatFeeTotal": {
-      "visible": false
+    "$.results[*].totalCosts": {
+      "display_name": "Total costs",
+      "display_order": 10
     },
     "$.results[*].grossProfit": {
-      "display_order": 6
+      "display_order": 11
     },
     "$.results[*].grossProfitMargin": {
       "display_name": "Gross margin",
-      "display_order": 7
+      "display_order": 12
     },
     "$.results[*].id": {
+      "display_order": 25,
       "link": {
         "tool_id": "get-product-price",
         "display_order": 0,
@@ -38,29 +75,6 @@
         ]
       }
     },
-    "$.results[*].landedUnitCost": {
-      "visible": false
-    },
-    "$.results[*].price": {
-      "display_name": "Price excl VAT",
-      "display_order": 4
-    },
-    "$.results[*].priceInclVat": {
-      "display_name": "Price incl VAT",
-      "display_order": 3
-    },
-    "$.results[*].priceListChannelName": {
-      "display_name": "Channel",
-      "display_order": 2,
-      "visible": false
-    },
-    "$.results[*].priceListId": {
-      "visible": false
-    },
-    "$.results[*].priceListName": {
-      "display_name": "Price list",
-      "display_order": 1
-    },
     "$.results[*].productId": {
       "visible": false
     },
@@ -70,17 +84,38 @@
     "$.results[*].productSku": {
       "visible": false
     },
+    "$.results[*].priceListId": {
+      "visible": false
+    },
+    "$.results[*].targetAdvertisingRoi": {
+      "visible": false
+    },
     "$.results[*].successFeePercentage": {
       "visible": false
     },
-    "$.results[*].unitCost": {
+    "$.results[*].flatFeeTotal": {
       "visible": false
     },
-    "$.results[*].unitFreightIn": {
+    "$.results[*].alwaysCommissionPercentage": {
+      "visible": false
+    },
+    "$.results[*].alwaysFlatTotal": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
       "visible": false
     },
     "$.results[*].updatedAt": {
       "visible": false
+    }
+  },
+  "get_entry_action": {
+    "tool_id": "get-product-price",
+    "deleted": true
+  },
+  "display_layout": {
+    "config": {
+      "type": 3
     }
   }
 }

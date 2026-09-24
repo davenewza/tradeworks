@@ -72,6 +72,7 @@ This API is Takealot's own and does **not** draw on the shared Zoho daily quota.
 | --- | --- |
 | `schemas/products.keel` | The `@on([create, update], syncTakealotBarcode)` event hook on `Product`. |
 | `schemas/labels.keel` | The `SyncTakealotBarcodes` flow declaration (next to `ProductChannelCode`). |
-| `lib/takealotOfferHelpers.ts` | API fetchers, the plan/apply pair for the flow, and the single-product sync for the subscriber. |
+| `lib/takealotOfferHelpers.ts` | API fetchers, the offer → code mapping that feeds the flow's plan, and the single-product sync for the subscriber. |
+| `lib/channelCodeSync.ts` | The plan/apply pair itself — shared with the Amazon FNSKU import ([amazon-fnskus.md](amazon-fnskus.md)), so the never-delete and one-channel-only rules live once. |
 | `subscribers/syncTakealotBarcode.ts` | Event handler: skip unless created or SKU changed, then sync that product. |
 | `flows/syncTakealotBarcodes.ts` | UI orchestration only: confirm → review changes → apply. |

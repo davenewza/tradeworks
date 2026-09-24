@@ -3,6 +3,30 @@
   "action_name": "getChannelLabelSpec",
   "entry_activity_actions": [
     { "tool_id": "update-channel-label-spec", "display_order": 0 },
-    { "tool_id": "delete-channel-label-spec", "display_order": 1 }
+    {
+      "tool_id": "create-channel-label-element",
+      "title": "Add a label element",
+      "display_order": 1,
+      "data_mapping": [{ "key": "$.spec.id", "path": { "path": "$.id" } }]
+    },
+    { "tool_id": "delete-channel-label-spec", "display_order": 2 }
+  ],
+  "embedded_tools": [
+    {
+      "id": "labelElements",
+      "title": "What the label carries",
+      "display_order": 0,
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-channel-label-elements",
+            "title": "Label elements"
+          },
+          "response_overrides": {
+            "$.results[*].specId": false
+          }
+        }
+      ]
+    }
   ]
 }

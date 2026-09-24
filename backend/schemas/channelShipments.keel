@@ -32,6 +32,13 @@ model ChannelShipment {
         // Text rather than Number: platforms differ, and it is an opaque key
         // here, never arithmetic.
         externalId Text
+        // The channel's id for the batch this consignment belongs to, on
+        // platforms that nest consignments inside one (Amazon's inbound plan).
+        // Null for platforms that do not — Takealot's shipments stand alone.
+        // Stored because such a platform cannot address a shipment without it:
+        // Amazon's is `/inboundPlans/{planId}/shipments/{shipmentId}`, so
+        // without the plan id a tracked consignment could never be refreshed.
+        externalGroupId Text?
         // The channel's human reference for the consignment, as shown in its
         // seller portal.
         reference Text?
@@ -110,6 +117,13 @@ model ChannelShipmentItem {
         // against.
         quantitySending Number @default(0)
         cancelled Boolean @default(false)
+        // The channel is putting the unit label on itself, or the units carry
+        // the manufacturer's own barcode — either way we print nothing for this
+        // line, and a print run leaves it out with that reason rather than
+        // reporting it as a problem to fix. Amazon says so per line
+        // (`labelOwner` of `AMAZON` or `NONE`); on Takealot the labels are
+        // always ours, so it stays false.
+        labelledByChannel Boolean @default(false)
     }
 
     actions {

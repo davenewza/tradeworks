@@ -1,7 +1,10 @@
 <template>
   <div id="app" class="min-h-screen bg-gray-50">
+    <!-- Password reset landing page: the emailed link points at /reset-password?token=... -->
+    <ResetPassword v-if="isResetPasswordPage" />
+
     <!-- Authentication Check -->
-    <div v-if="!isAuthenticated" class="min-h-screen">
+    <div v-else-if="!isAuthenticated" class="min-h-screen">
       <div class="max-w-6xl mx-auto px-4 py-0">
         <LoginForm @login-success="handleLoginSuccess" />
       </div>
@@ -9,7 +12,7 @@
     
     <!-- Profile Completion Dialog -->
     <UserProfileDialog 
-      v-if="showProfileDialog" 
+      v-else-if="showProfileDialog" 
       :show="showProfileDialog"
       @profile-saved="handleProfileSaved"
       @cancel="handleProfileCancel"
@@ -78,6 +81,7 @@
 <script>
 import PriceListManager from './components/PriceListManager.vue'
 import LoginForm from './components/LoginForm.vue'
+import ResetPassword from './components/ResetPassword.vue'
 import UserProfileDialog from './components/UserProfileDialog.vue'
 import DeliveryAddresses from './components/DeliveryAddresses.vue'
 import { authService } from './services/authService.js'
@@ -88,12 +92,14 @@ export default {
   components: {
     PriceListManager,
     LoginForm,
+    ResetPassword,
     UserProfileDialog,
     DeliveryAddresses
   },
   data() {
     return {
       isAuthenticated: false,
+      isResetPasswordPage: window.location.pathname === '/reset-password',
       currentUser: null,
       showProfileDialog: false,
       loginData: null,

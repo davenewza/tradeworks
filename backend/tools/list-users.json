@@ -20,9 +20,6 @@
         ]
       }
     },
-    "$.results[*].identityId": {
-      "visible": false
-    },
     "$.results[*].updatedAt": {
       "visible": false
     }

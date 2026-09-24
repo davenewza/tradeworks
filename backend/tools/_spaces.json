@@ -68,6 +68,16 @@
               "display_order": 1
             },
             "hidden": false
+          },
+          {
+            "id": "action-sync-products",
+            "link": {
+              "tool_id": "sync-products",
+              "title": "Sync Products from Zoho",
+              "description": "Add new products from Zoho Books and update existing ones whose name or brand has changed",
+              "display_order": 2
+            },
+            "hidden": false
           }
         ]
       },
@@ -111,47 +121,28 @@
             "link": {
               "tool_id": "print-channel-barcodes",
               "title": "Print barcodes",
-              "description": "Pick a channel and products, set label counts, print",
+              "description": "Pick products, set label counts, print",
               "display_order": 0
             },
             "hidden": false
           },
           {
-            "id": "action-list-channel-label-specs",
+            "id": "action-sync-amazon-fnskus",
             "link": {
-              "tool_id": "list-channel-label-specs",
-              "title": "Label specs",
-              "description": "How each channel’s label is built — symbology, annotation, stock",
+              "tool_id": "sync-amazon-fnskus",
+              "title": "Sync Amazon FNSKUs",
+              "description": "Pull each FBA listing’s FNSKU from the Selling Partner API",
               "display_order": 1
             },
             "hidden": false
           },
           {
-            "id": "action-create-channel-label-spec",
+            "id": "action-sync-takealot-barcodes",
             "link": {
-              "tool_id": "create-channel-label-spec",
-              "title": "Add a label spec",
-              "description": "Make a channel printable — symbology, annotation, label stock",
+              "tool_id": "sync-takealot-barcodes",
+              "title": "Sync Takealot barcodes",
+              "description": "Pull each offer’s label barcode from the Marketplace API",
               "display_order": 2
-            },
-            "hidden": false
-          }
-        ]
-      },
-      {
-        "id": "group-purchasing",
-        "name": "Purchasing",
-        "description": "What to reorder from a brand, and how many, so every product lands with the same months of cover",
-        "display_order": 4,
-        "hidden": false,
-        "actions": [
-          {
-            "id": "action-plan-purchase",
-            "link": {
-              "tool_id": "plan-purchase",
-              "title": "Plan a purchase",
-              "description": "Pick a brand, set the purchase date and lead time, review the suggested quantities",
-              "display_order": 0
             },
             "hidden": false
           }
@@ -179,6 +170,65 @@
     ],
     "topics": null,
     "charts": null
+  },
+  {
+    "id": "space-inventory",
+    "name": "Inventory",
+    "icon": "warehouse",
+    "display_order": 1,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-stock-and-cover",
+        "link": {
+          "tool_id": "list-stock-and-cover",
+          "title": "View stock and cover",
+          "description": "Stock on hand and months of cover for every product — filter by brand, class or status, sort any column",
+          "display_order": 0
+        },
+        "hidden": false
+      },
+      {
+        "id": "action-plan-purchase",
+        "link": {
+          "tool_id": "plan-purchase",
+          "title": "Plan a purchase",
+          "description": "Pick a brand, set the purchase date and lead time, review the suggested quantities",
+          "display_order": 1
+        },
+        "hidden": false
+      }
+    ],
+    "groups": null,
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": [
+      {
+        "id": "chart-attach-products-in-shortfall",
+        "chart_id": "chart_3I5aKq2NcVtRw8LmXe4PbHs6Uj1",
+        "display_order": 0,
+        "hidden": false
+      },
+      {
+        "id": "chart-attach-products-running-low",
+        "chart_id": "chart_3I5aLr3OdWuSx9MnYf5QcIt7Vk2",
+        "display_order": 1,
+        "hidden": false
+      },
+      {
+        "id": "chart-attach-months-of-stock-cover",
+        "chart_id": "chart_3I5aMs4PeXvTy0NoZg6RdJu8Wl3",
+        "display_order": 2,
+        "hidden": false
+      },
+      {
+        "id": "chart-attach-stock-value-on-hand",
+        "chart_id": "chart_3I5aNt5QfYwUz1OpAh7SeKv9Xm4",
+        "display_order": 3,
+        "hidden": false
+      }
+    ]
   },
   {
     "id": "space-sales",
@@ -226,7 +276,7 @@
     "id": "space-logistics",
     "name": "Logistics",
     "icon": "truck",
-    "display_order": 1,
+    "display_order": 2,
     "hidden": false,
     "actions": [
       {

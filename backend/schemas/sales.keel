@@ -87,12 +87,19 @@ flow ScheduledSyncSales {
 //
 // Only ever put this on a dashboard whose filters resolve against THIS cube —
 // its own fields, or channel/brand, which it joins many-to-one and so can be
-// filtered on without adding rows. The "Cumulative sales" dashboard is built
-// that way. Do NOT add it to a dashboard carrying a sale.* filter (both the
-// existing ones do): dashboard filters are appended to every chart's query
+// filtered on without adding rows. "The Worm" dashboard is built that way. Do
+// NOT add it to a dashboard carrying a sale.* filter (both the existing ones
+// do): dashboard filters are appended to every chart's query
 // unconditionally, and Cube would resolve sale.date over the one-to-many path
 // brand → product → sale, fanning each row out across every sale of that brand
 // and inflating the totals. It reads as plausible numbers, not as an error.
+//
+// The Worm also carries a "Revenue by day (this month)" bar chart off
+// `dailySales`, the per-day figure the running total is built from. It pins its
+// own window with a `dateRange` of "this month", which is ANDed with — never
+// overridden by — the dashboard's Month filter, so narrowing that filter to a
+// past month leaves the daily chart empty. Its title says which month it shows,
+// and the worm is what the Month filter is really there for.
 //
 // Rebuilt wholesale per month by RebuildCumulativeSales — never incrementally
 // updated, so a re-run always converges on the current Sale data.
@@ -101,12 +108,17 @@ model CumulativeSales {
         channel Channel
         brand Brand
         date Date
-        // First day of this row's month. The chart's series key: pivoting on a
-        // Date keeps the legend in chronological order, which a text label
-        // ("Apr 2026" < "Aug 2026") would not.
+        // First day of this row's month. Rows are rebuilt a month at a time on
+        // this column, and The Worm dashboard filters its date range against it.
         monthStart Date
-        // Human-readable series label ("Aug 2026"), for charts that pivot on a
-        // plain dimension instead of a time dimension.
+        // The chart's series label and pivot key ("Aug 2026"). Deliberately a
+        // plain string dimension rather than the monthStart time dimension: the
+        // Console derives the x-axis date formatting from the query's first time
+        // dimension whatever field is actually on that axis, so a monthly one
+        // rendered the day-of-month numbers as timestamps — every tick Jan 1970.
+        // The cost is order: the legend lists months alphabetically, because
+        // Vega-Lite sorts a nominal colour domain by its own value and the chart
+        // config has no way to give it a different sort key.
         monthLabel Text
         // 1–31. The chart's x-axis, so each month's line overlays the others.
         dayOfMonth Number

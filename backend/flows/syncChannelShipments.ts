@@ -4,7 +4,7 @@ import {
     ShipmentApplyResult,
     computeShipmentSyncPlan,
     applyShipmentSync,
-    openShipmentExternalIds,
+    openShipmentRefs,
 } from '../lib/channelShipmentHelpers';
 import { configuredAdapters, adapterFor } from '../lib/channelShipmentAdapters';
 
@@ -53,6 +53,31 @@ function buildNotes(plan: ShipmentSyncPlan): string[] {
     return notes;
 }
 
+// The unit-label codes the consignments state, where the channel puts one on
+// its lines. A channel that does not (Takealot) shows nothing here.
+function codeReview(ctx: any, plan: ShipmentSyncPlan) {
+    const changes = plan.codePlan.changes;
+    if (changes.length === 0) return [];
+
+    return [
+        ctx.ui.display.markdown({
+            content:
+                `**${changes.length} label code(s)** on these consignments differ from what is stored ` +
+                `(${plan.codePlan.unchanged} already match). Applying sets them, so the ` +
+                'consignment can be labelled without running the code sync first.',
+        }),
+        ctx.ui.display.table({
+            data: changes.map((c) => ({
+                SKU: c.sku,
+                Product: c.product,
+                Code: c.code,
+                Replaces: c.replaces || '—',
+                Change: c.change,
+            })),
+        }),
+    ];
+}
+
 export default SyncChannelShipments(config, async (ctx) => {
     const adapters = configuredAdapters(ctx);
 
@@ -62,7 +87,9 @@ export default SyncChannelShipments(config, async (ctx) => {
             stage: 'complete',
             description:
                 'None of the channels we can pull shipments from have their API credentials ' +
-                'set. Takealot needs TAKEALOT_API_KEY (Seller Portal → API Access).',
+                'set. Takealot needs TAKEALOT_API_KEY (Seller Portal → API Access); Amazon ' +
+                'needs AMAZON_LWA_CLIENT_SECRET and AMAZON_LWA_REFRESH_TOKEN (Seller Central ' +
+                '→ Apps & Services → Develop Apps).',
             content: [],
         });
     }
@@ -80,7 +107,9 @@ export default SyncChannelShipments(config, async (ctx) => {
                         ? `This pulls the consignments **${adapters[0].channelName}** is still expecting from us, together with the lines on each one, and matches those lines to products **by SKU**.`
                         : 'This pulls the consignments the channel is still expecting from us, together with the lines on each one, and matches those lines to products **by SKU**.',
                     '',
-                    'Only consignments that have **not shipped yet** are pulled — those are the ones that still need labelling. Anything already tracked here is refreshed too, so a consignment that has since gone out is closed off rather than left showing as open.',
+                    'Only consignments that have **not shipped yet** are pulled — those are the ones that still need labelling — and on a channel that gives no such filter, only recently updated ones. Anything already tracked here is refreshed too, so a consignment that has since gone out is closed off rather than left showing as open.',
+                    '',
+                    'Where the channel states the unit-label code for a line, the matched products’ codes are brought into step with it, so a consignment can be labelled without syncing codes separately first.',
                     '',
                     "You'll review the changes before they are applied. Nothing is pushed back to the channel — this only reads.",
                 ].join('\n'),
@@ -98,7 +127,7 @@ export default SyncChannelShipments(config, async (ctx) => {
                   ]
                 : []),
             ctx.ui.inputs.boolean('fullHistory', {
-                label: 'Pull the full history, including shipped and archived consignments',
+                label: 'Pull the full history, including shipped, archived and older consignments',
                 optional: true,
                 defaultValue: false,
             }),
@@ -115,17 +144,21 @@ export default SyncChannelShipments(config, async (ctx) => {
         progress.set({ message: `Fetching shipments from ${channelName}…` });
         // Consignments already tracked here are fetched even when they fall
         // outside the unshipped filter, so their status keeps moving.
-        const alsoFetchIds = fullHistory ? [] : await openShipmentExternalIds(channelName);
+        const alsoFetch = fullHistory ? [] : await openShipmentRefs(channelName);
         const external = await adapter.fetch(
             ctx,
-            { includeShipped: fullHistory, includeArchived: fullHistory, alsoFetchIds },
+            { includeShipped: fullHistory, includeArchived: fullHistory, alsoFetch },
             progress
         );
         progress.set({ message: 'Comparing against stored shipments…' });
         return await computeShipmentSyncPlan(channelName, external);
     })) as unknown as ShipmentSyncPlan;
 
-    if (plan.changes.length === 0) {
+    const codeChanges = plan.codePlan.changes;
+
+    // Codes are diffed across every consignment fetched, not just the ones that
+    // moved, so there can be a code to fix even when no shipment changed.
+    if (plan.changes.length === 0 && codeChanges.length === 0) {
         return ctx.complete({
             title: 'Everything is up to date',
             stage: 'complete',
@@ -139,22 +172,30 @@ export default SyncChannelShipments(config, async (ctx) => {
 
     await ctx.ui.page('review', {
         stage: 'review',
-        title: `${plan.changes.length} shipment${plan.changes.length === 1 ? '' : 's'} to apply`,
+        title:
+            plan.changes.length > 0
+                ? `${plan.changes.length} shipment${plan.changes.length === 1 ? '' : 's'} to apply`
+                : `${codeChanges.length} label code${codeChanges.length === 1 ? '' : 's'} to apply`,
         content: [
             ctx.ui.display.markdown({
                 content: `Shipments that change: **${plan.changes.length}** (${plan.unchanged} unchanged), **${totalUnits}** unit(s) in total.`,
             }),
-            ctx.ui.display.table({
-                data: plan.changes.map((c) => ({
-                    Shipment: c.externalId,
-                    Reference: c.reference,
-                    Status: c.status,
-                    Change: c.change,
-                    Lines: c.lines,
-                    Units: c.units,
-                    Unmatched: c.unmatched,
-                })),
-            }),
+            ...(plan.changes.length > 0
+                ? [
+                      ctx.ui.display.table({
+                          data: plan.changes.map((c) => ({
+                              Shipment: c.externalId,
+                              Reference: c.reference,
+                              Status: c.status,
+                              Change: c.change,
+                              Lines: c.lines,
+                              Units: c.units,
+                              Unmatched: c.unmatched,
+                          })),
+                      }),
+                  ]
+                : []),
+            ...codeReview(ctx, plan),
             ...buildNotes(plan).map((note) => ctx.ui.display.markdown({ content: note })),
         ],
         actions: [{ label: 'Apply changes', value: 'apply', mode: 'primary' }],
@@ -169,7 +210,10 @@ export default SyncChannelShipments(config, async (ctx) => {
     return ctx.complete({
         title: 'Shipment sync complete',
         stage: 'complete',
-        description: `${result.created + result.updated} shipment(s) synced for ${channelName}. Print their unit labels from the shipment page.`,
+        description:
+            `${result.created + result.updated} shipment(s) synced for ${channelName}` +
+            `${result.codesCreated + result.codesUpdated > 0 ? `, and ${result.codesCreated + result.codesUpdated} label code(s) set` : ''}. ` +
+            'Print their unit labels from the shipment page.',
         content: [
             ctx.ui.display.keyValue({
                 data: [
@@ -178,6 +222,12 @@ export default SyncChannelShipments(config, async (ctx) => {
                     { key: 'Already up to date', value: plan.unchanged },
                     { key: 'Lines written', value: result.linesWritten },
                     { key: 'Lines removed', value: result.linesRemoved },
+                    ...(result.codesCreated + result.codesUpdated > 0
+                        ? [
+                              { key: 'Label codes added', value: result.codesCreated },
+                              { key: 'Label codes updated', value: result.codesUpdated },
+                          ]
+                        : []),
                 ],
             }),
             ...buildNotes(plan).map((note) => ctx.ui.display.markdown({ content: note })),

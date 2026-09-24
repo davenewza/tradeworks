@@ -116,9 +116,14 @@ model ProductPrice {
             )
             @orderBy(productName: desc)
         }
-        // A product's prices across every price list — embedded on the product page.
+        // A product's prices across every sales channel — the product page embeds
+        // a slim view of this and links to the full grid. Grouped by channel, then
+        // by price list within a channel; channel-less price lists sort last.
         list listProductPricesForProduct(product.id) {
-            @orderBy(priceListName: asc)
+            @orderBy(
+                priceListChannelName: asc,
+                priceListName: asc
+            )
         }
         update updateProductPrice(id) with (priceInclVat)
         delete deleteProductPrice(id)
