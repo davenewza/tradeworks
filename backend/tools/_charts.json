@@ -23,9 +23,9 @@
   {
     "id": "chart_3I1tBYq44PDZsEOPsah9JJLmYvR",
     "name": "Product Sales Quantities",
-    "config": "{\"query\":{\"limit\":500,\"measures\":[\"sale.quantity_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"dimensions\":[\"product.sku\",\"product.name\"]},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{},\"pageSize\":25,\"pivot\":{\"x\":[\"product.sku\",\"product.name\",\"measures\"],\"y\":[\"sale.date.month\"]}},\"version\":3}",
+    "config": "{\"query\":{\"limit\":500,\"measures\":[\"sale.quantity_sum\"],\"timeDimensions\":[{\"dimension\":\"sale.date\",\"granularity\":\"month\"}],\"dimensions\":[\"product.sku\",\"product.name\"]},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{},\"pageSize\":25,\"pivot\":{\"x\":[\"product.sku\",\"product.name\",\"measures\"],\"y\":[\"sale.date.month\"],\"fillDateFields\":[\"sale.date.month\"]}},\"version\":3}",
     "createdAt": "2026-08-17T05:16:07.155783Z",
-    "updatedAt": "2026-08-17T05:16:07.155783Z"
+    "updatedAt": "2026-09-15T09:00:00.000000Z"
   },
   {
     "id": "chart_3I1tbdW7gvem4Wkx8QKjGP0iGLQ",
@@ -61,5 +61,75 @@
     "config": "{\"query\":{\"measures\":[\"cumulative_sales.daily_sales_sum\"],\"timeDimensions\":[{\"dimension\":\"cumulative_sales.date\",\"granularity\":\"day\",\"dateRange\":\"this month\"}],\"limit\":500,\"dimensions\":[]},\"settings\":{\"chartType\":\"bar\",\"xField\":\"cumulative_sales_date_day\",\"yField\":\"cumulative_sales_daily_sales_sum\",\"pivotField\":null,\"xAxis\":{\"title\":\"\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\" \",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":false,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
     "createdAt": "2026-09-12T12:00:00.000000Z",
     "updatedAt": "2026-09-12T12:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aKq2NcVtRw8LmXe4PbHs6Uj1",
+    "name": "Products in shortfall",
+    "config": "{\"query\":{\"measures\":[\"product.product_stock_cover_status_insufficient_supply\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]}],\"limit\":500},\"settings\":{\"chartType\":\"kpi\",\"valueField\":\"product_product_stock_cover_status_insufficient_supply\",\"label\":\"Products in shortfall\",\"format\":\"\",\"sparkline\":null},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aLr3OdWuSx9MnYf5QcIt7Vk2",
+    "name": "Products running low",
+    "config": "{\"query\":{\"measures\":[\"product.product_stock_cover_status_low_supply\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]}],\"limit\":500},\"settings\":{\"chartType\":\"kpi\",\"valueField\":\"product_product_stock_cover_status_low_supply\",\"label\":\"Products running low\",\"format\":\"\",\"sparkline\":null},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aMs4PeXvTy0NoZg6RdJu8Wl3",
+    "name": "Months of stock cover",
+    "config": "{\"query\":{\"measures\":[\"product.stock_cover\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]}],\"limit\":500},\"settings\":{\"chartType\":\"kpi\",\"valueField\":\"product_stock_cover\",\"label\":\"Months of cover (all stock ÷ all monthly sales)\",\"format\":\"\",\"sparkline\":null},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aNt5QfYwUz1OpAh7SeKv9Xm4",
+    "name": "Stock value on hand",
+    "config": "{\"query\":{\"measures\":[\"product.stock_value\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]}],\"limit\":500},\"settings\":{\"chartType\":\"kpi\",\"valueField\":\"product_stock_value\",\"label\":\"Stock value on hand (landed cost)\",\"format\":\"\",\"sparkline\":null},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aOu6RgZxVa2PqBi8TfLw0Yn5",
+    "name": "Products by cover status and class",
+    "config": "{\"query\":{\"measures\":[\"product.count\"],\"dimensions\":[\"product.abc_class\",\"product.stock_cover_status\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.abc_class\",\"operator\":\"set\"},{\"member\":\"product.stock_cover_status\",\"operator\":\"set\"}],\"limit\":500},\"settings\":{\"chartType\":\"bar\",\"xField\":\"product_abc_class\",\"yField\":\"product_count\",\"pivotField\":\"product_stock_cover_status\",\"xAxis\":{\"title\":\"ABC class\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"Products\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":true,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aPv7ShAyWb3QrCj9UgMx1Zo6",
+    "name": "Months of cover by class",
+    "config": "{\"query\":{\"measures\":[\"product.stock_cover\"],\"dimensions\":[\"product.abc_class\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.abc_class\",\"operator\":\"set\"}],\"limit\":500},\"settings\":{\"chartType\":\"bar\",\"xField\":\"product_abc_class\",\"yField\":\"product_stock_cover\",\"pivotField\":null,\"xAxis\":{\"title\":\"ABC class\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"Months of cover\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\".1f\",\"zero\":true},\"legend\":{\"show\":false,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":true,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aQw8TiBzXc4RsDk0VhNy2Ap7",
+    "name": "Stock value by class and status",
+    "config": "{\"query\":{\"measures\":[\"product.stock_value\"],\"dimensions\":[\"product.abc_class\",\"product.stock_cover_status\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.abc_class\",\"operator\":\"set\"},{\"member\":\"product.stock_cover_status\",\"operator\":\"set\"}],\"limit\":500},\"settings\":{\"chartType\":\"bar\",\"xField\":\"product_abc_class\",\"yField\":\"product_stock_value\",\"pivotField\":\"product_stock_cover_status\",\"xAxis\":{\"title\":\"ABC class\",\"type\":\"auto\",\"labelAngle\":0,\"labelLimit\":100,\"labelOverlap\":\"parity\",\"labelAlign\":\"center\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\"},\"yAxis\":{\"title\":\"Stock value (landed cost)\",\"type\":\"auto\",\"scaleType\":\"linear\",\"showDomain\":true,\"showTicks\":true,\"showLabels\":true,\"tickCount\":null,\"format\":\"\",\"zero\":true},\"legend\":{\"show\":true,\"position\":\"right\"},\"mark\":{\"barWidth\":null,\"lineStrokeWidth\":2,\"pointSize\":50},\"behaviors\":{\"showDataLabels\":false,\"showTooltips\":true,\"showGrid\":true,\"stackingMode\":\"stacked\",\"showBarTotals\":false,\"fillMissingValues\":false,\"showPoints\":true},\"facet\":{\"row\":null,\"column\":null},\"arc\":{\"donut\":true}},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aRx9UjCaYd5StEl1WiOz3Bq8",
+    "name": "Months of cover by brand and class",
+    "config": "{\"query\":{\"measures\":[\"product.stock_cover\"],\"dimensions\":[\"brand.name\",\"product.abc_class\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.abc_class\",\"operator\":\"set\"}],\"order\":[[\"brand.name\",\"asc\"],[\"product.abc_class\",\"asc\"]],\"limit\":500},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{\"brand.name\":\"Brand\",\"product.stock_cover\":\"Months of cover\"},\"pageSize\":25,\"pivot\":{\"x\":[\"brand.name\"],\"y\":[\"product.abc_class\",\"measures\"]}},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aSy0VkDbZe6TuFm2XjPa4Cr9",
+    "name": "Products to reorder",
+    "config": "{\"query\":{\"dimensions\":[\"product.abc_class\",\"product.sku\",\"product.name\",\"brand.name\",\"product.stock_cover_status\",\"product.stock_available\",\"product.estimated_monthly_sale\",\"product.current_stock_cover\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.stock_cover_status\",\"operator\":\"equals\",\"values\":[\"InsufficientSupply\",\"LowSupply\"]}],\"order\":[[\"product.abc_class\",\"asc\"],[\"product.current_stock_cover\",\"asc\"]],\"limit\":500},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{\"product.abc_class\":\"Class\",\"product.sku\":\"SKU\",\"product.name\":\"Product\",\"brand.name\":\"Brand\",\"product.stock_cover_status\":\"Status\",\"product.stock_available\":\"Stock available\",\"product.estimated_monthly_sale\":\"Est. monthly sales\",\"product.current_stock_cover\":\"Current cover (months)\"},\"pageSize\":25,\"pivot\":{\"x\":[\"product.abc_class\",\"product.sku\",\"product.name\",\"brand.name\",\"product.stock_cover_status\",\"product.stock_available\",\"product.estimated_monthly_sale\",\"product.current_stock_cover\"],\"y\":[]}},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3I5aTz1WlEcAf7UvGn3YkQb5Ds0",
+    "name": "Oversupplied stock",
+    "config": "{\"query\":{\"measures\":[\"product.stock_value\"],\"dimensions\":[\"product.abc_class\",\"product.sku\",\"product.name\",\"brand.name\",\"product.stock_available\",\"product.current_stock_cover\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.stock_cover_status\",\"operator\":\"equals\",\"values\":[\"Oversupply\"]}],\"order\":[[\"product.stock_value\",\"desc\"]],\"limit\":500},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{\"product.abc_class\":\"Class\",\"product.sku\":\"SKU\",\"product.name\":\"Product\",\"brand.name\":\"Brand\",\"product.stock_available\":\"Stock available\",\"product.current_stock_cover\":\"Current cover (months)\",\"product.stock_value\":\"Stock value (landed cost)\"},\"pageSize\":25,\"pivot\":{\"x\":[\"product.abc_class\",\"product.sku\",\"product.name\",\"brand.name\",\"product.stock_available\",\"product.current_stock_cover\",\"measures\"],\"y\":[]}},\"version\":3}",
+    "createdAt": "2026-09-24T09:00:00.000000Z",
+    "updatedAt": "2026-09-24T09:00:00.000000Z"
   }
 ]

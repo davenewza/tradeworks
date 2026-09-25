@@ -58,7 +58,7 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             return ctx.complete({
                 stage: 'review',
                 title: 'Nothing to plan for this brand',
-                description: 'It has no enabled products, or it no longer exists.',
+                description: 'It has no active products, or it no longer exists.',
                 content: [],
             });
         }
@@ -67,7 +67,7 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             return ctx.complete({
                 stage: 'review',
                 title: 'Nothing to plan',
-                description: 'No brand has any enabled products.',
+                description: 'No brand has any active products.',
                 content: [],
             });
         }
@@ -151,7 +151,7 @@ export default PlanPurchase(config, async (ctx, inputs) => {
         return ctx.complete({
             stage: 'review',
             title: `Nothing to plan for ${brand.name}`,
-            description: 'This brand has no enabled products.',
+            description: 'This brand has no active products.',
             content: [],
         });
     }

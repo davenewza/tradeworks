@@ -3,7 +3,7 @@ model Brand {
         name Text
         logo File?
         products Product[]
-        totalProducts Number @computed(COUNTIF(brand.products, brand.products.isEnabled))
+        totalProducts Number @computed(COUNTIF(brand.products, brand.products.isActive))
         // How long (in days) new stock takes to arrive from this brand's
         // supplier — used to grade each product's stock-cover status. Editable on
         // the brand page; hidden from the brands list.
@@ -53,7 +53,16 @@ model Product {
         heightInCm Decimal?
         weightInGrams Decimal?
         volumeInLitres Decimal? @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
-        isEnabled Boolean @default(true)
+        // Mirrors Zoho's item status. An inactive item cannot be used in
+        // transactions over there, so the product is out of use here too:
+        // hidden from the catalogue, and left out of pricing, quoting,
+        // purchase planning, labelling and delivery.
+        //
+        // Zoho owns this field. No action writes it — SyncProducts is the only
+        // thing that does, in both directions, so the two systems cannot drift
+        // and there is never a local change for a sync to second-guess. Change
+        // an item's status in Zoho, then sync.
+        isActive Boolean @default(true)
         synchronisedAt Timestamp?
         views ProductViews[]
         sales Sale[]
@@ -107,10 +116,24 @@ model Product {
         abcClass AbcClass?
     }
 
+    // Read-time aggregates for the Stock cover dashboard's charts.
+    measures {
+        // Months of cover for a group of products taken as a whole: total stock
+        // ÷ total monthly sales. Averaging per-product covers would let one
+        // slow seller with years of stock drown out the rest of the group.
+        stockCover @computed(SUM(product.stockAvailable) / SUM(product.estimatedMonthlySale))
+        // Capital tied up in stock on hand, at weighted landed cost. Negative
+        // stock (billed ahead of receipt) holds no capital, so it is left out.
+        stockValue @computed(SUMIF(product.stockAvailable * product.weightedLandedCost, product.stockAvailable > 0))
+    }
+
     actions {
         get getProduct(id)
+        // The Console's products list. Its search box matches SKU or name
+        // (full-text plus fuzzy), so an operator can type either.
         list listProducts(name?, sku?, brand.id?, abcClass?) {
-            @where(product.isEnabled)
+            @where(product.isActive)
+            @searchable(sku, name)
             @sortable(
                 name,
                 sku,
@@ -124,6 +147,41 @@ model Product {
             )
             @orderBy(name: asc)
         }
+        // The reorder view (Inventory → View stock and cover): every active
+        // product's stock and cover figures, filterable by brand, SKU, name, ABC
+        // class, status and either cover, and sortable on every column. Brand
+        // is a relation, which @sortable can't order by.
+        list listStockAndCover(
+            name?,
+            sku?,
+            brand.id?,
+            abcClass?,
+            stockCoverStatus?,
+            currentStockCover?,
+            totalStockCover?,
+        ) {
+            @where(product.isActive)
+            @sortable(
+                sku,
+                name,
+                abcClass,
+                totalUnitsSold,
+                stockAvailable,
+                stockOnWay,
+                estimatedMonthlySale,
+                currentStockCover,
+                totalStockCover,
+                stockCoverStatus
+            )
+            @orderBy(name: asc)
+        }
+        // Pooled cover and stock value per ABC class — the Stock cover
+        // dashboard's figures, over the same measures its charts use.
+        aggregate stockCoverByClass(brand.id?) over (abcClass) {
+            @measures(stockCover, stockValue)
+            @where(product.isActive)
+            @orderBy(abcClass: asc)
+        }
         update updateProductDimensions(id) with (
             lengthInCm,
             widthInCm,
@@ -131,8 +189,13 @@ model Product {
             weightInGrams,
         )
         update updateProduct(id) with (name?, brand.id?, sku?)
-        update disableProduct(id) {
-            @set(product.isEnabled = false)
+        // Read-only view of what the sync has switched off. There is no action
+        // to switch one back on: isActive belongs to Zoho, so the way back is to
+        // make the item active there and run SyncProducts.
+        list listInactiveProducts(name?, sku?, brand.id?) {
+            @where(product.isActive == false)
+            @sortable(name, sku)
+            @orderBy(name: asc)
         }
     }
 
@@ -149,7 +212,7 @@ model Product {
 
     @permission(
         roles: [Operator],
-        actions: [get, list, update, delete]
+        actions: [get, list, aggregate, update, delete]
     )
 }
 

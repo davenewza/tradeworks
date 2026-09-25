@@ -71,9 +71,9 @@ function stubInventory(summaries: unknown[]) {
     );
 }
 
-async function createProduct(sku: string, name = `Product ${sku}`, isEnabled = true) {
+async function createProduct(sku: string, name = `Product ${sku}`, isActive = true) {
     const brand = await models.brand.create({ name: 'Test Brand' });
-    return await models.product.create({ name, sku, brandId: brand.id, isEnabled });
+    return await models.product.create({ name, sku, brandId: brand.id, isActive });
 }
 
 async function createAmazonChannel() {

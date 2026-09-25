@@ -103,7 +103,7 @@ export async function loadPrintableChannels(): Promise<PrintableChannel[]> {
 }
 
 /**
- * Every enabled product carrying a code for this channel, split by whether that
+ * Every active product carrying a code for this channel, split by whether that
  * code is printable under the channel's symbology.
  *
  * One product at a time is not this function's job — see
@@ -122,7 +122,7 @@ export async function loadLabelCandidates(
     const unprintable: UnprintableProduct[] = [];
 
     const products = await models.product.findMany({
-        where: { id: { oneOf: codes.map((c) => c.productId) }, isEnabled: { equals: true } },
+        where: { id: { oneOf: codes.map((c) => c.productId) }, isActive: { equals: true } },
     });
     const productById = new Map(products.map((p) => [p.id, p]));
 
@@ -131,8 +131,8 @@ export async function loadLabelCandidates(
 
     for (const row of codes) {
         const product = productById.get(row.productId);
-        // Disabled products are filtered out above; skip rather than report them,
-        // since they are intentionally out of the catalogue.
+        // Inactive products are filtered out above; skip rather than report
+        // them, since they are intentionally out of the catalogue.
         if (!product) continue;
 
         const check = checkCode(symbology, row.code);

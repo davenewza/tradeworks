@@ -1,6 +1,13 @@
 import { models, resetDatabase } from '@teamkeel/testing';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { applyProductSync, SyncCandidate } from './zohoProductHelpers';
+import {
+    applyProductSync,
+    buildSyncCandidates,
+    ExistingProduct,
+    isItemInactive,
+    SyncCandidate,
+    ZohoItem,
+} from './zohoProductHelpers';
 
 beforeEach(resetDatabase);
 
@@ -23,15 +30,32 @@ function recordingProgress() {
     return { reporter, state };
 }
 
-// Build a SyncCandidate; the apply pass only reads sku/name/brand, so the
-// display/hidden fields are filled with representative values.
+// Build a SyncCandidate; the apply pass only reads sku/name/brand/action/reason,
+// so the remaining fields are filled with representative values.
 function candidate(overrides: Partial<SyncCandidate> & Pick<SyncCandidate, 'sku' | 'name' | 'brand'>): SyncCandidate {
     return {
         change: 'New',
+        reason: 'Not in our catalogue yet',
+        isActive: true,
         zohoItemId: `zoho-${overrides.sku}`,
         action: 'create',
         ...overrides,
     };
+}
+
+// Build a Zoho item as /itemdetails returns it: active, with a Brand custom
+// field, unless overridden.
+function zohoItem(overrides: Partial<ZohoItem> & Pick<ZohoItem, 'sku' | 'name'>): ZohoItem {
+    return {
+        item_id: `zoho-${overrides.sku}`,
+        status: 'active',
+        custom_fields: [{ label: 'Brand', value: 'Acme' }],
+        ...overrides,
+    };
+}
+
+function existing(overrides: Partial<ExistingProduct> = {}): ExistingProduct {
+    return { name: 'Widget', brandName: 'Acme', isActive: true, ...overrides };
 }
 
 describe('applyProductSync', () => {
@@ -132,6 +156,126 @@ describe('applyProductSync', () => {
         expect(state.logs).toHaveLength(3);
     });
 
+    test('switches off a deactivated product, leaving its name and brand as they were', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Widget', sku: 'F-1', brandId: brand.id });
+
+        const result = await applyProductSync([
+            candidate({
+                sku: 'F-1',
+                name: 'Widget',
+                brand: 'Acme',
+                change: 'Deactivate',
+                reason: 'Inactive in Zoho',
+                action: 'deactivate',
+            }),
+        ]);
+
+        expect(result).toMatchObject({ created: 0, updated: 0, deactivated: 1 });
+        expect(result.synced[0]).toMatchObject({ sku: 'F-1', change: 'Deactivate', reason: 'Inactive in Zoho' });
+
+        const product = await models.product.findOne({ sku: 'F-1' });
+        expect(product!.isActive).toBe(false);
+        expect(product!.name).toBe('Widget');
+        expect(product!.brandId).toBe(brand.id);
+        expect(product!.synchronisedAt).not.toBeNull();
+    });
+
+    test('a deactivation never creates a brand', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Widget', sku: 'G-1', brandId: brand.id });
+
+        await applyProductSync([
+            candidate({ sku: 'G-1', name: 'Widget', brand: 'Acme', change: 'Deactivate', action: 'deactivate' }),
+        ]);
+
+        expect(await models.brand.findMany({})).toHaveLength(1);
+    });
+
+    test('skips a deactivation whose product has since gone, without failing the run', async () => {
+        const { reporter, state } = recordingProgress();
+
+        const result = await applyProductSync(
+            [
+                candidate({ sku: 'H-1', name: 'Vanished', brand: 'Acme', change: 'Deactivate', action: 'deactivate' }),
+                candidate({ sku: 'H-2', name: 'Added', brand: 'Acme' }),
+            ],
+            reporter
+        );
+
+        expect(result).toMatchObject({ created: 1, updated: 0, deactivated: 0 });
+        expect(result.synced.map((s) => s.sku)).toEqual(['H-2']);
+        expect(state.current).toBe(2); // both rows counted, one of them a skip
+        expect(state.logs[0]).toContain('Skipped H-1');
+    });
+
+    test('creates an inactive item as an inactive product, counted apart', async () => {
+        const result = await applyProductSync([
+            candidate({ sku: 'H-9', name: 'Retired', brand: 'Acme', isActive: false }),
+            candidate({ sku: 'H-8', name: 'Live', brand: 'Acme' }),
+        ]);
+
+        expect(result).toMatchObject({ created: 2, createdInactive: 1 });
+        expect((await models.product.findOne({ sku: 'H-9' }))!.isActive).toBe(false);
+        expect((await models.product.findOne({ sku: 'H-8' }))!.isActive).toBe(true);
+    });
+
+    test('reactivates a product, refreshing its name and brand on the way back', async () => {
+        const oldBrand = await models.brand.create({ name: 'Old Brand' });
+        await models.product.create({
+            name: 'Old Name',
+            sku: 'J-1',
+            brandId: oldBrand.id,
+            isActive: false,
+        });
+
+        const result = await applyProductSync([
+            candidate({
+                sku: 'J-1',
+                name: 'New Name',
+                brand: 'New Brand',
+                change: 'Reactivate',
+                reason: 'Active again in Zoho',
+                action: 'reactivate',
+            }),
+        ]);
+
+        expect(result).toMatchObject({ created: 0, updated: 0, reactivated: 1 });
+        expect(result.synced[0]).toMatchObject({ sku: 'J-1', change: 'Reactivate' });
+
+        const product = await models.product.findOne({ sku: 'J-1' });
+        expect(product!.isActive).toBe(true);
+        expect(product!.name).toBe('New Name');
+    });
+
+    test('an ordinary update never touches status', async () => {
+        // A rename on a product that is off must not quietly switch it on.
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Old', sku: 'K-1', brandId: brand.id, isActive: false });
+
+        await applyProductSync([
+            candidate({ sku: 'K-1', name: 'Renamed', brand: 'Acme', change: 'Update', action: 'update' }),
+        ]);
+
+        const product = await models.product.findOne({ sku: 'K-1' });
+        expect(product!.name).toBe('Renamed');
+        expect(product!.isActive).toBe(false);
+    });
+
+    test('is idempotent — re-deactivating an off product is a no-op on its state', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Widget', sku: 'I-1', brandId: brand.id });
+        const selected = [
+            candidate({ sku: 'I-1', name: 'Widget', brand: 'Acme', change: 'Deactivate', action: 'deactivate' }),
+        ];
+
+        await applyProductSync(selected);
+        const second = await applyProductSync(selected);
+
+        expect(second.deactivated).toBe(1);
+        expect((await models.product.findOne({ sku: 'I-1' }))!.isActive).toBe(false);
+    });
+
     test('is idempotent — re-running a create becomes an update, no duplicates', async () => {
         const selected = [candidate({ sku: 'E-1', name: 'First', brand: 'Acme' })];
 
@@ -144,5 +288,146 @@ describe('applyProductSync', () => {
 
         const products = await models.product.findMany({ where: { sku: { equals: 'E-1' } } });
         expect(products).toHaveLength(1);
+    });
+});
+
+describe('isItemInactive', () => {
+    test('reads Zoho item status, tolerating case and padding', () => {
+        expect(isItemInactive(zohoItem({ sku: 'A', name: 'A', status: 'inactive' }))).toBe(true);
+        expect(isItemInactive(zohoItem({ sku: 'A', name: 'A', status: '  Inactive ' }))).toBe(true);
+        expect(isItemInactive(zohoItem({ sku: 'A', name: 'A', status: 'active' }))).toBe(false);
+        expect(isItemInactive(zohoItem({ sku: 'A', name: 'A', status: undefined }))).toBe(false);
+    });
+});
+
+describe('buildSyncCandidates', () => {
+    test('adds items we do not carry yet', () => {
+        const candidates = buildSyncCandidates([zohoItem({ sku: 'A-1', name: 'Widget' })], new Map());
+
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0]).toMatchObject({
+            sku: 'A-1',
+            name: 'Widget',
+            brand: 'Acme',
+            change: 'New',
+            action: 'create',
+        });
+    });
+
+    test('updates a product whose name or brand moved on, and says which', () => {
+        const items = [
+            zohoItem({ sku: 'N-1', name: 'Renamed' }),
+            zohoItem({
+                sku: 'B-1',
+                name: 'Widget',
+                custom_fields: [{ label: 'Brand', value: 'Rebranded' }],
+            }),
+            zohoItem({
+                sku: 'NB-1',
+                name: 'Renamed',
+                custom_fields: [{ label: 'Brand', value: 'Rebranded' }],
+            }),
+        ];
+        const held = new Map<string, ExistingProduct>([
+            ['N-1', existing()],
+            ['B-1', existing()],
+            ['NB-1', existing()],
+        ]);
+
+        expect(buildSyncCandidates(items, held).map((c) => [c.sku, c.change, c.reason])).toEqual([
+            ['N-1', 'Update', 'Name changed in Zoho'],
+            ['B-1', 'Update', 'Brand changed in Zoho'],
+            ['NB-1', 'Update', 'Name and brand changed in Zoho'],
+        ]);
+    });
+
+    test('produces nothing for a product that already matches Zoho', () => {
+        const held = new Map<string, ExistingProduct>([['M-1', existing({ name: 'Widget', brandName: 'Acme' })]]);
+
+        expect(buildSyncCandidates([zohoItem({ sku: 'M-1', name: 'Widget' })], held)).toEqual([]);
+    });
+
+    test('deactivates a product whose Zoho item has gone inactive', () => {
+        const held = new Map<string, ExistingProduct>([['I-1', existing()]]);
+
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'I-1', name: 'Widget', status: 'inactive' })],
+            held
+        );
+
+        expect(candidates.map((c) => [c.sku, c.change, c.action, c.reason])).toEqual([
+            ['I-1', 'Deactivate', 'deactivate', 'Inactive in Zoho'],
+        ]);
+    });
+
+    test('a rename on an inactive item still only deactivates — the name is not worth syncing', () => {
+        const held = new Map<string, ExistingProduct>([['I-3', existing({ name: 'Old Name' })]]);
+
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'I-3', name: 'Renamed', status: 'inactive' })],
+            held
+        );
+
+        expect(candidates.map((c) => c.change)).toEqual(['Deactivate']);
+    });
+
+    test('shows the brand we hold on a deactivation, not the one on the Zoho item', () => {
+        // An obsolete item's brand custom field is often stale or cleared in
+        // Zoho — our own record is the one to show.
+        const item = zohoItem({ sku: 'I-2', name: 'Widget', status: 'inactive', custom_fields: [] });
+        const held = new Map<string, ExistingProduct>([['I-2', existing({ brandName: 'Acme' })]]);
+
+        expect(buildSyncCandidates([item], held)[0].brand).toBe('Acme');
+    });
+
+    test('imports an inactive item we do not carry, as an inactive product', () => {
+        // Without the product row, every invoice line for this SKU is dropped
+        // by the sales sync with "no product found".
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'X-1', name: 'Retired', status: 'inactive' })],
+            new Map()
+        );
+
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0]).toMatchObject({
+            sku: 'X-1',
+            name: 'Retired',
+            brand: 'Acme',
+            change: 'New',
+            action: 'create',
+            isActive: false,
+            reason: 'Inactive in Zoho — imported for its history',
+        });
+    });
+
+    test('an inactive item we already hold as inactive produces nothing', () => {
+        // It is a history record, not a catalogue entry — re-proposing it every
+        // run would bury the real changes.
+        const held = new Map<string, ExistingProduct>([['X-2', existing({ name: 'Old', isActive: false })]]);
+
+        expect(buildSyncCandidates([zohoItem({ sku: 'X-2', name: 'Renamed', status: 'inactive' })], held)).toEqual([]);
+    });
+
+    test('reactivates a product whose Zoho item is active again, refreshing its name and brand', () => {
+        const held = new Map<string, ExistingProduct>([
+            ['R-9', existing({ name: 'Old Name', brandName: 'Old Brand', isActive: false })],
+        ]);
+
+        const candidates = buildSyncCandidates([zohoItem({ sku: 'R-9', name: 'New Name' })], held);
+
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0]).toMatchObject({
+            sku: 'R-9',
+            name: 'New Name',
+            brand: 'Acme',
+            change: 'Reactivate',
+            action: 'reactivate',
+            isActive: true,
+            reason: 'Active again in Zoho',
+        });
+    });
+
+    test('skips items with no SKU — there is nothing to match them on', () => {
+        expect(buildSyncCandidates([zohoItem({ sku: '   ', name: 'No SKU' })], new Map())).toEqual([]);
     });
 });

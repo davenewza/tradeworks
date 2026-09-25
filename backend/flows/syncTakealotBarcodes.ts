@@ -42,7 +42,7 @@ function buildNotes(plan: ChannelCodeSyncPlan): string[] {
 
     if (plan.productsWithoutSource.length > 0) {
         notes.push(
-            `${plan.productsWithoutSource.length} enabled product(s) have no Takealot offer: ${capped(plan.productsWithoutSource)}`
+            `${plan.productsWithoutSource.length} active product(s) have no Takealot offer: ${capped(plan.productsWithoutSource)}`
         );
     }
 

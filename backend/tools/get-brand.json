@@ -1,9 +1,19 @@
 {
   "id": "get-brand",
   "action_name": "getBrand",
+  "response": {
+    "$.products": {
+      "link": {
+        "tool_id": "list-products",
+        "data_mapping": [
+          { "key": "$.where.brand.id.equals", "path": { "path": "$.id" } }
+        ]
+      }
+    }
+  },
   "entry_activity_actions": [
     {
-      "tool_id": "list-product-stock",
+      "tool_id": "list-stock-and-cover",
       "title": "View stock & cover",
       "data_mapping": [
         { "key": "$.where.brand.id.equals", "path": { "path": "$.id" } }

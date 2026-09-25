@@ -33,9 +33,9 @@ function mptalOffer(sku: string, label: string | null): TakealotOffer {
     return { sku, product_label: label, barcode: 'MPTAL75747951' };
 }
 
-async function createProduct(sku: string, name = `Product ${sku}`, isEnabled = true) {
+async function createProduct(sku: string, name = `Product ${sku}`, isActive = true) {
     const brand = await models.brand.create({ name: 'Test Brand' });
-    return await models.product.create({ name, sku, brandId: brand.id, isEnabled });
+    return await models.product.create({ name, sku, brandId: brand.id, isActive });
 }
 
 async function createTakealotChannel() {
@@ -220,7 +220,7 @@ describe('computeBarcodeSyncPlan', () => {
         expect(plan.changes[0]).toMatchObject({ productId: product.id, code: '2222222222222' });
     });
 
-    test('lists enabled products with no offer, leaving disabled ones out', async () => {
+    test('lists active products with no offer, leaving inactive ones out', async () => {
         await createProduct('ON-TAKEALOT');
         await createProduct('NOT-LISTED');
         await createProduct('DISABLED', 'Product DISABLED', false);
