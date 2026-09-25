@@ -1,0 +1,49 @@
+{
+  "id": "list-products-without-supplier",
+  "action_name": "listProductsWithoutSupplier",
+  "name": "Products without a supplier",
+  "title": "Products without a supplier",
+  "icon": "emoji:❓",
+  "help_text": "Active products with no supplier yet. They have no lead time, so their stock cover goes ungraded and purchase planning leaves them out. Open one and use Set supplier & price.",
+  "response": {
+    "$.results[*].sku": {
+      "display_name": "SKU",
+      "display_order": 0
+    },
+    "$.results[*].name": {
+      "display_order": 1
+    },
+    "$.results[*].brandId": {
+      "display_name": "Brand",
+      "display_order": 2
+    },
+    "$.results[*].id": {
+      "display_order": 20,
+      "link": {
+        "tool_id": "get-product",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "update-product-supplier",
+      "title": "Set supplier & price",
+      "as_dialog": true,
+      "display_order": 0
+    }
+  ],
+  "pagination": {
+    "page_size": {
+      "default_value": 100
+    }
+  }
+}

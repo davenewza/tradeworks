@@ -4,9 +4,10 @@ model Brand {
         logo File?
         products Product[]
         totalProducts Number @computed(COUNTIF(brand.products, brand.products.isActive))
-        // How long (in days) new stock takes to arrive from this brand's
-        // supplier — used to grade each product's stock-cover status. Editable on
-        // the brand page; hidden from the brands list.
+        // Superseded by Supplier.leadTimeInDays, which now grades stock cover
+        // and drives purchase planning. Kept only so CreateSuppliersFromBrands
+        // can carry each brand's lead time onto its supplier; drop it once
+        // that has run in production.
         leadTimeInDays Number @default(60)
     }
 
@@ -15,7 +16,6 @@ model Brand {
         list listBrands()
         update updateBrandName(id) with (name)
         update updateBrandLogo(id) with (logo)
-        update updateBrandLeadTime(id) with (leadTimeInDays)
     }
 
     @permission(
@@ -46,6 +46,13 @@ model Product {
     fields {
         name Text
         brand Brand
+        // Who we buy it from, and what they charge per unit (excl VAT, excl
+        // freight) in the currency they quote. Unset until someone assigns
+        // it; a product with no supplier has no lead time, so it goes
+        // ungraded and is left out of purchase planning.
+        supplier Supplier?
+        supplierUnitCost Decimal?
+        supplierCurrency Currency?
         sku Text @unique
         image File?
         lengthInCm Decimal?
@@ -102,11 +109,12 @@ model Product {
         // cover must stay consistent with the rounded estimate it's shown beside.
         currentStockCover Decimal?
         totalStockCover Decimal?
-        // Reorder signal: current cover vs the brand's lead time (L = days / 30):
+        // Reorder signal: current cover vs the supplier's lead time (L = days / 30):
         //   Shortfall (<L) · Low (L–1.5L) · Good (1.5L–2.5L) · Oversupply (≥2.5L).
-        // Null when cover is unknown. @computed, so it re-grades the moment cover
-        // or the brand's lead time changes.
-        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null, null, IF(product.currentStockCover < product.brand.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 1.5, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.brand.leadTimeInDays / 30 * 2.5, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
+        // Null when cover is unknown or there is no supplier to take a lead
+        // time from. @computed, so it re-grades the moment cover, the supplier
+        // or the supplier's lead time changes.
+        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null || product.supplier.leadTimeInDays == null, null, IF(product.currentStockCover < product.supplier.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.supplier.leadTimeInDays / 30 * 1.5, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.supplier.leadTimeInDays / 30 * 2.5, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
         // Revenue-importance grade, written by the daily job: products ranked by
         // monthly revenue run-rate — trailing-365-day realized revenue (net of
         // discount, excl VAT) ÷ months since first sale — then cut at 80% / 95%
@@ -131,7 +139,7 @@ model Product {
         get getProduct(id)
         // The Console's products list. Its search box matches SKU or name
         // (full-text plus fuzzy), so an operator can type either.
-        list listProducts(name?, sku?, brand.id?, abcClass?) {
+        list listProducts(name?, sku?, brand.id?, supplier.id?, abcClass?) {
             @where(product.isActive)
             @searchable(sku, name)
             @sortable(
@@ -148,13 +156,15 @@ model Product {
             @orderBy(name: asc)
         }
         // The reorder view (Inventory → View stock and cover): every active
-        // product's stock and cover figures, filterable by brand, SKU, name, ABC
-        // class, status and either cover, and sortable on every column. Brand
-        // is a relation, which @sortable can't order by.
+        // product's stock and cover figures, filterable by brand, supplier,
+        // SKU, name, ABC class, status and either cover, and sortable on every
+        // column. Brand and supplier are relations, which @sortable can't
+        // order by.
         list listStockAndCover(
             name?,
             sku?,
             brand.id?,
+            supplier.id?,
             abcClass?,
             stockCoverStatus?,
             currentStockCover?,
@@ -177,7 +187,7 @@ model Product {
         }
         // Pooled cover and stock value per ABC class — the Stock cover
         // dashboard's figures, over the same measures its charts use.
-        aggregate stockCoverByClass(brand.id?) over (abcClass) {
+        aggregate stockCoverByClass(brand.id?, supplier.id?) over (abcClass) {
             @measures(stockCover, stockValue)
             @where(product.isActive)
             @orderBy(abcClass: asc)
@@ -189,6 +199,18 @@ model Product {
             weightInGrams,
         )
         update updateProduct(id) with (name?, brand.id?, sku?)
+        update updateProductSupplier(id) with (
+            supplier.id?,
+            supplierUnitCost?,
+            supplierCurrency?,
+        )
+        // Active products nobody has assigned a supplier to yet — ungraded and
+        // out of purchase planning until someone does.
+        list listProductsWithoutSupplier(name?, sku?, brand.id?) {
+            @where(product.isActive && product.supplier == null)
+            @sortable(name, sku)
+            @orderBy(name: asc)
+        }
         // Read-only view of what the sync has switched off. There is no action
         // to switch one back on: isActive belongs to Zoho, so the way back is to
         // make the item active there and run SyncProducts.
@@ -203,6 +225,16 @@ model Product {
     // Takealot holds against its offer. The handler only calls out when the
     // SKU is new or changed — the SKU is what identifies the offer.
     @on([create, update], syncTakealotBarcode)
+
+    // A price means nothing without its currency.
+    @validate(
+        product.supplierUnitCost == null || product.supplierCurrency != null,
+        "A supplier price should have a currency"
+    )
+    @validate(
+        product.supplierUnitCost == null || product.supplierUnitCost >= 0,
+        "A supplier price should not be negative"
+    )
 
     @permission(
         roles: [Operator],
@@ -223,7 +255,7 @@ flow ScheduledSyncStock {
     @permission(roles: [Operator])
 }
 
-// Suggests a purchase order for one brand: which products to reorder and how
+// Suggests a purchase order for one supplier: which products to reorder and how
 // many units, so that every product lands with the same months of cover and
 // the next order can wait until they all run down together — no top-up orders
 // for the one SKU that ran out early. Projects each product's stock forward at
@@ -231,10 +263,11 @@ flow ScheduledSyncStock {
 // difference to a target cover. Pure local arithmetic over the stock-cover
 // figures; no Zoho calls. See docs/purchase-planning.md.
 //
-// brandId is set when launched from a brand's page; without it the flow asks.
+// supplierId is set when launched from a supplier's page; without it the flow
+// asks.
 flow PlanPurchase {
     inputs {
-        brandId ID?
+        supplierId ID?
     }
     @permission(roles: [Operator])
 }

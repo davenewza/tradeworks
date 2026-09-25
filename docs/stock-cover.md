@@ -10,15 +10,15 @@ matters, not just how close it is to running out.
 ## Where to find it
 
 - **Inventory → View stock and cover** — the reorder view: every enabled
-  product's figures in one grid. Filter by brand, SKU, name, ABC class, status,
-  and current or total cover (any comparison — less than, at least, between);
-  click any column heading to sort by it. Brand is the one column that can't be
-  sorted, because it is a relation.
+  product's figures in one grid. Filter by brand, supplier, SKU, name, ABC
+  class, status, and current or total cover (any comparison — less than, at
+  least, between); click any column heading to sort by it. Brand and supplier
+  are the columns that can't be sorted, because they are relations.
 - **Stock cover dashboard** — charts of cover by ABC class; see
   [the dashboard](#stock-cover-dashboard). Its four headline figures are also
   pinned to the top of the Inventory space.
-- **Per brand** — open a brand and click **View stock & cover** to open that
-  same grid filtered to the brand.
+- **Per brand or supplier** — open a brand or a supplier and click **View stock
+  & cover** to open that same grid filtered to it.
 - **Per product** — the **Stock & cover** section on any product page.
 
 ## The figures
@@ -35,8 +35,8 @@ matters, not just how close it is to running out.
 
 ## Status
 
-Each product is graded by comparing its **current cover** to the brand's **lead
-time** — how long new stock takes to arrive from the supplier. With
+Each product is graded by comparing its **current cover** to its supplier's
+**lead time** — how long new stock takes to arrive from them. With
 `L = leadTimeInDays ÷ 30` (lead time in months):
 
 | Status | Colour | Cover | Meaning |
@@ -46,9 +46,10 @@ time** — how long new stock takes to arrive from the supplier. With
 | **Good** | 🟢 green | `1.5 × L` to `2.5 × L` | Comfortable. |
 | **Oversupply** | 🟣 purple | `≥ 2.5 × L` | More stock than needed. |
 
-The status is **blank** when cover is unknown (no sales estimate). It is a
-computed field, so it re-grades automatically the moment either the cover or the
-brand's lead time changes.
+The status is **blank** when cover is unknown (no sales estimate) or the
+product has no supplier (so no lead time). It is a computed field, so it
+re-grades automatically the moment the cover, the product's supplier or that
+supplier's lead time changes.
 
 ## ABC class
 
@@ -116,16 +117,18 @@ How the group figures are worked out:
 
 ## Lead time
 
-Each **brand** carries a **lead time** (`leadTimeInDays`, default **60**). Set it
-from the brand page via **Edit lead time**; it drives the status bands for all of
-that brand's products, and is the default lead time when
-[planning a purchase](purchase-planning.md).
+Each **supplier** carries a **lead time** (`leadTimeInDays`, default **60**).
+Set it from the supplier page via **Edit supplier**; it drives the status bands
+for every product bought from that supplier, and is the default lead time when
+[planning a purchase](purchase-planning.md). (Brands used to carry the lead
+time; `Brand.leadTimeInDays` is kept only for **Create suppliers from brands**
+to copy across, and is no longer read anywhere else.)
 
 ## Reordering
 
-Cover tells you *when* to reorder; **Plan a purchase** (on the brand page, or
-under Products → Purchasing) works out *how many* of each product to order so
-the whole brand lands with the same months of cover. See
+Cover tells you *when* to reorder; **Plan a purchase** (on the supplier page,
+or under Inventory) works out *how many* of each product to order so the whole
+order lands with the same months of cover. See
 [purchase-planning.md](purchase-planning.md).
 
 ## Refresh
@@ -140,9 +143,9 @@ the Console.
 
 | Concern | Files |
 | --- | --- |
-| Schema | `backend/schemas/products.keel` — `Product` stock/cover fields, `stockCoverStatus`, `abcClass`, the `listStockAndCover` action, `Brand.leadTimeInDays` |
+| Schema | `backend/schemas/products.keel` — `Product` stock/cover fields, `stockCoverStatus`, `abcClass`, the `listStockAndCover` action; `backend/schemas/suppliers.keel` — `Supplier.leadTimeInDays` |
 | Daily sync | `backend/flows/scheduledSyncStock.ts`, `backend/lib/stockCoverHelpers.ts`, `backend/lib/zohoStockHelpers.ts` |
-| Console | `backend/tools/list-stock-and-cover.json` (the Inventory space's grid, in `_spaces.json`), `get-brand.json`, `get-product.json`, `_fields.json` |
+| Console | `backend/tools/list-stock-and-cover.json` (the Inventory space's grid, in `_spaces.json`), `get-brand.json`, `get-supplier.json`, `get-product.json`, `_fields.json` |
 | Dashboard | `backend/tools/_dashboards.json` ("Stock cover") and `_charts.json`, over the `stockCover` / `stockValue` measures in `products.keel` |
 
 > **Roadmap — Stock on way (Phase 2):** populate `stockOnWay` from future-dated

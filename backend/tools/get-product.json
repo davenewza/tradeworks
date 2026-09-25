@@ -162,6 +162,21 @@
     "$.isActive": {
       "display_order": 4,
       "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
+    },
+    "$.supplierId": {
+      "display_name": "Supplier",
+      "display_order": 0,
+      "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
+    },
+    "$.supplierUnitCost": {
+      "display_name": "Supplier price",
+      "display_order": 1,
+      "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
+    },
+    "$.supplierCurrency": {
+      "display_name": "Currency",
+      "display_order": 2,
+      "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
     }
   },
   "sections": [
@@ -194,6 +209,13 @@
       "title": "Overview",
       "display_order": 1,
       "visible": true
+    },
+    {
+      "name": "a1b2c3d4-0000-4000-8000-supplierxxxx",
+      "title": "Supplier",
+      "description": "Who we buy it from and what they charge per unit (excl VAT & freight), in their currency.",
+      "display_order": 3,
+      "visible": true
     }
   ],
   "entry_activity_actions": [
@@ -202,9 +224,15 @@
       "display_order": 0
     },
     {
+      "tool_id": "update-product-supplier",
+      "title": "Set supplier & price",
+      "as_dialog": true,
+      "display_order": 1
+    },
+    {
       "tool_id": "update-product-dimensions",
       "title": "Update dimensions",
-      "display_order": 1
+      "display_order": 2
     },
     {
       "tool_id": "print-channel-barcodes",

@@ -4,7 +4,7 @@
   "name": "View stock and cover",
   "title": "Stock and cover",
   "icon": "emoji:📦",
-  "help_text": "Every active product's stock on hand and months of cover at its current sales rate, graded against the brand's lead time. Filter by brand, SKU, name, ABC class, status or cover; click a column heading to sort by it. Figures refresh nightly — see docs/stock-cover.md.",
+  "help_text": "Every active product's stock on hand and months of cover at its current sales rate, graded against its supplier's lead time (blank until the product has a supplier). Filter by brand, supplier, SKU, name, ABC class, status or cover; click a column heading to sort by it. Figures refresh nightly — see docs/stock-cover.md.",
   "inputs": {
     "$.where.sku": {
       "display_name": "SKU"
@@ -34,37 +34,41 @@
       "display_name": "Brand",
       "display_order": 3
     },
+    "$.results[*].supplierId": {
+      "display_name": "Supplier",
+      "display_order": 4
+    },
     "$.results[*].abcClass": {
       "display_name": "ABC class",
-      "display_order": 4
+      "display_order": 5
     },
     "$.results[*].totalUnitsSold": {
       "display_name": "Total sales",
-      "display_order": 5
+      "display_order": 6
     },
     "$.results[*].stockAvailable": {
       "display_name": "Stock available",
-      "display_order": 6
+      "display_order": 7
     },
     "$.results[*].stockOnWay": {
       "display_name": "Stock on way",
-      "display_order": 7
+      "display_order": 8
     },
     "$.results[*].estimatedMonthlySale": {
       "display_name": "Est. monthly sales",
-      "display_order": 8
+      "display_order": 9
     },
     "$.results[*].currentStockCover": {
       "display_name": "Current cover",
-      "display_order": 9
+      "display_order": 10
     },
     "$.results[*].totalStockCover": {
       "display_name": "Total cover",
-      "display_order": 10
+      "display_order": 11
     },
     "$.results[*].stockCoverStatus": {
       "display_name": "Status",
-      "display_order": 11
+      "display_order": 12
     },
     "$.results[*].id": {
       "display_order": 20,
@@ -151,6 +155,12 @@
       "visible": false
     },
     "$.results[*].isActive": {
+      "visible": false
+    },
+    "$.results[*].supplierUnitCost": {
+      "visible": false
+    },
+    "$.results[*].supplierCurrency": {
       "visible": false
     }
   },
