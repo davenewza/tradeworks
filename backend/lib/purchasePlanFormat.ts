@@ -1,4 +1,4 @@
-import { StockCoverStatus } from '@teamkeel/sdk';
+import { Currency, StockCoverStatus } from '@teamkeel/sdk';
 import { PlanLine, PurchasePlan, PurchasePlanParams, daysBetween } from './purchasePlanHelpers';
 
 // How a purchase plan is shown — the grid the buyer edits, the "why" behind
@@ -12,10 +12,34 @@ export function formatDate(date: Date): string {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
-// 'R 1,234.50'. en-GB grouping rather than en-ZA: the ZA locale uses a comma
-// for the decimal point, which reads as thousands next to whole-unit columns.
-export function formatRand(value: number): string {
-    return `R ${value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const CURRENCY_PREFIX: Record<Currency, string> = {
+    [Currency.ZAR]: 'R ',
+    [Currency.USD]: '$',
+    [Currency.GBP]: '£',
+    [Currency.EUR]: '€',
+    [Currency.CNY]: 'CN¥',
+};
+
+// 'R 1,234.50', '£1,234.50'. en-GB grouping rather than en-ZA: the ZA locale
+// uses a comma for the decimal point, which reads as thousands next to
+// whole-unit columns.
+export function formatMoney(value: number, currency: Currency): string {
+    const amount = value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${CURRENCY_PREFIX[currency]}${amount}`;
+}
+
+// A line's value, blank when its cost is unknown. A last-bill stand-in is
+// marked, so nobody mistakes it for the supplier's price.
+export function formatLineValue(line: PlanLine): string {
+    if (line.lineValue === null || line.currency === null) return '';
+    const value = formatMoney(line.lineValue, line.currency);
+    return line.costSource === 'LastBill' ? `${value} (last bill)` : value;
+}
+
+export function formatUnitCost(line: PlanLine): string {
+    if (line.unitCost === null || line.currency === null) return '';
+    const cost = formatMoney(line.unitCost, line.currency);
+    return line.costSource === 'LastBill' ? `${cost} (last bill)` : cost;
 }
 
 // The status bands' Console labels (see docs/stock-cover.md).
@@ -87,7 +111,7 @@ export function toGridRow(line: PlanLine, arrival: Date): PlanGridRow {
         order: line.orderQuantity,
         cover: line.coverAtArrivalMonths === null ? '' : `${line.coverAtArrivalMonths.toFixed(1)} mo · ${statusLabel(line.statusAtArrival)}`,
         coveredUntil: line.coveredUntil ? formatDate(line.coveredUntil) : '',
-        value: line.lineValue === null ? '' : formatRand(line.lineValue),
+        value: formatLineValue(line),
         why: describeReason(line, arrival),
     };
 }
@@ -96,10 +120,10 @@ export function toGridRow(line: PlanLine, arrival: Date): PlanGridRow {
 // pages.
 export function summaryRows(plan: PurchasePlan, params: PurchasePlanParams): { key: string; value: string | number }[] {
     const s = plan.summary;
-    const value =
-        s.linesWithoutCost > 0
-            ? `${formatRand(s.totalValue)} + ${s.linesWithoutCost} line(s) with no cost on record`
-            : formatRand(s.totalValue);
+    const parts = s.valueByCurrency.map((t) => formatMoney(t.value, t.currency));
+    if (parts.length === 0) parts.push(formatMoney(0, Currency.ZAR));
+    if (s.linesWithoutCost > 0) parts.push(`${s.linesWithoutCost} line(s) with no cost on record`);
+    const value = parts.join(' + ');
     return [
         { key: 'Purchase date', value: formatDate(params.purchaseDate) },
         { key: 'Lead time', value: `${params.leadTimeInDays} days` },
@@ -109,6 +133,9 @@ export function summaryRows(plan: PurchasePlan, params: PurchasePlanParams): { k
         { key: 'Products to order', value: `${s.linesToOrder} of ${s.products}` },
         { key: 'Units', value: s.totalUnits },
         { key: 'Goods value (excl VAT & freight)', value },
+        ...(s.linesCostedFromBills > 0
+            ? [{ key: 'Costed from last bill', value: `${s.linesCostedFromBills} line(s) with no supplier price, in rand` }]
+            : []),
     ];
 }
 

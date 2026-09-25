@@ -1,5 +1,5 @@
 import { models, resetDatabase } from '@teamkeel/testing';
-import { AbcClass, StockCoverStatus } from '@teamkeel/sdk';
+import { AbcClass, Currency, StockCoverStatus } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
     DAYS_PER_MONTH,
@@ -14,11 +14,11 @@ import {
     defaultTargetCoverMonths,
     loadLatestUnitCosts,
     loadPlanCandidates,
-    loadPlannableBrands,
+    loadPlannableSuppliers,
     parseDay,
     planLine,
 } from './purchasePlanHelpers';
-import { describeReason, formatDate, formatRand, toGridRow } from './purchasePlanFormat';
+import { describeReason, formatDate, formatMoney, summaryRows, toGridRow } from './purchasePlanFormat';
 
 const TODAY = new Date('2026-09-04T00:00:00Z');
 
@@ -42,6 +42,8 @@ function candidate(overrides: Partial<PlanCandidate> = {}): PlanCandidate {
         stockOnWay: 0,
         monthlyDemand: 30,
         unitCost: 50,
+        currency: Currency.ZAR,
+        costSource: 'SupplierPrice',
         ...overrides,
     };
 }
@@ -236,10 +238,29 @@ describe('buildPurchasePlan', () => {
         expect(plan.summary.products).toBe(3);
         expect(plan.summary.linesToOrder).toBe(2);
         expect(plan.summary.totalUnits).toBe(160);
-        expect(plan.summary.totalValue).toBe(4000);
+        expect(plan.summary.valueByCurrency).toEqual([{ currency: Currency.ZAR, value: 4000 }]);
         expect(plan.summary.linesWithoutCost).toBe(1);
         expect(plan.summary.stockouts).toBe(0);
         expect(plan.summary.arrival.toISOString()).toBe('2026-11-03T00:00:00.000Z');
+    });
+
+    test('values are totalled per currency, never added across them, largest first', () => {
+        const pounds = candidate({ productId: 'gbp', sku: 'GBP', currency: Currency.GBP, unitCost: 10 });
+        const dollars = candidate({ productId: 'usd', sku: 'USD', currency: Currency.USD, unitCost: 2, stockAvailable: 0 });
+        const billed = candidate({ productId: 'bill', sku: 'BILL', unitCost: 100, costSource: 'LastBill' });
+        const plan = buildPurchasePlan([pounds, dollars, billed], PARAMS);
+
+        // 80 × £10, 120 × $2 (out of stock: full 4-month target), 80 × R100.
+        expect(plan.summary.valueByCurrency).toEqual([
+            { currency: Currency.ZAR, value: 8000 },
+            { currency: Currency.GBP, value: 800 },
+            { currency: Currency.USD, value: 240 },
+        ]);
+        expect(plan.summary.linesCostedFromBills).toBe(1);
+
+        const value = summaryRows(plan, PARAMS).find((r) => r.key.startsWith('Goods value'))!.value;
+        expect(value).toBe('R 8,000.00 + £800.00 + $240.00');
+        expect(summaryRows(plan, PARAMS).find((r) => r.key === 'Costed from last bill')!.value).toMatch(/^1 line/);
     });
 
     test('a trimmed quantity that no longer reaches the horizon is called out as a top-up risk', () => {
@@ -261,7 +282,9 @@ describe('buildPurchasePlan', () => {
 describe('presentation', () => {
     test('dates, money and the Why column read the way the Console shows them', () => {
         expect(formatDate(new Date('2026-11-03T00:00:00Z'))).toBe('3 Nov 2026');
-        expect(formatRand(1234.5)).toBe('R 1,234.50');
+        expect(formatMoney(1234.5, Currency.ZAR)).toBe('R 1,234.50');
+        expect(formatMoney(1234.5, Currency.GBP)).toBe('£1,234.50');
+        expect(formatMoney(0.5, Currency.USD)).toBe('$0.50');
 
         const arrival = arrivalDate(PARAMS);
         const why = (c: Partial<PlanCandidate>, qty?: number) => describeReason(planLine(candidate(c), PARAMS, qty), arrival);
@@ -284,6 +307,10 @@ describe('presentation', () => {
 
         const blank = toGridRow(planLine(candidate({ monthlyDemand: null, stockAvailable: null }), PARAMS), arrival);
         expect(blank).toMatchObject({ abc: 'A', stock: 0, monthly: 0, suggested: 0, order: 0, cover: '', coveredUntil: '' });
+
+        // A supplier price shows in its own currency; a last-bill stand-in says so.
+        expect(toGridRow(planLine(candidate({ currency: Currency.USD, unitCost: 2 }), PARAMS), arrival).value).toBe('$160.00');
+        expect(toGridRow(planLine(candidate({ costSource: 'LastBill' }), PARAMS), arrival).value).toBe('R 4,000.00 (last bill)');
     });
 });
 
@@ -304,33 +331,42 @@ describe('loading', () => {
             netAmount: quantity * 10,
         });
 
-    test('loadPlannableBrands lists brands with active products, with their lead times and counts', async () => {
-        const acme = await models.brand.create({ name: 'Acme', leadTimeInDays: 45 });
-        const zeta = await models.brand.create({ name: 'Zeta' });
-        await models.brand.create({ name: 'Empty' });
-        await models.product.create({ name: 'A1', sku: 'A1', brandId: acme.id });
-        await models.product.create({ name: 'A2', sku: 'A2', brandId: acme.id });
-        await models.product.create({ name: 'A3', sku: 'A3', brandId: acme.id, isActive: false });
-        await models.product.create({ name: 'Z1', sku: 'Z1', brandId: zeta.id });
+    test('loadPlannableSuppliers lists suppliers with active products, with their lead times and counts', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        const acme = await models.supplier.create({ name: 'Acme Ltd', leadTimeInDays: 45 });
+        const zeta = await models.supplier.create({ name: 'Zeta' });
+        await models.supplier.create({ name: 'Empty' });
+        await models.product.create({ name: 'A1', sku: 'A1', brandId: brand.id, supplierId: acme.id });
+        await models.product.create({ name: 'A2', sku: 'A2', brandId: brand.id, supplierId: acme.id });
+        await models.product.create({ name: 'A3', sku: 'A3', brandId: brand.id, supplierId: acme.id, isActive: false });
+        await models.product.create({ name: 'Z1', sku: 'Z1', brandId: brand.id, supplierId: zeta.id });
+        // Unassigned products belong to no supplier's plan.
+        await models.product.create({ name: 'N1', sku: 'N1', brandId: brand.id });
 
-        expect(await loadPlannableBrands()).toEqual([
-            { brandId: acme.id, name: 'Acme', leadTimeInDays: 45, productCount: 2 },
-            { brandId: zeta.id, name: 'Zeta', leadTimeInDays: 60, productCount: 1 },
+        expect(await loadPlannableSuppliers()).toEqual([
+            { supplierId: acme.id, name: 'Acme Ltd', leadTimeInDays: 45, productCount: 2 },
+            { supplierId: zeta.id, name: 'Zeta', leadTimeInDays: 60, productCount: 1 },
         ]);
     });
 
-    test('loadPlanCandidates builds each active product of the brand with an unrounded rate and its latest cost', async () => {
-        const acme = await models.brand.create({ name: 'Acme' });
-        const other = await models.brand.create({ name: 'Other' });
+    test('loadPlanCandidates builds each active product of the supplier with an unrounded rate and its cost', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        const acme = await models.supplier.create({ name: 'Acme Ltd', currency: Currency.GBP });
+        const other = await models.supplier.create({ name: 'Other' });
         const channel = await models.channel.create({ name: 'Shop' });
 
+        // Brand and supplier are independent: a second brand bought from the
+        // same supplier is in the same plan.
+        const otherBrand = await models.brand.create({ name: 'Bolt' });
         const widget = await models.product.create({
-            name: 'Widget', sku: 'W-1', brandId: acme.id, stockAvailable: 40, abcClass: AbcClass.B,
+            name: 'Widget', sku: 'W-1', brandId: brand.id, supplierId: acme.id, stockAvailable: 40, abcClass: AbcClass.B,
         });
-        const trickle = await models.product.create({ name: 'Trickle', sku: 'T-1', brandId: acme.id, stockAvailable: 3 });
-        const dormant = await models.product.create({ name: 'Dormant', sku: 'D-1', brandId: acme.id });
-        await models.product.create({ name: 'Retired', sku: 'R-1', brandId: acme.id, isActive: false });
-        await models.product.create({ name: 'Elsewhere', sku: 'E-1', brandId: other.id, stockAvailable: 9 });
+        const trickle = await models.product.create({ name: 'Trickle', sku: 'T-1', brandId: otherBrand.id, supplierId: acme.id, stockAvailable: 3 });
+        const dormant = await models.product.create({
+            name: 'Dormant', sku: 'D-1', brandId: brand.id, supplierId: acme.id, supplierUnitCost: 7.25, supplierCurrency: Currency.GBP,
+        });
+        await models.product.create({ name: 'Retired', sku: 'R-1', brandId: brand.id, supplierId: acme.id, isActive: false });
+        await models.product.create({ name: 'Elsewhere', sku: 'E-1', brandId: brand.id, supplierId: other.id, stockAvailable: 9 });
 
         // Widget: established (first sale years ago → 12 months active), 120 in
         // the window → 10/month. An old sale outside the window doesn't count.
@@ -343,11 +379,14 @@ describe('loading', () => {
         // Dormant: only ancient sales.
         await sale(dormant.id, channel.id, '2021-01-01', 30, 5);
 
-        // Two bills for Widget: the later one's cost wins, regardless of insert order.
+        // Widget has no supplier price, so it falls back to its bills: the
+        // later one's cost wins, regardless of insert order. Dormant has a
+        // supplier price, which wins over its bill.
         const newer = await models.supplierBill.create({ billNumber: 'B-2', date: new Date('2026-05-01') });
         const older = await models.supplierBill.create({ billNumber: 'B-1', date: new Date('2025-01-01') });
         await models.productCostLine.create({ productId: widget.id, supplierBillId: newer.id, unitCost: 55, quantity: 100, zohoRecordId: 'z2' });
         await models.productCostLine.create({ productId: widget.id, supplierBillId: older.id, unitCost: 40, quantity: 100, zohoRecordId: 'z1' });
+        await models.productCostLine.create({ productId: dormant.id, supplierBillId: newer.id, unitCost: 140, quantity: 10, zohoRecordId: 'z3' });
 
         const candidates = await loadPlanCandidates(acme.id, NOW);
 
@@ -355,18 +394,23 @@ describe('loading', () => {
         const byId = new Map(candidates.map((c) => [c.productId, c]));
 
         expect(byId.get(widget.id)).toMatchObject({
-            sku: 'W-1', name: 'Widget', abcClass: AbcClass.B, stockAvailable: 40, stockOnWay: 0, unitCost: 55,
+            sku: 'W-1', name: 'Widget', abcClass: AbcClass.B, stockAvailable: 40, stockOnWay: 0,
+            unitCost: 55, currency: Currency.ZAR, costSource: 'LastBill',
         });
         expect(byId.get(widget.id)!.monthlyDemand).toBeCloseTo(10, 6);
         expect(byId.get(trickle.id)!.monthlyDemand).toBeCloseTo(5 / 12, 6);
-        expect(byId.get(trickle.id)!.unitCost).toBeNull();
-        expect(byId.get(dormant.id)).toMatchObject({ monthlyDemand: null, stockAvailable: null, abcClass: null });
+        expect(byId.get(trickle.id)).toMatchObject({ unitCost: null, currency: null, costSource: null });
+        expect(byId.get(dormant.id)).toMatchObject({
+            monthlyDemand: null, stockAvailable: null, abcClass: null,
+            unitCost: 7.25, currency: Currency.GBP, costSource: 'SupplierPrice',
+        });
     });
 
-    test('loadPlanCandidates is empty for a brand with nothing active', async () => {
+    test('loadPlanCandidates is empty for a supplier with nothing active', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
-        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isActive: false });
-        expect(await loadPlanCandidates(brand.id, NOW)).toEqual([]);
+        const supplier = await models.supplier.create({ name: 'Bare Ltd' });
+        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, supplierId: supplier.id, isActive: false });
+        expect(await loadPlanCandidates(supplier.id, NOW)).toEqual([]);
     });
 
     test('loadLatestUnitCosts puts undated bills last and handles an empty request', async () => {

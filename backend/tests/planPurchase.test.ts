@@ -3,7 +3,7 @@
 // arithmetic itself is covered in lib/purchasePlanHelpers.test.ts.
 
 import { flows, models, resetDatabase } from '@teamkeel/testing';
-import { Team } from '@teamkeel/sdk';
+import { Currency, Team } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { formatDay } from '../lib/cumulativeSalesHelpers';
 
@@ -20,19 +20,20 @@ async function operator() {
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
-// A brand with one steady seller (30/month, 100 on hand, costed) and one
-// product that has never sold.
-async function seedBrand() {
-    const brand = await models.brand.create({ name: 'Acme', leadTimeInDays: 60 });
+// A supplier with one steady seller (30/month, 100 on hand, costed from its
+// last bill) and one product that has never sold.
+async function seedSupplier() {
+    const brand = await models.brand.create({ name: 'Acme' });
+    const supplier = await models.supplier.create({ name: 'Acme Ltd', leadTimeInDays: 60 });
     const channel = await models.channel.create({ name: 'Shop' });
-    const widget = await models.product.create({ name: 'Widget', sku: 'ACME-W', brandId: brand.id, stockAvailable: 100 });
-    const gadget = await models.product.create({ name: 'Gadget', sku: 'ACME-G', brandId: brand.id, stockAvailable: 5 });
+    const widget = await models.product.create({ name: 'Widget', sku: 'ACME-W', brandId: brand.id, supplierId: supplier.id, stockAvailable: 100 });
+    const gadget = await models.product.create({ name: 'Gadget', sku: 'ACME-G', brandId: brand.id, supplierId: supplier.id, stockAvailable: 5 });
     // First sold years ago (12 months active), 360 in the trailing year → 30/month.
     await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: daysAgo(3 * 365), productId: widget.id, quantity: 1, price: 10 });
     await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: daysAgo(200), productId: widget.id, quantity: 360, price: 10 });
     const bill = await models.supplierBill.create({ billNumber: 'B-1', date: daysAgo(100) });
     await models.productCostLine.create({ productId: widget.id, supplierBillId: bill.id, unitCost: 50, quantity: 200, zohoRecordId: 'z1' });
-    return { brand, widget, gadget };
+    return { supplier, widget, gadget };
 }
 
 type Executor = ReturnType<typeof flows.planPurchase.withIdentity>;
@@ -51,13 +52,13 @@ function gridRows(ui: any): any[] {
 describe('PlanPurchase', () => {
     beforeEach(resetDatabase);
 
-    test('from a brand page: details → suggested grid → edited quantities reach the report', async () => {
-        const { brand, widget, gadget } = await seedBrand();
+    test('from a supplier page: details → suggested grid → edited quantities reach the report', async () => {
+        const { supplier, widget, gadget } = await seedSupplier();
         const authed = flows.planPurchase.withIdentity(await operator());
 
-        let run = await authed.start({ brandId: brand.id });
+        let run = await authed.start({ supplierId: supplier.id });
 
-        // The brand is preset, so the first page is the order details.
+        // The supplier is preset, so the first page is the order details.
         let page = await pendingPage(authed, run.id);
         expect(page.step.name).toBe('details');
         const numberDefaults = Object.fromEntries(
@@ -78,7 +79,7 @@ describe('PlanPurchase', () => {
         expect(page.step.name).toBe('review-0');
         const rows = gridRows(page.ui);
         expect(rows.map((r) => r.sku)).toEqual(['ACME-W', 'ACME-G']);
-        expect(rows[0]).toMatchObject({ productId: widget.id, stock: 100, monthly: 30, suggested: 80, order: 80, value: 'R 4,000.00' });
+        expect(rows[0]).toMatchObject({ productId: widget.id, stock: 100, monthly: 30, suggested: 80, order: 80, value: 'R 4,000.00 (last bill)' });
         expect(rows[0].cover).toBe('4.0 mo · Good');
         expect(rows[1]).toMatchObject({ productId: gadget.id, suggested: 0, order: 0, cover: '' });
 
@@ -93,7 +94,7 @@ describe('PlanPurchase', () => {
         page = await pendingPage(authed, run.id);
         expect(page.step.name).toBe('review-1');
         const recalculated = gridRows(page.ui);
-        expect(recalculated[0]).toMatchObject({ suggested: 80, order: 40, value: 'R 2,000.00' });
+        expect(recalculated[0]).toMatchObject({ suggested: 80, order: 40, value: 'R 2,000.00 (last bill)' });
         expect(recalculated[0].cover).toBe('2.7 mo · Low');
         expect(recalculated[1]).toMatchObject({ suggested: 0, order: 6 });
         // Trimming below the target is called out as a top-up risk.
@@ -106,7 +107,7 @@ describe('PlanPurchase', () => {
 
         const done = run.steps.find((s) => s.type === 'COMPLETE')!;
         const ui = done.ui as any;
-        expect(ui.title).toBe('Purchase plan — Acme');
+        expect(ui.title).toBe('Purchase plan — Acme Ltd');
         expect(ui.description).toMatch(/^46 unit\(s\) across 2 product\(s\)\./);
         const table = (ui.content as any[]).find((el) => el.__type === 'ui.display.table');
         expect(table.data.map((r: any) => [r.SKU, r.Order])).toEqual([
@@ -115,28 +116,28 @@ describe('PlanPurchase', () => {
         ]);
     });
 
-    test('from the space: the brand is picked first, and only brands with active products are offered', async () => {
-        const { brand } = await seedBrand();
-        await models.brand.create({ name: 'Nothing here' });
+    test('from the space: the supplier is picked first, and only suppliers with active products are offered', async () => {
+        const { supplier } = await seedSupplier();
+        await models.supplier.create({ name: 'Nothing here' });
         const authed = flows.planPurchase.withIdentity(await operator());
 
         let run = await authed.start({});
         let page = await pendingPage(authed, run.id);
-        expect(page.step.name).toBe('brand');
+        expect(page.step.name).toBe('supplier');
         const select = (page.ui.content as any[]).find((el) => el.__type === 'ui.select.one');
-        expect(select.options.map((o: any) => o.value)).toEqual([brand.id]);
+        expect(select.options.map((o: any) => o.value)).toEqual([supplier.id]);
 
-        run = await authed.putStepValues(run.id, page.step.id, { brandId: brand.id }, 'next');
+        run = await authed.putStepValues(run.id, page.step.id, { supplierId: supplier.id }, 'next');
         page = await pendingPage(authed, run.id);
         expect(page.step.name).toBe('details');
-        expect(page.ui.title).toBe('Order details — Acme');
+        expect(page.ui.title).toBe('Order details — Acme Ltd');
     });
 
     test('rejects a lead time that is not a whole number of days', async () => {
-        const { brand } = await seedBrand();
+        const { supplier } = await seedSupplier();
         const authed = flows.planPurchase.withIdentity(await operator());
 
-        let run = await authed.start({ brandId: brand.id });
+        let run = await authed.start({ supplierId: supplier.id });
         const page = await pendingPage(authed, run.id);
         run = await authed.putStepValues(
             run.id,
@@ -156,15 +157,37 @@ describe('PlanPurchase', () => {
         expect(again.step.name).toBe('details');
     });
 
-    test('a brand with no active products completes straight away with nothing to plan', async () => {
+    test('a supplier with no active products completes straight away with nothing to plan', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
-        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isActive: false });
+        const supplier = await models.supplier.create({ name: 'Bare Ltd' });
+        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, supplierId: supplier.id, isActive: false });
         const authed = flows.planPurchase.withIdentity(await operator());
 
-        const run = await authed.start({ brandId: brand.id });
+        const run = await authed.start({ supplierId: supplier.id });
         const finished = await authed.untilFinished(run.id, FLOW_TIMEOUT);
         expect(finished.status).toBe('COMPLETED');
         const done = finished.steps.find((s) => s.type === 'COMPLETE')!;
-        expect((done.ui as any).title).toBe('Nothing to plan for this brand');
+        expect((done.ui as any).title).toBe('Nothing to plan for this supplier');
+    });
+
+    test('supplier prices are shown and totalled in the currency the supplier quotes', async () => {
+        const { supplier, widget } = await seedSupplier();
+        await models.product.update({ id: widget.id }, { supplierUnitCost: 3.5, supplierCurrency: Currency.GBP });
+        const authed = flows.planPurchase.withIdentity(await operator());
+
+        let run = await authed.start({ supplierId: supplier.id });
+        let page = await pendingPage(authed, run.id);
+        run = await authed.putStepValues(
+            run.id,
+            page.step.id,
+            { purchaseDate: formatDay(new Date()), leadTimeInDays: 60, targetCoverMonths: 4 },
+            'next',
+        );
+
+        page = await pendingPage(authed, run.id);
+        const rows = gridRows(page.ui);
+        expect(rows[0]).toMatchObject({ sku: 'ACME-W', order: 80, value: '£280.00' });
+        const summary = (page.ui.content as any[]).find((el) => el.__type === 'ui.display.keyValue');
+        expect(summary.data.find((r: any) => r.key.startsWith('Goods value')).value).toBe('£280.00');
     });
 });

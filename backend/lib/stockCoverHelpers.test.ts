@@ -205,9 +205,10 @@ describe('Product stockCoverStatus (computed enum)', () => {
     // (red); [L, 1.5L) → Low (amber); [1.5L, 2.5L) → Good (green); ≥ 2.5L →
     // Oversupply (purple).
     async function makeProduct(sku: string, cover: number | null, leadTimeInDays = 60) {
-        const brand = await models.brand.create({ name: `B-${sku}`, leadTimeInDays });
-        const product = await models.product.create({ name: sku, sku, brandId: brand.id, currentStockCover: cover });
-        return { product, brand };
+        const brand = await models.brand.create({ name: `B-${sku}` });
+        const supplier = await models.supplier.create({ name: `S-${sku}`, leadTimeInDays });
+        const product = await models.product.create({ name: sku, sku, brandId: brand.id, supplierId: supplier.id, currentStockCover: cover });
+        return { product, brand, supplier };
     }
     const statusOf = async (id: string) => (await models.product.findOne({ id }))!.stockCoverStatus;
 
@@ -233,12 +234,36 @@ describe('Product stockCoverStatus (computed enum)', () => {
         expect(await statusOf((await makeProduct('ST-6', null)).product.id)).toBeNull();
     });
 
-    test('re-grades when the brand lead time changes', async () => {
+    test('re-grades when the supplier lead time changes', async () => {
         // 3mo cover at a 2mo lead (L=2) → 3 ∈ [3, 5) → Good.
-        const { product, brand } = await makeProduct('ST-7', 3, 60);
+        const { product, supplier } = await makeProduct('ST-7', 3, 60);
         expect(await statusOf(product.id)).toBe(StockCoverStatus.GoodSupply);
         // Stretch the lead time to 120 days (4mo): 3mo cover < 4 → Shortfall.
-        await models.brand.update({ id: brand.id }, { leadTimeInDays: 120 });
+        await models.supplier.update({ id: supplier.id }, { leadTimeInDays: 120 });
         expect(await statusOf(product.id)).toBe(StockCoverStatus.InsufficientSupply);
+    });
+
+    test('the brand lead time no longer grades anything', async () => {
+        const { product, brand } = await makeProduct('ST-8', 3, 60);
+        await models.brand.update({ id: brand.id }, { leadTimeInDays: 120 });
+        expect(await statusOf(product.id)).toBe(StockCoverStatus.GoodSupply);
+    });
+
+    test('a product with no supplier has no lead time, so goes ungraded until it gets one', async () => {
+        const brand = await models.brand.create({ name: 'B-none' });
+        const product = await models.product.create({ name: 'N', sku: 'ST-9', brandId: brand.id, currentStockCover: 1 });
+        expect(await statusOf(product.id)).toBeNull();
+
+        const slow = await models.supplier.create({ name: 'Slow', leadTimeInDays: 120 });
+        await models.product.update({ id: product.id }, { supplierId: slow.id });
+        expect(await statusOf(product.id)).toBe(StockCoverStatus.InsufficientSupply);
+
+        // Moving to a quicker supplier re-grades against its lead time (L=0.5).
+        const quick = await models.supplier.create({ name: 'Quick', leadTimeInDays: 15 });
+        await models.product.update({ id: product.id }, { supplierId: quick.id });
+        expect(await statusOf(product.id)).toBe(StockCoverStatus.GoodSupply);
+
+        await models.product.update({ id: product.id }, { supplierId: null });
+        expect(await statusOf(product.id)).toBeNull();
     });
 });

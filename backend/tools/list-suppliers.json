@@ -1,0 +1,54 @@
+{
+  "id": "list-suppliers",
+  "action_name": "listSuppliers",
+  "name": "Suppliers",
+  "title": "Suppliers",
+  "icon": "emoji:🚢",
+  "help_text": "Who we buy stock from. A supplier's lead time grades the stock cover of every product bought from it, and each product's supplier price is quoted in the supplier's currency.",
+  "response": {
+    "$.results[*].name": {
+      "display_order": 0
+    },
+    "$.results[*].currency": {
+      "display_order": 1
+    },
+    "$.results[*].leadTimeInDays": {
+      "display_order": 2
+    },
+    "$.results[*].totalProducts": {
+      "display_name": "Active products",
+      "display_order": 3
+    },
+    "$.results[*].notes": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "display_order": 10,
+      "link": {
+        "tool_id": "get-supplier",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "get-supplier",
+      "title": "View supplier",
+      "display_order": 0
+    }
+  ]
+}

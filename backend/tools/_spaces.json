@@ -193,15 +193,72 @@
         "link": {
           "tool_id": "plan-purchase",
           "title": "Plan a purchase",
-          "description": "Pick a brand, set the purchase date and lead time, review the suggested quantities",
+          "description": "Pick a supplier, set the purchase date and lead time, review the suggested quantities",
           "display_order": 1
         },
         "hidden": false
       }
     ],
-    "groups": null,
+    "groups": [
+      {
+        "id": "group-suppliers",
+        "name": "Suppliers",
+        "description": "Who we buy from, their lead times and prices",
+        "display_order": 1,
+        "hidden": false,
+        "actions": [
+          {
+            "id": "action-list-suppliers",
+            "link": {
+              "tool_id": "list-suppliers",
+              "title": "Suppliers",
+              "display_order": 0
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-create-supplier",
+            "link": {
+              "tool_id": "create-supplier",
+              "title": "Add a supplier",
+              "display_order": 1
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-list-products-without-supplier",
+            "link": {
+              "tool_id": "list-products-without-supplier",
+              "title": "Products without a supplier",
+              "description": "Ungraded and left out of purchase planning until assigned",
+              "display_order": 2
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-create-suppliers-from-brands",
+            "link": {
+              "tool_id": "create-suppliers-from-brands",
+              "title": "Create suppliers from brands",
+              "description": "One-off: a supplier per brand, with the brand’s lead time and its products assigned",
+              "display_order": 3
+            },
+            "hidden": false
+          }
+        ]
+      }
+    ],
     "links": null,
-    "metrics": null,
+    "metrics": [
+      {
+        "id": "metric-products-without-supplier",
+        "label": "Products without a supplier",
+        "tool_id": "list-products-without-supplier",
+        "facet_location": "$.pageInfo.totalCount",
+        "display_order": 0,
+        "hidden": false
+      }
+    ],
     "topics": null,
     "charts": [
       {
