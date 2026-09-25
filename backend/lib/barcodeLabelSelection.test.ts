@@ -410,7 +410,7 @@ describe('loadProductLabelOptions', () => {
         ]);
     });
 
-    test('a disabled product is still printable from its own page', async () => {
+    test('an inactive product is still printable from its own page', async () => {
         const { channel, brand } = await setup();
         const widget = await models.product.create({
             name: 'Widget',

@@ -1,5 +1,5 @@
 // Action-level coverage for Inventory → View stock and cover: the reorder grid
-// lists every enabled product's stock and cover figures, filters by brand, SKU,
+// lists every active product's stock and cover figures, filters by brand, SKU,
 // name, ABC class, status and either cover, and sorts on every column. The
 // figures themselves are written by ScheduledSyncStock (covered alongside the
 // lib helpers), so the rows are seeded here directly.
@@ -39,7 +39,7 @@ async function seed() {
     const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, supplierId: boltCo.id, abcClass: AbcClass.A, stockAvailable: 135, stockOnWay: 60, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
     // Never sold: no estimate, so cover, class and status are all blank.
     await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, supplierId: boltCo.id, stockAvailable: 3 });
-    // Disabled products never appear, however alarming their figures.
+    // Inactive products never appear, however alarming their figures.
     await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, supplierId: acmeLtd.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
 
     // Lifetime sales feed the "Total sales" column.
@@ -71,7 +71,7 @@ const SORTABLE = [
 ] as const;
 
 describe('listStockAndCover', () => {
-    test('lists every enabled product by name, with cover graded against its supplier lead time', async () => {
+    test('lists every active product by name, with cover graded against its supplier lead time', async () => {
         await seed();
         const { results } = await (await operator()).listStockAndCover();
 

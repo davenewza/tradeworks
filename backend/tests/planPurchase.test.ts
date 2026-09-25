@@ -116,7 +116,7 @@ describe('PlanPurchase', () => {
         ]);
     });
 
-    test('from the space: the supplier is picked first, and only suppliers with enabled products are offered', async () => {
+    test('from the space: the supplier is picked first, and only suppliers with active products are offered', async () => {
         const { supplier } = await seedSupplier();
         await models.supplier.create({ name: 'Nothing here' });
         const authed = flows.planPurchase.withIdentity(await operator());
@@ -157,7 +157,7 @@ describe('PlanPurchase', () => {
         expect(again.step.name).toBe('details');
     });
 
-    test('a supplier with no enabled products completes straight away with nothing to plan', async () => {
+    test('a supplier with no active products completes straight away with nothing to plan', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
         const supplier = await models.supplier.create({ name: 'Bare Ltd' });
         await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, supplierId: supplier.id, isActive: false });

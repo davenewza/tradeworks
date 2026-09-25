@@ -9,7 +9,7 @@ matters, not just how close it is to running out.
 
 ## Where to find it
 
-- **Inventory → View stock and cover** — the reorder view: every enabled
+- **Inventory → View stock and cover** — the reorder view: every active
   product's figures in one grid. Filter by brand, supplier, SKU, name, ABC
   class, status, and current or total cover (any comparison — less than, at
   least, between); click any column heading to sort by it. Brand and supplier
@@ -89,7 +89,7 @@ Details worth knowing:
 The **Stock cover** dashboard shows the catalogue's cover split by ABC class, so
 you can check that the A products — the ones carrying 80% of revenue — are the
 best stocked. Filter it by **Brand**, **ABC class** or **Status**. Every chart
-counts enabled products only.
+counts active products only.
 
 | Chart | What it shows |
 | --- | --- |
