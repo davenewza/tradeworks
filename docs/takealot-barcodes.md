@@ -24,18 +24,25 @@ every printed EAN matched `product_label` exactly, while `barcode` held an
 version of this sync read `barcode` and filled the catalogue with placeholders;
 re-running the flow replaces them.
 
-## The two paths in
+## The three paths in
 
 - **Automatically, per product.** `@on([create, update], syncTakealotBarcode)`
   on `Product` fires an event on every create and update. The subscriber acts
   only when the SKU is **new or changed** — the SKU is what identifies the offer,
   so no other edit can alter which barcode applies. It looks the offer up with
   `GET /v1/offers/by_sku/{sku}` and upserts the product's Takealot code.
+- **Automatically, nightly.** **ScheduledSyncChannelCodes** runs the
+  whole-catalogue sync below at 3am and applies it without review, alongside the
+  Amazon one. The subscriber cannot see a `product_label` Takealot reissues
+  against an unchanged SKU — no product write happens, so no event fires. The
+  sweep is what catches that, and an offer created after the product arrived
+  here. See [amazon-fnskus.md](amazon-fnskus.md#why-the-subscriber-is-not-enough-on-its-own)
+  for why applying unreviewed is safe.
 - **Manually, whole catalogue.** The **Sync Takealot Barcodes** flow pulls every
   offer via the paginated `GET /v1/offers` listing (1000 per page, full objects —
   no `fields=` trimming, so `product_label` is always present), shows a review of
-  adds/updates, and applies on confirmation. Use it for the initial backfill and
-  to repair drift.
+  adds/updates, and applies on confirmation. Use it for the initial backfill, and
+  whenever you want to see what would change before it does.
 
 ## What it never does
 
@@ -71,8 +78,9 @@ This API is Takealot's own and does **not** draw on the shared Zoho daily quota.
 | File | Role |
 | --- | --- |
 | `schemas/products.keel` | The `@on([create, update], syncTakealotBarcode)` event hook on `Product`. |
-| `schemas/labels.keel` | The `SyncTakealotBarcodes` flow declaration (next to `ProductChannelCode`). |
+| `schemas/labels.keel` | The `SyncTakealotBarcodes` and `ScheduledSyncChannelCodes` flow declarations (next to `ProductChannelCode`). |
 | `lib/takealotOfferHelpers.ts` | API fetchers, the offer → code mapping that feeds the flow's plan, and the single-product sync for the subscriber. |
 | `lib/channelCodeSync.ts` | The plan/apply pair itself — shared with the Amazon FNSKU import ([amazon-fnskus.md](amazon-fnskus.md)), so the never-delete and one-channel-only rules live once. |
 | `subscribers/syncTakealotBarcode.ts` | Event handler: skip unless created or SKU changed, then sync that product. |
 | `flows/syncTakealotBarcodes.ts` | UI orchestration only: confirm → review changes → apply. |
+| `lib/channelCodeSweep.ts` | The unattended both-channel sweep behind `flows/scheduledSyncChannelCodes.ts`. |

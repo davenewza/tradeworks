@@ -15,10 +15,22 @@ plan → review → apply shape as the Takealot barcode sync and runs on the sam
 core (`lib/channelCodeSync.ts`): only the Amazon channel's rows are read or
 written, and nothing is ever deleted.
 
-## Where to find it
+## The three paths in
 
-**Products → Barcode labels → Sync Amazon FNSKUs.** Confirm, review the adds
-and updates, apply.
+- **Automatically, per product.** `@on([create, update], syncAmazonFnsku)` on
+  `Product` fires on every create and update. The subscriber acts only when the
+  SKU is **new or changed** — the seller SKU is what identifies the listing, so
+  no other edit can alter which FNSKU applies. It looks the listing up with the
+  summaries call filtered to that one `sellerSkus` value and upserts the
+  product's Amazon code. It only finds something when the FBA listing already
+  exists, which is the minority case (see below).
+- **Automatically, nightly.** **ScheduledSyncChannelCodes** runs the
+  whole-catalogue sync below at 3am and applies it without review, alongside the
+  Takealot one. This is what picks an FNSKU up once Amazon mints it, days or
+  weeks after the product arrived here.
+- **Manually, whole catalogue.** **Products → Barcode labels → Sync Amazon
+  FNSKUs.** Confirm, review the adds and updates, apply. Use it for the initial
+  backfill, and whenever you want to see what would change before it does.
 
 ## What the API is asked
 
@@ -98,16 +110,28 @@ SKU, only this channel's rows, an ASIN-as-FNSKU refused, nothing ever deleted),
 on the same shared core, but it only ever sees the SKUs on those consignments.
 This sync remains the way to cover the **whole catalogue**.
 
-## Why there is no per-product subscriber
+## Why the subscriber is not enough on its own
 
-Takealot codes are also synced one product at a time, on product create or SKU
-change. Amazon deliberately is not: an FNSKU exists once the **listing** is
-created on Amazon, which normally happens *after* the product exists in Zoho, so
-a hook on product create would mostly find no listing yet — and nothing would
-fire again when the listing appeared. Run the sync after listing new products;
-it is one confirmation and a few seconds. (A nightly scheduled sync would be the
-next step if that becomes a chore; it applies without review, which is why it is
-not the default.)
+An FNSKU exists once the **listing** is created on Amazon, which normally
+happens *after* the product exists in Zoho. So the per-product subscriber
+usually fires at the one moment Amazon has nothing to give — and because it
+acts only on a new or changed SKU, it will never fire again when the listing
+does appear. It is worth having for the case where the listing predates the
+product here, and no more than that.
+
+The nightly **ScheduledSyncChannelCodes** sweep is what actually closes the gap,
+for both channels: it re-reads the whole catalogue, so it sees an FNSKU minted
+last week, or a Takealot `product_label` reissued against an unchanged SKU —
+neither of which any create/update hook can notice.
+
+It applies without a review page, which is safe because of what the shared core
+does not do: it only ever upserts the named channel's row, and a SKU the channel
+lists without a code keeps whatever is stored rather than being blanked. The
+worst an unattended run can do is write the code the channel is currently
+reporting. Each channel is fetched and applied independently, so a Takealot
+outage or a missing Amazon credential cannot stop the other channel syncing; a
+channel that fails is reported and fails the run after the other has had its
+turn.
 
 ## After syncing
 
@@ -143,8 +167,12 @@ one, so coordinate before regenerating.
 
 | File | Role |
 | --- | --- |
-| `schemas/labels.keel` | The `SyncAmazonFnskus` flow declaration (next to `ProductChannelCode`). |
-| `lib/amazonFnskuHelpers.ts` | The paged FBA Inventory fetch, the Amazon-specific plan (manufacturer-barcode and condition notes), the label-spec check. |
+| `schemas/products.keel` | The `@on([create, update], syncAmazonFnsku)` event hook on `Product`. |
+| `schemas/labels.keel` | The `SyncAmazonFnskus` and `ScheduledSyncChannelCodes` flow declarations (next to `ProductChannelCode`). |
+| `lib/amazonFnskuHelpers.ts` | The paged FBA Inventory fetch, the by-SKU lookup and single-product sync behind the subscriber, the Amazon-specific plan (manufacturer-barcode and condition notes), the label-spec check. |
 | `lib/amazonApi.ts` | The LWA token exchange and the paced, throttle-aware GET, shared with the inbound shipment sync. |
 | `lib/channelCodeSync.ts` | The plan/apply pair shared with the Takealot barcode sync. |
+| `lib/channelCodeSweep.ts` | The unattended both-channel sweep: skip an unconfigured channel, isolate a failing one, apply without review. |
+| `subscribers/syncAmazonFnsku.ts` | Event handler: skip unless created or SKU changed, then sync that product. |
 | `flows/syncAmazonFnskus.ts` | UI orchestration only: confirm → review changes → apply. |
+| `flows/scheduledSyncChannelCodes.ts` | The 3am run: sweep both channels, report each, fail the run if one failed. |
