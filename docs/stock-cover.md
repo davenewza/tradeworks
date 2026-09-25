@@ -88,7 +88,7 @@ Details worth knowing:
 The **Stock cover** dashboard shows the catalogue's cover split by ABC class, so
 you can check that the A products — the ones carrying 80% of revenue — are the
 best stocked. Filter it by **Brand**, **ABC class** or **Status**. Every chart
-counts enabled products only.
+counts active products only.
 
 | Chart | What it shows |
 | --- | --- |

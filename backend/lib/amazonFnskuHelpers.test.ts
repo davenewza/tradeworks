@@ -340,7 +340,7 @@ describe('computeAmazonFnskuPlan', () => {
         expect(plan.changes[0]).toMatchObject({ productId: product.id, code: 'X001SECOND' });
     });
 
-    test('lists enabled products with no FBA listing, leaving disabled ones out', async () => {
+    test('lists active products with no FBA listing, leaving inactive ones out', async () => {
         await createProduct('ON-AMAZON');
         await createProduct('NOT-LISTED');
         await createProduct('DISABLED', 'Product DISABLED', false);

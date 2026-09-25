@@ -44,7 +44,7 @@ export interface ChannelCodeSyncPlan {
     skusWithoutProduct: string[];
     // SKUs that matched a product but carry no code at the source.
     skusWithoutCode: string[];
-    // Enabled products the source does not list — informational only.
+    // Active products the source does not list — informational only.
     productsWithoutSource: string[];
     warnings: string[];
 }

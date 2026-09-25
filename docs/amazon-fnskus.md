@@ -51,7 +51,7 @@ gives up. A few hundred listings is a handful of pages and well under a minute.
 | No seller SKU | Skipped. |
 | Same SKU twice | Warned; the last occurrence wins. |
 
-Enabled products with no FBA listing are listed for information only.
+Active products with no FBA listing are listed for information only.
 
 ### FNSKU equal to ASIN
 
