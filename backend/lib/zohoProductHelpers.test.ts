@@ -5,6 +5,7 @@ import {
     buildSyncCandidates,
     ExistingProduct,
     isItemInactive,
+    resolveSelectedCandidates,
     SyncCandidate,
     ZohoItem,
 } from './zohoProductHelpers';
@@ -429,5 +430,87 @@ describe('buildSyncCandidates', () => {
 
     test('skips items with no SKU — there is nothing to match them on', () => {
         expect(buildSyncCandidates([zohoItem({ sku: '   ', name: 'No SKU' })], new Map())).toEqual([]);
+    });
+});
+
+
+// What ctx.ui.select.table() actually hands back. Its processTableData() keeps
+// only the keys named in `columns` before the rows are sent to the browser, so
+// the selection returns with `action`, `isActive` and `zohoItemId` missing.
+// Checked against the real runtime rather than inferred: driving
+// ctx.ui.select.table() with a full candidate emits exactly these five keys.
+const PICKER_COLUMNS = ['sku', 'name', 'brand', 'change', 'reason'] as const;
+
+function throughPicker(candidates: SyncCandidate[]): { sku: string }[] {
+    return candidates.map(
+        (c) => Object.fromEntries(Object.entries(c).filter(([k]) => PICKER_COLUMNS.includes(k as never))) as { sku: string }
+    );
+}
+
+describe('resolveSelectedCandidates', () => {
+    test('restores the fields the picker stripped', () => {
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'S-1', name: 'Widget', status: 'inactive' })],
+            new Map([['S-1', existing()]])
+        );
+
+        // Precondition: the picker really does drop them.
+        const rows = throughPicker(candidates);
+        expect(rows[0]).not.toHaveProperty('action');
+        expect(rows[0]).not.toHaveProperty('isActive');
+
+        expect(resolveSelectedCandidates(candidates, rows)).toEqual(candidates);
+    });
+
+    test('returns only the ticked rows, and tolerates one that no longer matches', () => {
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'S-1', name: 'One' }), zohoItem({ sku: 'S-2', name: 'Two' })],
+            new Map()
+        );
+
+        const resolved = resolveSelectedCandidates(candidates, [{ sku: 'S-2' }, { sku: 'GONE' }]);
+        expect(resolved.map((c) => c.sku)).toEqual(['S-2']);
+    });
+});
+
+describe('the picker round trip', () => {
+    beforeEach(resetDatabase);
+
+    test('a deactivation ticked in the picker really switches the product off', async () => {
+        // The regression: applying the picker's rows directly left `action`
+        // undefined, so the row fell through to the update path — the product
+        // was renamed, counted as updated, and never deactivated.
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Widget', sku: 'RT-1', brandId: brand.id });
+
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'RT-1', name: 'Widget', status: 'inactive' })],
+            new Map([['RT-1', existing()]])
+        );
+        expect(candidates[0].change).toBe('Deactivate');
+
+        const result = await applyProductSync(resolveSelectedCandidates(candidates, throughPicker(candidates)));
+
+        expect(result).toMatchObject({ deactivated: 1, updated: 0 });
+        expect((await models.product.findOne({ sku: 'RT-1' }))!.isActive).toBe(false);
+    });
+
+    test('applying the picker rows unresolved fails loudly rather than renaming', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Widget', sku: 'RT-2', brandId: brand.id });
+
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'RT-2', name: 'Renamed', status: 'inactive' })],
+            new Map([['RT-2', existing()]])
+        );
+
+        await expect(applyProductSync(throughPicker(candidates) as SyncCandidate[])).rejects.toThrow(
+            /no recognised action/
+        );
+
+        // And nothing was written on the way to that error.
+        const product = await models.product.findOne({ sku: 'RT-2' });
+        expect(product!.name).toBe('Widget');
+        expect(product!.isActive).toBe(true);
     });
 });

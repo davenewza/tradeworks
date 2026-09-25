@@ -49,9 +49,12 @@ export interface ZohoProductCtx {
 
 // A single add/update/deactivate candidate produced by the read-only diff pass.
 // All fields are JSON-serializable so the whole array can flow through
-// ctx.step() and ctx.ui.select.table() unchanged. `sku`/`name`/`brand`/`change`/
-// `reason` are the human-facing columns; `zohoItemId`/`action` are carried
-// through hidden.
+// ctx.step() unchanged.
+//
+// It does NOT survive ctx.ui.select.table() whole: that helper strips every key
+// not named in `columns` before the rows reach the browser, so only the
+// human-facing columns come back on the selection. Re-hydrate the ticked rows
+// with resolveSelectedCandidates() before applying them.
 export interface SyncCandidate {
     sku: string;
     name: string;
@@ -281,6 +284,25 @@ export function buildSyncCandidates(
     return candidates;
 }
 
+// Match the rows a picker handed back to the candidates they came from.
+//
+// ctx.ui.select.table() sends the browser only the columns it was given, so the
+// selection comes back carrying `sku`/`name`/`brand`/`change`/`reason` and
+// nothing else — `action`, `isActive` and `zohoItemId` are gone. Applying those
+// rows directly means every deactivation reads as an action-less row and falls
+// through to the update path: the product gets renamed and counted as updated,
+// and is never switched off. SKU is unique and always shown, so it is what the
+// rows are matched on.
+export function resolveSelectedCandidates(
+    candidates: SyncCandidate[],
+    selectedRows: { sku: string }[]
+): SyncCandidate[] {
+    const bySku = new Map(candidates.map((c) => [c.sku, c]));
+    return selectedRows
+        .map((row) => bySku.get(row.sku?.trim()))
+        .filter((c): c is SyncCandidate => c !== undefined);
+}
+
 // Pull every item from Zoho and work out what each one means here. Performs NO
 // writes — products are only touched later in applyProductSync(), and only for
 // the items the user chooses to sync.
@@ -386,6 +408,8 @@ export interface ApplyResult {
 // Apply only the selected candidates, creating any missing brands along the
 // way. Idempotent: keyed on the unique SKU, so a step retry re-derives the same
 // result rather than duplicating records.
+const KNOWN_ACTIONS = new Set<SyncCandidate['action']>(['create', 'update', 'deactivate', 'reactivate']);
+
 export async function applyProductSync(
     selected: SyncCandidate[],
     progress?: ProgressReporter
@@ -415,6 +439,17 @@ export async function applyProductSync(
     progress?.set({ current: 0, total: selected.length, unit: 'products', counter: 'count' });
 
     for (const candidate of selected) {
+        // A candidate that reached here without its action must not quietly fall
+        // through to the update path — that is exactly how a batch of
+        // deactivations once came back reported as renames. Fail loudly instead.
+        if (!KNOWN_ACTIONS.has(candidate.action)) {
+            throw new Error(
+                `Sync candidate for SKU ${candidate.sku} has no recognised action ` +
+                    `(got ${JSON.stringify(candidate.action)}). Selections must be re-hydrated ` +
+                    `with resolveSelectedCandidates() before applying them.`
+            );
+        }
+
         const now = new Date();
         const existing = await models.product.findOne({ sku: candidate.sku });
 
