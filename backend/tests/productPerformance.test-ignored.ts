@@ -17,7 +17,7 @@ async function createTestProduct(brandId: string, sku: string, name: string) {
         name,
         sku,
         brandId,
-        isEnabled: true,
+        isActive: true,
     });
 }
 

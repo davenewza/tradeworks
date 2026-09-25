@@ -176,7 +176,7 @@ describe('validateRateLines', () => {
         return {
             sku: 'GOOD-1',
             name: 'Good product',
-            isEnabled: true,
+            isActive: true,
             volumeInLitres: 2.5,
             weightInGrams: 800,
             ...overrides
@@ -200,13 +200,13 @@ describe('validateRateLines', () => {
         const issues = validateRateLines(
             [
                 { sku: 'MISSING', quantity: 1 },
-                { sku: 'DISABLED', quantity: 1 },
+                { sku: 'INACTIVE', quantity: 1 },
                 { sku: 'NO-DIMS', quantity: 1 },
                 { sku: 'NO-WEIGHT', quantity: 0 }
             ],
             new Map([
                 ['MISSING', null],
-                ['DISABLED', product({ sku: 'DISABLED', isEnabled: false })],
+                ['INACTIVE', product({ sku: 'INACTIVE', isActive: false })],
                 ['NO-DIMS', product({ sku: 'NO-DIMS', volumeInLitres: null })],
                 ['NO-WEIGHT', product({ sku: 'NO-WEIGHT', weightInGrams: null })]
             ])
@@ -214,7 +214,7 @@ describe('validateRateLines', () => {
 
         expect(issues).toEqual([
             'SKU "MISSING": no product with this SKU exists',
-            'SKU "DISABLED": product is disabled',
+            'SKU "INACTIVE": product is inactive',
             'SKU "NO-DIMS": product is missing dimensions (length, width and height must be set)',
             'SKU "NO-WEIGHT": quantity must be a whole number of 1 or more (got 0)',
             'SKU "NO-WEIGHT": product is missing a weight (weightInGrams must be greater than 0)'

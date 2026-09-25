@@ -337,12 +337,12 @@ export interface PlannableBrand {
     productCount: number;
 }
 
-// Brands with at least one enabled product, for the picker. A brand with
-// nothing enabled has nothing to plan.
+// Brands with at least one active product, for the picker. A brand with
+// nothing active has nothing to plan.
 export async function loadPlannableBrands(): Promise<PlannableBrand[]> {
     const [brands, products] = await Promise.all([
         models.brand.findMany({}),
-        models.product.findMany({ where: { isEnabled: { equals: true } } }),
+        models.product.findMany({ where: { isActive: { equals: true } } }),
     ]);
     const counts = new Map<string, number>();
     for (const p of products) counts.set(p.brandId, (counts.get(p.brandId) ?? 0) + 1);
@@ -358,13 +358,13 @@ export async function loadPlannableBrands(): Promise<PlannableBrand[]> {
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Everything the plan needs for one brand's enabled products, as of `now`:
+// Everything the plan needs for one brand's active products, as of `now`:
 // the stock figures the daily sync wrote, an unrounded run-rate from the same
 // sales window that sync uses, and the latest cost per product. Pure local
 // reads — nothing here touches Zoho.
 export async function loadPlanCandidates(brandId: string, now: Date): Promise<PlanCandidate[]> {
     const products = await models.product.findMany({
-        where: { brandId: { equals: brandId }, isEnabled: { equals: true } },
+        where: { brandId: { equals: brandId }, isActive: { equals: true } },
     });
     if (products.length === 0) return [];
 

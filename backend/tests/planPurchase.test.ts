@@ -158,7 +158,7 @@ describe('PlanPurchase', () => {
 
     test('a brand with no enabled products completes straight away with nothing to plan', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
-        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isEnabled: false });
+        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isActive: false });
         const authed = flows.planPurchase.withIdentity(await operator());
 
         const run = await authed.start({ brandId: brand.id });

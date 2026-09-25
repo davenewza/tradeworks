@@ -71,7 +71,12 @@ export function computeStockCover(
 // via the generated models API, so we drop to Kysely (raw SQL) per the
 // project's DB-query convention. `productIds` narrows the pass to those
 // products (the purchase planner wants one brand); omitted, it covers every
-// product that has ever sold.
+// active product that has ever sold.
+//
+// Inactive products are excluded at the join. Their own figures would only be
+// stale numbers on a product nobody can transact, and ABC is a Pareto cut over
+// whatever this returns — leaving them in would spend A and B share on
+// products that are out of the catalogue and push live ones down a grade.
 export async function loadSaleAggregates(windowStart: Date, productIds?: string[]): Promise<SaleAggregate[]> {
     if (productIds && productIds.length === 0) return [];
     const db = useDatabase();
@@ -85,13 +90,14 @@ export async function loadSaleAggregates(windowStart: Date, productIds?: string[
         firstSaleDate: string | Date | null;
     }>`
         select
-            product_id,
-            coalesce(sum(quantity) filter (where date >= ${windowStart}), 0) as units_last_365,
-            coalesce(sum(coalesce(net_amount, total_excl_vat)) filter (where date >= ${windowStart}), 0) as revenue_last_365,
-            min(date) as first_sale_date
+            sale.product_id,
+            coalesce(sum(sale.quantity) filter (where sale.date >= ${windowStart}), 0) as units_last_365,
+            coalesce(sum(coalesce(sale.net_amount, sale.total_excl_vat)) filter (where sale.date >= ${windowStart}), 0) as revenue_last_365,
+            min(sale.date) as first_sale_date
         from sale
-        ${productIds ? sql`where product_id = any(${productIds})` : sql``}
-        group by product_id
+        join product on product.id = sale.product_id and product.is_active
+        ${productIds ? sql`where sale.product_id = any(${productIds})` : sql``}
+        group by sale.product_id
     `.execute(db);
 
     return result.rows.map((row) => ({

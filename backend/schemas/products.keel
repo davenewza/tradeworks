@@ -3,7 +3,7 @@ model Brand {
         name Text
         logo File?
         products Product[]
-        totalProducts Number @computed(COUNTIF(brand.products, brand.products.isEnabled))
+        totalProducts Number @computed(COUNTIF(brand.products, brand.products.isActive))
         // How long (in days) new stock takes to arrive from this brand's
         // supplier — used to grade each product's stock-cover status. Editable on
         // the brand page; hidden from the brands list.
@@ -53,7 +53,16 @@ model Product {
         heightInCm Decimal?
         weightInGrams Decimal?
         volumeInLitres Decimal? @computed(product.lengthInCm * product.widthInCm * product.heightInCm / 1000)
-        isEnabled Boolean @default(true)
+        // Mirrors Zoho's item status. An inactive item cannot be used in
+        // transactions over there, so the product is out of use here too:
+        // hidden from the catalogue, and left out of pricing, quoting,
+        // purchase planning, labelling and delivery.
+        //
+        // Zoho owns this field. No action writes it — SyncProducts is the only
+        // thing that does, in both directions, so the two systems cannot drift
+        // and there is never a local change for a sync to second-guess. Change
+        // an item's status in Zoho, then sync.
+        isActive Boolean @default(true)
         synchronisedAt Timestamp?
         views ProductViews[]
         sales Sale[]
@@ -121,7 +130,7 @@ model Product {
     actions {
         get getProduct(id)
         list listProducts(name?, sku?, brand.id?, abcClass?) {
-            @where(product.isEnabled)
+            @where(product.isActive)
             @sortable(
                 name,
                 sku,
@@ -135,7 +144,7 @@ model Product {
             )
             @orderBy(name: asc)
         }
-        // The reorder view (Inventory → View stock and cover): every enabled
+        // The reorder view (Inventory → View stock and cover): every active
         // product's stock and cover figures, filterable by brand, SKU, name, ABC
         // class, status and either cover, and sortable on every column. Brand
         // is a relation, which @sortable can't order by.
@@ -148,7 +157,7 @@ model Product {
             currentStockCover?,
             totalStockCover?,
         ) {
-            @where(product.isEnabled)
+            @where(product.isActive)
             @sortable(
                 sku,
                 name,
@@ -167,7 +176,7 @@ model Product {
         // dashboard's figures, over the same measures its charts use.
         aggregate stockCoverByClass(brand.id?) over (abcClass) {
             @measures(stockCover, stockValue)
-            @where(product.isEnabled)
+            @where(product.isActive)
             @orderBy(abcClass: asc)
         }
         update updateProductDimensions(id) with (
@@ -177,8 +186,13 @@ model Product {
             weightInGrams,
         )
         update updateProduct(id) with (name?, brand.id?, sku?)
-        update disableProduct(id) {
-            @set(product.isEnabled = false)
+        // Read-only view of what the sync has switched off. There is no action
+        // to switch one back on: isActive belongs to Zoho, so the way back is to
+        // make the item active there and run SyncProducts.
+        list listInactiveProducts(name?, sku?, brand.id?) {
+            @where(product.isActive == false)
+            @sortable(name, sku)
+            @orderBy(name: asc)
         }
     }
 

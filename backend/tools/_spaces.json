@@ -61,12 +61,21 @@
             "hidden": false
           },
           {
+            "id": "action-list-inactive-products",
+            "link": {
+              "tool_id": "list-inactive-products",
+              "title": "Inactive",
+              "display_order": 1
+            },
+            "hidden": false
+          },
+          {
             "id": "action-sync-products",
             "link": {
               "tool_id": "sync-products",
               "title": "Sync Products from Zoho",
               "description": "Add new products from Zoho Books and update existing ones whose name or brand has changed",
-              "display_order": 1
+              "display_order": 2
             },
             "hidden": false
           }
@@ -141,7 +150,24 @@
       }
     ],
     "links": null,
-    "metrics": null,
+    "metrics": [
+      {
+        "id": "metric-active-products",
+        "label": "Active products",
+        "tool_id": "list-products",
+        "facet_location": "$.pageInfo.totalCount",
+        "display_order": 1,
+        "hidden": false
+      },
+      {
+        "id": "metric-inactive-products",
+        "label": "Inactive products",
+        "tool_id": "list-inactive-products",
+        "facet_location": "$.pageInfo.totalCount",
+        "display_order": 2,
+        "hidden": false
+      }
+    ],
     "topics": null,
     "charts": null
   },
