@@ -6,6 +6,7 @@ import {
     computeSyncCandidates,
     resolveSelectedCandidates,
     applyProductSync,
+    zohoPhotoFetcher,
 } from '../lib/zohoProductHelpers';
 
 const config = {
@@ -38,9 +39,10 @@ export default SyncProducts(config, async (ctx) => {
                     '- **Update** existing products whose **name** or **brand** has changed in Zoho.',
                     '- **Deactivate** products whose Zoho item has gone **inactive**, taking them out of the catalogue.',
                     '- **Reactivate** products whose Zoho item is **active** again, bringing them back.',
+                    "- **Add a photo** from Zoho to active products that don't have one yet. Existing photos are never replaced.",
                     '',
                     'A product\'s active status lives in Zoho and is only ever changed there — this sync is how it reaches us.',
-                    'Product dimensions, images and prices are **not** touched.',
+                    'Product dimensions and prices are **not** touched.',
                 ].join('\n'),
             }),
         ],
@@ -77,7 +79,7 @@ export default SyncProducts(config, async (ctx) => {
             }),
             ctx.ui.select.table('products', {
                 data: candidates,
-                columns: ['sku', 'name', 'brand', 'change', 'reason'],
+                columns: ['sku', 'name', 'brand', 'change', 'reason', 'photo'],
                 mode: 'multi',
             }),
         ],
@@ -101,14 +103,14 @@ export default SyncProducts(config, async (ctx) => {
 
     // ── Step: apply — create/update selected products (and their brands) ─────
     const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
-        return await applyProductSync(selected, progress);
+        return await applyProductSync(selected, progress, zohoPhotoFetcher(ctx, accessToken));
     })) as unknown as ApplyResult;
 
     // ── Completion: full list of what was added/updated ──────────────────────
     return ctx.complete({
         title: 'Product sync complete',
         stage: 'complete',
-        description: `${result.created} added, ${result.updated} updated, ${result.deactivated} deactivated, ${result.reactivated} reactivated.`,
+        description: `${result.created} added, ${result.updated} updated, ${result.deactivated} deactivated, ${result.reactivated} reactivated, ${result.photosAdded} photo${result.photosAdded === 1 ? '' : 's'} added.`,
         content: [
             ctx.ui.display.keyValue({
                 data: [
@@ -117,12 +119,21 @@ export default SyncProducts(config, async (ctx) => {
                     { key: 'Products updated', value: result.updated },
                     { key: 'Products deactivated', value: result.deactivated },
                     { key: 'Products reactivated', value: result.reactivated },
+                    { key: 'Photos added', value: result.photosAdded },
                 ],
             }),
+            ...(result.photoFailures.length > 0
+                ? [
+                      ctx.ui.display.markdown({
+                          content: `**${result.photoFailures.length} photo${result.photoFailures.length === 1 ? '' : 's'} could not be downloaded** — they'll be offered again on the next sync.`,
+                      }),
+                      ctx.ui.display.table({ data: result.photoFailures, columns: ['sku', 'error'] }),
+                  ]
+                : []),
             ctx.ui.display.divider(),
             ctx.ui.display.table({
                 data: result.synced,
-                columns: ['sku', 'name', 'brand', 'change', 'reason'],
+                columns: ['sku', 'name', 'brand', 'change', 'reason', 'photo'],
             }),
         ],
     });

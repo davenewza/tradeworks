@@ -1,16 +1,22 @@
 import { models, resetDatabase } from '@teamkeel/testing';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { InlineFile } from '@teamkeel/sdk';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
     applyProductSync,
     buildSyncCandidates,
+    computeSyncCandidates,
     ExistingProduct,
     isItemInactive,
+    PhotoFetcher,
     resolveSelectedCandidates,
     SyncCandidate,
     ZohoItem,
+    ZohoProductCtx,
+    zohoPhotoFetcher,
 } from './zohoProductHelpers';
 
 beforeEach(resetDatabase);
+afterEach(() => vi.unstubAllGlobals());
 
 // A ProgressReporter that records what a step reported, so tests can assert the
 // per-item progress without a live flow runtime.
@@ -37,6 +43,8 @@ function candidate(overrides: Partial<SyncCandidate> & Pick<SyncCandidate, 'sku'
     return {
         change: 'New',
         reason: 'Not in our catalogue yet',
+        photo: '',
+        imageName: null,
         isActive: true,
         zohoItemId: `zoho-${overrides.sku}`,
         action: 'create',
@@ -56,7 +64,7 @@ function zohoItem(overrides: Partial<ZohoItem> & Pick<ZohoItem, 'sku' | 'name'>)
 }
 
 function existing(overrides: Partial<ExistingProduct> = {}): ExistingProduct {
-    return { name: 'Widget', brandName: 'Acme', isActive: true, ...overrides };
+    return { name: 'Widget', brandName: 'Acme', isActive: true, hasImage: false, ...overrides };
 }
 
 describe('applyProductSync', () => {
@@ -512,5 +520,248 @@ describe('the picker round trip', () => {
         const product = await models.product.findOne({ sku: 'RT-2' });
         expect(product!.name).toBe('Widget');
         expect(product!.isActive).toBe(true);
+    });
+});
+
+// ─── Photos ─────────────────────────────────────────────────────────────────
+
+function pngFile(filename = 'photo.png'): InlineFile {
+    const file = new InlineFile({ filename, contentType: 'image/png' });
+    file.write(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    return file;
+}
+
+// Records which Zoho items the apply pass downloaded a photo for.
+function recordingFetcher() {
+    const calls: string[] = [];
+    const fetcher: PhotoFetcher = async (zohoItemId) => {
+        calls.push(zohoItemId);
+        return pngFile();
+    };
+    return { fetcher, calls };
+}
+
+describe('buildSyncCandidates — photos', () => {
+    const pictured = (overrides: Partial<ZohoItem> = {}) =>
+        zohoItem({ sku: 'W-1', name: 'Widget', image_name: 'w1.jpg', ...overrides });
+
+    test('offers a photo-only change to a product that has none when Zoho has one', () => {
+        const [c] = buildSyncCandidates([pictured()], new Map([['W-1', existing()]]));
+        expect(c).toMatchObject({ change: 'Photo', action: 'update', photo: 'Add', imageName: 'w1.jpg' });
+    });
+
+    test('never offers a photo to a product that already has one', () => {
+        const candidates = buildSyncCandidates([pictured()], new Map([['W-1', existing({ hasImage: true })]]));
+        expect(candidates).toEqual([]);
+    });
+
+    test('a rename of a product with a photo is an ordinary update', () => {
+        const [c] = buildSyncCandidates(
+            [pictured({ name: 'Renamed' })],
+            new Map([['W-1', existing({ hasImage: true })]])
+        );
+        expect(c).toMatchObject({ change: 'Update', photo: '' });
+    });
+
+    test('a rename of a product without a photo carries the photo along', () => {
+        const [c] = buildSyncCandidates([pictured({ name: 'Renamed' })], new Map([['W-1', existing()]]));
+        expect(c).toMatchObject({ change: 'Update', photo: 'Add' });
+    });
+
+    test('new and reactivated products are offered the photo', () => {
+        const candidates = buildSyncCandidates(
+            [pictured({ sku: 'N-1' }), pictured({ sku: 'R-1' })],
+            new Map([['R-1', existing({ isActive: false })]])
+        );
+        expect(candidates.map((c) => [c.change, c.photo])).toEqual([
+            ['New', 'Add'],
+            ['Reactivate', 'Add'],
+        ]);
+    });
+
+    test('inactive items never get a photo — they are out of the catalogue', () => {
+        const candidates = buildSyncCandidates(
+            [pictured({ sku: 'I-1', status: 'inactive' }), pictured({ sku: 'I-2', status: 'inactive' })],
+            new Map([['I-2', existing()]])
+        );
+        expect(candidates.map((c) => [c.change, c.photo])).toEqual([
+            ['New', ''],
+            ['Deactivate', ''],
+        ]);
+    });
+
+    test('no photo is offered when Zoho has none', () => {
+        const candidates = buildSyncCandidates([zohoItem({ sku: 'W-1', name: 'Widget' })], new Map([['W-1', existing()]]));
+        expect(candidates).toEqual([]);
+    });
+
+    test('the photo survives the picker round trip', () => {
+        const candidates = buildSyncCandidates([pictured()], new Map([['W-1', existing()]]));
+        const [resolved] = resolveSelectedCandidates(candidates, throughPicker(candidates));
+        expect(resolved).toMatchObject({ photo: 'Add', imageName: 'w1.jpg', zohoItemId: 'zoho-W-1' });
+    });
+});
+
+describe('applyProductSync — photos', () => {
+    test('adds a photo to a new product when Zoho has one', async () => {
+        const { fetcher, calls } = recordingFetcher();
+
+        const result = await applyProductSync(
+            [candidate({ sku: 'P-1', name: 'Pictured', brand: 'Acme', photo: 'Add', imageName: 'p1.png' })],
+            undefined,
+            fetcher
+        );
+
+        expect(calls).toEqual(['zoho-P-1']);
+        expect(result.photosAdded).toBe(1);
+        expect(result.synced[0].photo).toBe('Added');
+        const product = await models.product.findOne({ sku: 'P-1' });
+        expect(product!.image!.contentType).toBe('image/png');
+    });
+
+    test('never downloads a photo for a product that already has one', async () => {
+        // The photo was uploaded by hand between the review page and apply.
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Mine', sku: 'P-2', brandId: brand.id, image: pngFile('mine.png') });
+        const { fetcher, calls } = recordingFetcher();
+
+        const result = await applyProductSync(
+            [candidate({ sku: 'P-2', name: 'Mine', brand: 'Acme', change: 'Photo', action: 'update', photo: 'Add' })],
+            undefined,
+            fetcher
+        );
+
+        expect(calls).toEqual([]);
+        expect(result.photosAdded).toBe(0);
+        expect((await models.product.findOne({ sku: 'P-2' }))!.image!.filename).toBe('mine.png');
+    });
+
+    test("only downloads photos for candidates flagged 'Add'", async () => {
+        const { fetcher, calls } = recordingFetcher();
+
+        await applyProductSync(
+            [
+                candidate({ sku: 'P-3', name: 'With', brand: 'Acme', photo: 'Add' }),
+                candidate({ sku: 'P-4', name: 'Without', brand: 'Acme' }),
+            ],
+            undefined,
+            fetcher
+        );
+
+        expect(calls).toEqual(['zoho-P-3']);
+        expect((await models.product.findOne({ sku: 'P-4' }))!.image).toBeNull();
+    });
+
+    test('a failed photo download is reported without undoing the product sync', async () => {
+        const failing: PhotoFetcher = async () => {
+            throw new Error('Zoho rate limit');
+        };
+
+        const result = await applyProductSync(
+            [
+                candidate({ sku: 'P-5', name: 'Broken', brand: 'Acme', photo: 'Add' }),
+                candidate({ sku: 'P-6', name: 'Fine', brand: 'Acme' }),
+            ],
+            undefined,
+            failing
+        );
+
+        expect(result.created).toBe(2);
+        expect(result.photosAdded).toBe(0);
+        expect(result.photoFailures).toEqual([{ sku: 'P-5', error: 'Zoho rate limit' }]);
+        expect(result.synced.find((s) => s.sku === 'P-5')!.photo).toBe('Failed');
+    });
+
+    test('a photo-only change is reported as Photo and not counted as an update', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Bare', sku: 'P-7', brandId: brand.id });
+        const { fetcher } = recordingFetcher();
+
+        const result = await applyProductSync(
+            [candidate({ sku: 'P-7', name: 'Bare', brand: 'Acme', change: 'Photo', action: 'update', photo: 'Add' })],
+            undefined,
+            fetcher
+        );
+
+        expect(result.updated).toBe(0);
+        expect(result.photosAdded).toBe(1);
+        expect(result.synced[0]).toMatchObject({ change: 'Photo', photo: 'Added' });
+    });
+
+    test('fails loudly when a photo is wanted but no fetcher was given', async () => {
+        await expect(
+            applyProductSync([candidate({ sku: 'P-8', name: 'Orphan', brand: 'Acme', photo: 'Add' })])
+        ).rejects.toThrow(/no photo fetcher/);
+    });
+});
+
+const zohoCtx: ZohoProductCtx = {
+    env: {
+        ZOHO_ACCOUNTS_BASE_URL: 'https://accounts.example',
+        ZOHO_CLIENT_ID: 'client',
+        ZOHO_BOOKS_BASE_URL: 'https://books.example/v3',
+        ZOHO_BOOKS_ORG_ID: 'org',
+    },
+    secrets: { ZOHO_CLIENT_SECRET: 'secret' },
+};
+
+function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+describe('computeSyncCandidates — photos', () => {
+    test('reads which products already have a photo, and downloads no images', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Has photo', sku: 'S-1', brandId: brand.id, image: pngFile() });
+        await models.product.create({ name: 'No photo', sku: 'S-2', brandId: brand.id });
+
+        const details = [
+            zohoItem({ sku: 'S-1', name: 'Has photo', image_name: 's1.png' }),
+            zohoItem({ sku: 'S-2', name: 'No photo', image_name: 's2.png' }),
+        ];
+        const urls: string[] = [];
+        vi.stubGlobal('fetch', async (url: string) => {
+            urls.push(url);
+            if (url.includes('/itemdetails')) return jsonResponse({ items: details });
+            if (url.includes('/items?')) {
+                return jsonResponse({
+                    items: details.map(({ item_id, name, sku, status }) => ({ item_id, name, sku, status })),
+                    page_context: { page: 1, per_page: 200, has_more_page: false },
+                });
+            }
+            throw new Error(`unexpected Zoho request: ${url}`);
+        });
+
+        const candidates = await computeSyncCandidates(zohoCtx, 'token');
+
+        expect(candidates.map((c) => [c.sku, c.change, c.photo])).toEqual([['S-2', 'Photo', 'Add']]);
+        expect(urls.some((u) => u.includes('/image'))).toBe(false);
+    });
+});
+
+describe('zohoPhotoFetcher', () => {
+    test('downloads the item image as a file named after the Zoho image', async () => {
+        const requested: string[] = [];
+        vi.stubGlobal('fetch', async (url: string) => {
+            requested.push(url);
+            return new Response(Buffer.from([1, 2, 3]), { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+        });
+
+        const file = await zohoPhotoFetcher(zohoCtx, 'token')('z9', 'widget.jpg');
+
+        expect(requested).toEqual(['https://books.example/v3/items/z9/image?organization_id=org']);
+        expect(file!.filename).toBe('widget.jpg');
+        expect(file!.contentType).toBe('image/jpeg');
+        expect([...(await file!.read())]).toEqual([1, 2, 3]);
+    });
+
+    test('returns null when Zoho has no image', async () => {
+        vi.stubGlobal('fetch', async () => new Response('{}', { status: 404 }));
+        expect(await zohoPhotoFetcher(zohoCtx, 'token')('z9', null)).toBeNull();
+    });
+
+    test('treats a JSON reply (e.g. a rate-limit error) as a failure, not a photo', async () => {
+        vi.stubGlobal('fetch', async () => jsonResponse({ code: 1070, message: 'rate limit exceeded' }));
+        await expect(zohoPhotoFetcher(zohoCtx, 'token')('z9', null)).rejects.toThrow(/instead of an image/);
     });
 });
