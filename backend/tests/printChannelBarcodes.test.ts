@@ -293,7 +293,7 @@ describe('PrintChannelBarcodes — from a product page', () => {
         );
     });
 
-    test('a disabled product still prints from its own page', async () => {
+    test('an inactive product still prints from its own page', async () => {
         const tak = await takealot();
         const widget = await product({ isActive: false });
         await models.productChannelCode.create({ productId: widget.id, channelId: tak.id, code: EAN_A });

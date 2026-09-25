@@ -190,7 +190,7 @@ export interface ProductLabelLoad {
  * with the answer in hand the flow only asks which channel when there is more
  * than one, and never asks at all when there is one.
  *
- * Disabled products are included. The catalogue picker leaves them out because
+ * Inactive products are included. The catalogue picker leaves them out because
  * they are deliberately out of stock rotation, but arriving from a product's own
  * page is an explicit request for that product, and refusing it would only read
  * as "this product has no code".
