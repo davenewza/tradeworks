@@ -2,15 +2,25 @@
   "id": "list-products",
   "action_name": "listProducts",
   "icon": "emoji:🤖",
+  "inputs": {
+    "$.where.sku": {
+      "display_name": "SKU"
+    },
+    "$.where.abcClass": {
+      "display_name": "ABC class"
+    }
+  },
   "response": {
     "$.results[*].sku": {
-      "display_order": 1
+      "display_order": 1,
+      "display_name": "SKU"
     },
     "$.results[*].name": {
       "display_order": 2
     },
     "$.results[*].brandId": {
-      "display_order": 3
+      "display_order": 3,
+      "display_name": "Brand"
     },
     "$.results[*].id": {
       "display_order": 12,
@@ -70,7 +80,8 @@
       "visible": false
     },
     "$.results[*].abcClass": {
-      "visible": false
+      "display_name": "ABC class",
+      "display_order": 4
     },
     "$.results[*].stockAvailable": {
       "visible": false
@@ -132,8 +143,5 @@
       "tool_id": "update-product-dimensions",
       "display_order": 3
     }
-  ],
-  "filter_config": {
-    "quick_search_field": "$.where.name.contains"
-  }
+  ]
 }
