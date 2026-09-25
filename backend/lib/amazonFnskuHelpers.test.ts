@@ -8,8 +8,11 @@ import {
     amazonLabelSpecExists,
     computeAmazonFnskuPlan,
     fetchFbaInventory,
+    fetchFbaListingBySku,
     getAmazonAccessToken,
     isNewCondition,
+    syncProductFnskuFromAmazon,
+    usesManufacturerBarcode,
 } from './amazonFnskuHelpers';
 import { applyChannelCodeSync } from './channelCodeSync';
 
@@ -58,9 +61,19 @@ function stubFetch(handler: (url: string, init: RequestInit | undefined, call: n
     return impl;
 }
 
-async function createProduct(sku: string, name = `Product ${sku}`, isEnabled = true) {
+// The token call followed by a summaries call answering with `summaries`.
+// Keyed on the URL rather than the call index so a test can run a sync twice.
+function stubInventory(summaries: unknown[]) {
+    return stubFetch((url) =>
+        url.startsWith('https://lwa.test')
+            ? TOKEN_OK
+            : { status: 200, body: { payload: { inventorySummaries: summaries } } }
+    );
+}
+
+async function createProduct(sku: string, name = `Product ${sku}`, isActive = true) {
     const brand = await models.brand.create({ name: 'Test Brand' });
-    return await models.product.create({ name, sku, brandId: brand.id, isEnabled });
+    return await models.product.create({ name, sku, brandId: brand.id, isActive });
 }
 
 async function createAmazonChannel() {
@@ -214,6 +227,52 @@ describe('fetchFbaInventory', () => {
 });
 
 // ─── isNewCondition ─────────────────────────────────────────────────────────
+
+describe('fetchFbaListingBySku', () => {
+    test('asks for the one seller SKU and returns its listing', async () => {
+        const impl = stubInventory([summary('CS-UNO', 'X001UNO000')]);
+
+        const listing = await fetchFbaListingBySku(ctx, 'CS-UNO', noWait);
+
+        expect(listing).toEqual({
+            sku: 'CS-UNO',
+            fnsku: 'X001UNO000',
+            asin: 'B0UNO00000',
+            condition: 'NewItem',
+            productName: 'Product CS-UNO',
+        });
+
+        // One page, not a walk of the catalogue — the point of the by-SKU call.
+        expect(impl).toHaveBeenCalledTimes(2);
+        const [url, init] = impl.mock.calls[1] as [string, RequestInit];
+        const params = new URL(url).searchParams;
+        expect(params.get('sellerSkus')).toBe('CS-UNO');
+        expect(params.get('granularityType')).toBe('Marketplace');
+        expect(params.get('marketplaceIds')).toBe('AE08WJ6YKNBMC');
+        expect((init.headers as Record<string, string>)['x-amz-access-token']).toBe('Atza|access');
+    });
+
+    test('returns null when Amazon holds no FBA listing for the SKU', async () => {
+        stubInventory([]);
+
+        expect(await fetchFbaListingBySku(ctx, 'CS-NONE', noWait)).toBeNull();
+    });
+
+    test('never returns another SKU\u2019s listing, whatever the filter sends back', async () => {
+        stubInventory([summary('CS-OTHER', 'X001OTHER0')]);
+
+        expect(await fetchFbaListingBySku(ctx, 'CS-UNO', noWait)).toBeNull();
+    });
+});
+
+describe('usesManufacturerBarcode', () => {
+    test('is true only when the FNSKU is the ASIN', () => {
+        expect(usesManufacturerBarcode(listing('CS-UNO', 'B07ABCDEFG'))).toBe(true);
+        expect(usesManufacturerBarcode(listing('CS-UNO', 'X001UNO000'))).toBe(false);
+        // No FNSKU at all is "missing", not "manufacturer barcode".
+        expect(usesManufacturerBarcode(listing('CS-UNO', '', { asin: '' }))).toBe(false);
+    });
+});
 
 describe('isNewCondition', () => {
     test('accepts the New conditions the API reports', () => {
@@ -397,5 +456,79 @@ describe('amazonLabelSpecExists', () => {
         });
 
         expect(await amazonLabelSpecExists()).toBe(true);
+    });
+});
+
+// ─── syncProductFnskuFromAmazon ─────────────────────────────────────────────
+
+describe('syncProductFnskuFromAmazon', () => {
+    test('creates the channel code from the listing FNSKU', async () => {
+        const product = await createProduct('CS-UNO');
+        stubInventory([summary('CS-UNO', ' X001UNO000 ')]);
+
+        const result = await syncProductFnskuFromAmazon(ctx, product, noWait);
+
+        expect(result).toEqual({ outcome: 'created', fnsku: 'X001UNO000' });
+        const rows = await codesForProduct(product.id);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].code).toBe('X001UNO000');
+    });
+
+    test('updates when the stored code differs and reports unchanged when it matches', async () => {
+        const product = await createProduct('CS-UNO');
+        const channel = await createAmazonChannel();
+        await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'X000OLD000' });
+        stubInventory([summary('CS-UNO', 'X001UNO000')]);
+
+        expect(await syncProductFnskuFromAmazon(ctx, product, noWait)).toEqual({
+            outcome: 'updated',
+            fnsku: 'X001UNO000',
+        });
+        expect(await syncProductFnskuFromAmazon(ctx, product, noWait)).toEqual({
+            outcome: 'unchanged',
+            fnsku: 'X001UNO000',
+        });
+        expect(await codesForProduct(product.id)).toHaveLength(1);
+    });
+
+    test('reports no_listing when the product is not on FBA and touches nothing', async () => {
+        const product = await createProduct('CS-UNO');
+        stubInventory([]);
+
+        expect(await syncProductFnskuFromAmazon(ctx, product, noWait)).toEqual({ outcome: 'no_listing' });
+        expect(await codesForProduct(product.id)).toHaveLength(0);
+    });
+
+    test('reports no_fnsku and keeps the stored code when Amazon holds none', async () => {
+        const product = await createProduct('CS-UNO');
+        const channel = await createAmazonChannel();
+        await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'KEEP-ME' });
+        stubInventory([summary('CS-UNO', null)]);
+
+        expect(await syncProductFnskuFromAmazon(ctx, product, noWait)).toEqual({ outcome: 'no_fnsku' });
+        expect((await codesForProduct(product.id)).map((r) => r.code)).toEqual(['KEEP-ME']);
+    });
+
+    test('never stores an ASIN as the code when the listing scans the manufacturer barcode', async () => {
+        const product = await createProduct('CS-UNO');
+        const channel = await createAmazonChannel();
+        await models.productChannelCode.create({ productId: product.id, channelId: channel.id, code: 'KEEP-ME' });
+        stubInventory([summary('CS-UNO', 'B0UNO00000', 'B0UNO00000')]);
+
+        expect(await syncProductFnskuFromAmazon(ctx, product, noWait)).toEqual({ outcome: 'manufacturer_barcode' });
+        expect((await codesForProduct(product.id)).map((r) => r.code)).toEqual(['KEEP-ME']);
+    });
+
+    test('only touches the Amazon channel — a Takealot code on the same product is left alone', async () => {
+        const product = await createProduct('CS-UNO');
+        const takealot = await models.channel.create({ name: 'Takealot' });
+        await models.productChannelCode.create({ productId: product.id, channelId: takealot.id, code: '6001234567893' });
+        stubInventory([summary('CS-UNO', 'X001UNO000')]);
+
+        await syncProductFnskuFromAmazon(ctx, product, noWait);
+
+        const rows = await codesForProduct(product.id);
+        expect(rows).toHaveLength(2);
+        expect(rows.find((r) => r.channelId === takealot.id)!.code).toBe('6001234567893');
     });
 });

@@ -4,13 +4,23 @@
   "name": "View stock and cover",
   "title": "Stock and cover",
   "icon": "emoji:📦",
-  "help_text": "Every enabled product's stock on hand and months of cover at its current sales rate, graded against the brand's lead time. Filter by brand, SKU, name, ABC class, status or cover; click a column heading to sort by it. Figures refresh nightly — see docs/stock-cover.md.",
+  "help_text": "Every active product's stock on hand and months of cover at its current sales rate, graded against the brand's lead time. Filter by brand, SKU, name, ABC class, status or cover; click a column heading to sort by it. Figures refresh nightly — see docs/stock-cover.md.",
   "inputs": {
-    "$.where.sku": { "display_name": "SKU" },
-    "$.where.abcClass": { "display_name": "ABC class" },
-    "$.where.stockCoverStatus": { "display_name": "Status" },
-    "$.where.currentStockCover": { "display_name": "Current cover (months)" },
-    "$.where.totalStockCover": { "display_name": "Total cover (months)" }
+    "$.where.sku": {
+      "display_name": "SKU"
+    },
+    "$.where.abcClass": {
+      "display_name": "ABC class"
+    },
+    "$.where.stockCoverStatus": {
+      "display_name": "Status"
+    },
+    "$.where.currentStockCover": {
+      "display_name": "Current cover (months)"
+    },
+    "$.where.totalStockCover": {
+      "display_name": "Total cover (months)"
+    }
   },
   "response": {
     "$.results[*].sku": {
@@ -71,30 +81,78 @@
         ]
       }
     },
-    "$.results[*].views": { "visible": false },
-    "$.results[*].sales": { "visible": false },
-    "$.results[*].channelFees": { "visible": false },
-    "$.results[*].costLines": { "visible": false },
-    "$.results[*].prices": { "visible": false },
-    "$.results[*].channelCodes": { "visible": false },
-    "$.results[*].image": { "visible": false },
-    "$.results[*].isEnabled": { "visible": false },
-    "$.results[*].lengthInCm": { "visible": false },
-    "$.results[*].widthInCm": { "visible": false },
-    "$.results[*].heightInCm": { "visible": false },
-    "$.results[*].weightInGrams": { "visible": false },
-    "$.results[*].volumeInLitres": { "visible": false },
-    "$.results[*].weightedUnitCost": { "visible": false },
-    "$.results[*].weightedFreightIn": { "visible": false },
-    "$.results[*].weightedLandedCost": { "visible": false },
-    "$.results[*].totalSupplierBills": { "visible": false },
-    "$.results[*].totalUnitsPurchased": { "visible": false },
-    "$.results[*].totalSalesValue": { "visible": false },
-    "$.results[*].averageSalePrice": { "visible": false },
-    "$.results[*].synchronisedAt": { "visible": false },
-    "$.results[*].stockSynchronisedAt": { "visible": false },
-    "$.results[*].createdAt": { "visible": false },
-    "$.results[*].updatedAt": { "visible": false }
+    "$.results[*].views": {
+      "visible": false
+    },
+    "$.results[*].sales": {
+      "visible": false
+    },
+    "$.results[*].channelFees": {
+      "visible": false
+    },
+    "$.results[*].costLines": {
+      "visible": false
+    },
+    "$.results[*].prices": {
+      "visible": false
+    },
+    "$.results[*].channelCodes": {
+      "visible": false
+    },
+    "$.results[*].image": {
+      "visible": false
+    },
+    "$.results[*].lengthInCm": {
+      "visible": false
+    },
+    "$.results[*].widthInCm": {
+      "visible": false
+    },
+    "$.results[*].heightInCm": {
+      "visible": false
+    },
+    "$.results[*].weightInGrams": {
+      "visible": false
+    },
+    "$.results[*].volumeInLitres": {
+      "visible": false
+    },
+    "$.results[*].weightedUnitCost": {
+      "visible": false
+    },
+    "$.results[*].weightedFreightIn": {
+      "visible": false
+    },
+    "$.results[*].weightedLandedCost": {
+      "visible": false
+    },
+    "$.results[*].totalSupplierBills": {
+      "visible": false
+    },
+    "$.results[*].totalUnitsPurchased": {
+      "visible": false
+    },
+    "$.results[*].totalSalesValue": {
+      "visible": false
+    },
+    "$.results[*].averageSalePrice": {
+      "visible": false
+    },
+    "$.results[*].synchronisedAt": {
+      "visible": false
+    },
+    "$.results[*].stockSynchronisedAt": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    },
+    "$.results[*].isActive": {
+      "visible": false
+    }
   },
   "pagination": {
     "page_size": {
@@ -102,10 +160,19 @@
     }
   },
   "entry_activity_actions": [
-    { "tool_id": "get-product", "title": "View product", "display_order": 0 },
-    { "tool_id": "update-product", "deleted": true },
-    { "tool_id": "update-product-dimensions", "deleted": true },
-    { "tool_id": "disable-product", "deleted": true }
+    {
+      "tool_id": "get-product",
+      "title": "View product",
+      "display_order": 0
+    },
+    {
+      "tool_id": "update-product",
+      "deleted": true
+    },
+    {
+      "tool_id": "update-product-dimensions",
+      "deleted": true
+    }
   ],
   "filter_config": {
     "quick_search_field": "$.where.name.contains"

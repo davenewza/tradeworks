@@ -38,7 +38,7 @@ async function seed() {
     // Never sold: no estimate, so cover, class and status are all blank.
     await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, stockAvailable: 3 });
     // Disabled products never appear, however alarming their figures.
-    await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, isEnabled: false, currentStockCover: 0.5, totalStockCover: 0.5 });
+    await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
 
     // Lifetime sales feed the "Total sales" column.
     await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: daysAgo(30), productId: anvil.id, quantity: 12, price: 10 });

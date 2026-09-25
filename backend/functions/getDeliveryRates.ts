@@ -38,7 +38,7 @@ export default GetDeliveryRates(async (ctx, inputs) => {
                 ? {
                       sku: product.sku,
                       name: product.name,
-                      isEnabled: product.isEnabled,
+                      isActive: product.isActive,
                       volumeInLitres: product.volumeInLitres === null ? null : Number(product.volumeInLitres),
                       weightInGrams: product.weightInGrams === null ? null : Number(product.weightInGrams)
                   }

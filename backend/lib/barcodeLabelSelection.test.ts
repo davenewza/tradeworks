@@ -416,7 +416,7 @@ describe('loadProductLabelOptions', () => {
             name: 'Widget',
             sku: 'ACME-001',
             brandId: brand.id,
-            isEnabled: false,
+            isActive: false,
         });
         await models.productChannelCode.create({
             productId: widget.id,

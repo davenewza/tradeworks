@@ -32,8 +32,8 @@ async function costAt(productId: string, unitCost: number) {
 async function seed() {
     const acme = await models.brand.create({ name: 'Acme' });
     const bolt = await models.brand.create({ name: 'Bolt' });
-    const product = (name: string, brandId: string, abcClass: AbcClass | null, stockAvailable: number, estimatedMonthlySale: number | null, isEnabled = true) =>
-        models.product.create({ name, sku: name.toUpperCase(), brandId, abcClass, stockAvailable, estimatedMonthlySale, isEnabled });
+    const product = (name: string, brandId: string, abcClass: AbcClass | null, stockAvailable: number, estimatedMonthlySale: number | null, isActive = true) =>
+        models.product.create({ name, sku: name.toUpperCase(), brandId, abcClass, stockAvailable, estimatedMonthlySale, isActive });
 
     await costAt((await product('Anvil', acme.id, AbcClass.A, 10, 10)).id, 5);
     await costAt((await product('Drill', bolt.id, AbcClass.A, 135, 30)).id, 2);

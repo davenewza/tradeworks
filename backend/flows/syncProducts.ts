@@ -4,6 +4,7 @@ import {
     ApplyResult,
     getZohoAccessToken,
     computeSyncCandidates,
+    resolveSelectedCandidates,
     applyProductSync,
     zohoPhotoFetcher,
 } from '../lib/zohoProductHelpers';
@@ -30,15 +31,18 @@ export default SyncProducts(config, async (ctx) => {
         content: [
             ctx.ui.display.markdown({
                 content: [
-                    'This will pull all **active items** from Zoho Books and compare them against your products.',
+                    'This will pull **every item** from Zoho Books and compare it against your products.',
                     '',
                     "On the next screen you'll pick which changes to apply. Syncing will:",
                     '',
-                    '- **Add** new products (matched by SKU), creating their **brand** if it does not exist yet.',
-                    "- **Update** existing products whose **name** or **brand** has changed in Zoho.",
-                    "- **Add a photo** from Zoho to products that don't have one yet. Existing photos are never replaced.",
+                    '- **Add** new products (matched by SKU), creating their **brand** if it does not exist yet. Items already **inactive** in Zoho come in too, as inactive products — they stay out of the catalogue, but their sales and costs need a SKU to attach to.',
+                    '- **Update** existing products whose **name** or **brand** has changed in Zoho.',
+                    '- **Deactivate** products whose Zoho item has gone **inactive**, taking them out of the catalogue.',
+                    '- **Reactivate** products whose Zoho item is **active** again, bringing them back.',
+                    "- **Add a photo** from Zoho to active products that don't have one yet. Existing photos are never replaced.",
                     '',
-                    'Product dimensions, prices and enabled status are **not** touched.',
+                    'A product\'s active status lives in Zoho and is only ever changed there — this sync is how it reaches us.',
+                    'Product dimensions and prices are **not** touched.',
                 ].join('\n'),
             }),
         ],
@@ -60,7 +64,7 @@ export default SyncProducts(config, async (ctx) => {
         return ctx.complete({
             title: 'Everything is up to date',
             stage: 'complete',
-            description: 'No products in Zoho needed to be added or updated.',
+            description: 'Every product already matches Zoho.',
             content: [],
         });
     }
@@ -68,46 +72,53 @@ export default SyncProducts(config, async (ctx) => {
     // ── Page 2: checklist of add/update candidates ───────────────────────────
     const selection = await ctx.ui.page('review', {
         stage: 'review',
-        title: `${candidates.length} product${candidates.length === 1 ? '' : 's'} to add or update`,
+        title: `${candidates.length} product${candidates.length === 1 ? '' : 's'} to sync`,
         content: [
             ctx.ui.display.markdown({
-                content: 'Tick the products you want to sync. Only ticked products will be added or updated.',
+                content: 'Tick the products you want to sync. Only ticked products will be changed.',
             }),
             ctx.ui.select.table('products', {
                 data: candidates,
-                columns: ['sku', 'name', 'brand', 'change', 'photo'],
+                columns: ['sku', 'name', 'brand', 'change', 'reason', 'photo'],
                 mode: 'multi',
             }),
         ],
         actions: [{ label: 'Sync selected', value: 'sync', mode: 'primary' }],
     });
 
-    const selected = (selection.data.products ?? []) as SyncCandidate[];
+    // The picker returns only the columns it was shown, so the ticked rows have
+    // lost `action`, `isActive` and `zohoItemId`. Match them back to the
+    // candidates computed above before anything is applied.
+    const selectedRows = (selection.data.products ?? []) as { sku: string }[];
+    const selected = resolveSelectedCandidates(candidates, selectedRows);
 
     if (selected.length === 0) {
         return ctx.complete({
             title: 'Nothing synced',
             stage: 'complete',
-            description: 'No products were selected, so nothing was added or updated.',
+            description: 'No products were selected, so nothing was changed.',
             content: [],
         });
     }
 
     // ── Step: apply — create/update selected products (and their brands) ─────
     const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
-        return await applyProductSync(selected, zohoPhotoFetcher(ctx, accessToken), progress);
+        return await applyProductSync(selected, progress, zohoPhotoFetcher(ctx, accessToken));
     })) as unknown as ApplyResult;
 
     // ── Completion: full list of what was added/updated ──────────────────────
     return ctx.complete({
         title: 'Product sync complete',
         stage: 'complete',
-        description: `${result.created} added, ${result.updated} updated, ${result.photosAdded} photo${result.photosAdded === 1 ? '' : 's'} added.`,
+        description: `${result.created} added, ${result.updated} updated, ${result.deactivated} deactivated, ${result.reactivated} reactivated, ${result.photosAdded} photo${result.photosAdded === 1 ? '' : 's'} added.`,
         content: [
             ctx.ui.display.keyValue({
                 data: [
                     { key: 'Products added', value: result.created },
+                    { key: '— of those, inactive (history only)', value: result.createdInactive },
                     { key: 'Products updated', value: result.updated },
+                    { key: 'Products deactivated', value: result.deactivated },
+                    { key: 'Products reactivated', value: result.reactivated },
                     { key: 'Photos added', value: result.photosAdded },
                 ],
             }),
@@ -122,7 +133,7 @@ export default SyncProducts(config, async (ctx) => {
             ctx.ui.display.divider(),
             ctx.ui.display.table({
                 data: result.synced,
-                columns: ['sku', 'name', 'brand', 'change', 'photo'],
+                columns: ['sku', 'name', 'brand', 'change', 'reason', 'photo'],
             }),
         ],
     });

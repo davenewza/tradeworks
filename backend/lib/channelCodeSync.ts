@@ -130,7 +130,7 @@ export async function planChannelCodeSync(
     }
 
     const productsWithoutSource = products
-        .filter((p) => p.isEnabled && !codeBySku.has(p.sku))
+        .filter((p) => p.isActive && !codeBySku.has(p.sku))
         .map((p) => p.sku)
         .sort();
 

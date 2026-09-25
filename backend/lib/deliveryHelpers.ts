@@ -231,7 +231,7 @@ export interface RateLineInput {
 export interface RateLineProduct {
     sku: string;
     name: string;
-    isEnabled: boolean;
+    isActive: boolean;
     volumeInLitres: number | null;
     weightInGrams: number | null;
 }
@@ -269,8 +269,8 @@ export function validateRateLines(
             issues.push(`SKU "${line.sku}": no product with this SKU exists`);
             continue;
         }
-        if (!product.isEnabled) {
-            issues.push(`SKU "${line.sku}": product is disabled`);
+        if (!product.isActive) {
+            issues.push(`SKU "${line.sku}": product is inactive`);
         }
         if (product.volumeInLitres === null || !(product.volumeInLitres > 0)) {
             issues.push(`SKU "${line.sku}": product is missing dimensions (length, width and height must be set)`);

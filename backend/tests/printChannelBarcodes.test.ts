@@ -88,14 +88,14 @@ async function amazon() {
     return channel;
 }
 
-async function product(fields: { sku?: string; name?: string; isEnabled?: boolean } = {}) {
+async function product(fields: { sku?: string; name?: string; isActive?: boolean } = {}) {
     const brand = await models.brand.create({ name: `Acme ${++seq}` });
     return await models.product.create({
         name: fields.name ?? 'Widget',
         sku: fields.sku ?? `ACME-W-${seq}`,
         brandId: brand.id,
         stockAvailable: 42,
-        isEnabled: fields.isEnabled ?? true,
+        isActive: fields.isActive ?? true,
     });
 }
 
@@ -295,7 +295,7 @@ describe('PrintChannelBarcodes — from a product page', () => {
 
     test('a disabled product still prints from its own page', async () => {
         const tak = await takealot();
-        const widget = await product({ isEnabled: false });
+        const widget = await product({ isActive: false });
         await models.productChannelCode.create({ productId: widget.id, channelId: tak.id, code: EAN_A });
         const authed = flows.printChannelBarcodes.withIdentity(await operator());
 
