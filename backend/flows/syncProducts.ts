@@ -5,6 +5,7 @@ import {
     getZohoAccessToken,
     computeSyncCandidates,
     applyProductSync,
+    zohoPhotoFetcher,
 } from '../lib/zohoProductHelpers';
 
 const config = {
@@ -35,8 +36,9 @@ export default SyncProducts(config, async (ctx) => {
                     '',
                     '- **Add** new products (matched by SKU), creating their **brand** if it does not exist yet.',
                     "- **Update** existing products whose **name** or **brand** has changed in Zoho.",
+                    "- **Add a photo** from Zoho to products that don't have one yet. Existing photos are never replaced.",
                     '',
-                    'Product dimensions, images, prices and enabled status are **not** touched.',
+                    'Product dimensions, prices and enabled status are **not** touched.',
                 ].join('\n'),
             }),
         ],
@@ -73,7 +75,7 @@ export default SyncProducts(config, async (ctx) => {
             }),
             ctx.ui.select.table('products', {
                 data: candidates,
-                columns: ['sku', 'name', 'brand', 'change'],
+                columns: ['sku', 'name', 'brand', 'change', 'photo'],
                 mode: 'multi',
             }),
         ],
@@ -93,25 +95,34 @@ export default SyncProducts(config, async (ctx) => {
 
     // ── Step: apply — create/update selected products (and their brands) ─────
     const result = (await ctx.step('apply-sync', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
-        return await applyProductSync(selected, progress);
+        return await applyProductSync(selected, zohoPhotoFetcher(ctx, accessToken), progress);
     })) as unknown as ApplyResult;
 
     // ── Completion: full list of what was added/updated ──────────────────────
     return ctx.complete({
         title: 'Product sync complete',
         stage: 'complete',
-        description: `${result.created} added, ${result.updated} updated.`,
+        description: `${result.created} added, ${result.updated} updated, ${result.photosAdded} photo${result.photosAdded === 1 ? '' : 's'} added.`,
         content: [
             ctx.ui.display.keyValue({
                 data: [
                     { key: 'Products added', value: result.created },
                     { key: 'Products updated', value: result.updated },
+                    { key: 'Photos added', value: result.photosAdded },
                 ],
             }),
+            ...(result.photoFailures.length > 0
+                ? [
+                      ctx.ui.display.markdown({
+                          content: `**${result.photoFailures.length} photo${result.photoFailures.length === 1 ? '' : 's'} could not be downloaded** — they'll be offered again on the next sync.`,
+                      }),
+                      ctx.ui.display.table({ data: result.photoFailures, columns: ['sku', 'error'] }),
+                  ]
+                : []),
             ctx.ui.display.divider(),
             ctx.ui.display.table({
                 data: result.synced,
-                columns: ['sku', 'name', 'brand', 'change'],
+                columns: ['sku', 'name', 'brand', 'change', 'photo'],
             }),
         ],
     });

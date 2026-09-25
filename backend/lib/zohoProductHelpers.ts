@@ -1,4 +1,4 @@
-import { models } from '@teamkeel/sdk';
+import { models, InlineFile } from '@teamkeel/sdk';
 import { ProgressReporter } from './progress';
 
 // ─── Zoho types ─────────────────────────────────────────────────────────────
@@ -15,6 +15,10 @@ export interface ZohoItem {
     sku: string;
     status: string;
     custom_fields?: ZohoCustomField[];
+    // Set on item details when the item has a photo attached in Zoho.
+    image_name?: string;
+    image_type?: string;
+    image_document_id?: string;
 }
 
 interface ZohoItemsResponse {
@@ -50,14 +54,18 @@ export interface ZohoProductCtx {
 // A single add/update candidate produced by the read-only diff pass. All fields
 // are JSON-serializable so the whole array can flow through ctx.step() and
 // ctx.ui.select.table() unchanged. `sku`/`name`/`brand`/`change` are the
-// human-facing columns; `zohoItemId`/`action` are carried through hidden.
+// human-facing columns; `zohoItemId`/`action`/`imageName` are carried through
+// hidden. `photo` is 'Add' when the product has no image yet and Zoho has one —
+// the photo itself is only downloaded in the apply pass, for ticked products.
 export interface SyncCandidate {
     sku: string;
     name: string;
     brand: string;
-    change: 'New' | 'Update';
+    change: 'New' | 'Update' | 'Photo';
+    photo: 'Add' | '';
     zohoItemId: string;
     action: 'create' | 'update';
+    imageName: string | null;
 }
 
 // ─── Authentication ───────────────────────────────────────────────────────
@@ -106,6 +114,46 @@ export function getBrandFromItem(item: ZohoItem): string {
             cf.label?.toLowerCase().includes('brand')
     );
     return brandField?.value?.trim() || 'Other';
+}
+
+// ─── Photo helpers ────────────────────────────────────────────────────────
+
+function hasZohoImage(item: ZohoItem): boolean {
+    return Boolean(item.image_name || item.image_document_id);
+}
+
+// Downloads a Zoho item's photo; null when Zoho has none. Injected into
+// applyProductSync so tests don't reach Zoho.
+export type PhotoFetcher = (zohoItemId: string, imageName: string | null) => Promise<InlineFile | null>;
+
+export function zohoPhotoFetcher(ctx: ZohoProductCtx, accessToken: string): PhotoFetcher {
+    return async (zohoItemId, imageName) => {
+        const url = `${ctx.env.ZOHO_BOOKS_BASE_URL}/items/${zohoItemId}/image?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        if (response.status === 404) return null;
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch image for Zoho item ${zohoItemId}: ${response.status} - ${errorText}`);
+        }
+
+        // Zoho answers errors (including rate limits) as JSON, sometimes with a
+        // 200 — anything that isn't an image is a failure, not a photo.
+        const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim();
+        if (!contentType.startsWith('image/')) {
+            const body = await response.text();
+            throw new Error(`Zoho returned ${contentType || 'no content type'} instead of an image for item ${zohoItemId}: ${body}`);
+        }
+
+        const file = new InlineFile({
+            filename: imageName || `${zohoItemId}.${contentType.slice('image/'.length)}`,
+            contentType,
+        });
+        file.write(Buffer.from(await response.arrayBuffer()));
+        return file;
+    };
 }
 
 // Fetch full item details in bulk to obtain custom_fields (the list endpoint
@@ -214,30 +262,27 @@ export async function computeSyncCandidates(
         const sku = item.sku.trim();
         const brandName = getBrandFromItem(item);
         const existing = productBySku.get(sku);
+        // Photos only ever fill a gap: a product that already has an image
+        // (e.g. uploaded by hand) is never overwritten or re-downloaded.
+        const addPhoto = hasZohoImage(item) && !existing?.image;
+        const shared = {
+            sku,
+            name: item.name,
+            brand: brandName,
+            photo: addPhoto ? ('Add' as const) : ('' as const),
+            zohoItemId: item.item_id,
+            imageName: item.image_name ?? null,
+        };
 
         if (!existing) {
-            candidates.push({
-                sku,
-                name: item.name,
-                brand: brandName,
-                change: 'New',
-                zohoItemId: item.item_id,
-                action: 'create',
-            });
+            candidates.push({ ...shared, change: 'New', action: 'create' });
             continue;
         }
 
         const currentBrandName = brandNameById.get(existing.brandId);
         const needsUpdate = existing.name !== item.name || currentBrandName !== brandName;
-        if (needsUpdate) {
-            candidates.push({
-                sku,
-                name: item.name,
-                brand: brandName,
-                change: 'Update',
-                zohoItemId: item.item_id,
-                action: 'update',
-            });
+        if (needsUpdate || addPhoto) {
+            candidates.push({ ...shared, change: needsUpdate ? 'Update' : 'Photo', action: 'update' });
         }
         // else: already matches Zoho → nothing to do, not shown.
     }
@@ -251,20 +296,26 @@ export interface SyncedProduct {
     sku: string;
     name: string;
     brand: string;
-    change: 'New' | 'Update';
+    change: 'New' | 'Update' | 'Photo';
+    photo: 'Added' | 'Failed' | '';
 }
 
 export interface ApplyResult {
     synced: SyncedProduct[];
     created: number;
     updated: number;
+    photosAdded: number;
+    photoFailures: { sku: string; error: string }[];
 }
 
 // Create/update only the selected candidates, creating any missing brands along
-// the way. Idempotent: keyed on the unique SKU, so a step retry re-derives the
-// same result rather than duplicating records.
+// the way, and downloading a photo for each ticked product that still has none.
+// Idempotent: keyed on the unique SKU, so a step retry re-derives the same
+// result rather than duplicating records — and a photo stored on an earlier
+// attempt isn't downloaded again.
 export async function applyProductSync(
     selected: SyncCandidate[],
+    fetchPhoto: PhotoFetcher,
     progress?: ProgressReporter
 ): Promise<ApplyResult> {
     const brandCache = new Map<string, string>(); // brand name → brand id
@@ -285,6 +336,8 @@ export async function applyProductSync(
     const synced: SyncedProduct[] = [];
     let created = 0;
     let updated = 0;
+    let photosAdded = 0;
+    const photoFailures: { sku: string; error: string }[] = [];
 
     progress?.set({ current: 0, total: selected.length, unit: 'products', counter: 'count' });
 
@@ -293,32 +346,40 @@ export async function applyProductSync(
         const now = new Date();
         const existing = await models.product.findOne({ sku: candidate.sku });
 
-        if (existing) {
-            await models.product.update(
-                { id: existing.id },
-                { name: candidate.name, brandId, synchronisedAt: now }
-            );
-            updated++;
-        } else {
-            await models.product.create({
-                name: candidate.name,
-                sku: candidate.sku,
-                brandId,
-                synchronisedAt: now,
-            });
-            created++;
+        const product = existing
+            ? await models.product.update({ id: existing.id }, { name: candidate.name, brandId, synchronisedAt: now })
+            : await models.product.create({ name: candidate.name, sku: candidate.sku, brandId, synchronisedAt: now });
+        if (existing) updated++;
+        else created++;
+
+        // Re-checked against the saved product, not the diff, so an image
+        // uploaded since the review page is kept.
+        let photo: SyncedProduct['photo'] = '';
+        if (candidate.photo === 'Add' && !product.image) {
+            // One product's photo failing (or the Zoho quota running out)
+            // shouldn't undo the name/brand sync — it's reported instead, and
+            // the next sync offers the photo again.
+            try {
+                const image = await fetchPhoto(candidate.zohoItemId, candidate.imageName);
+                if (image) {
+                    await models.product.update({ id: product.id }, { image });
+                    photo = 'Added';
+                    photosAdded++;
+                }
+            } catch (error) {
+                photo = 'Failed';
+                photoFailures.push({ sku: candidate.sku, error: error instanceof Error ? error.message : String(error) });
+            }
         }
 
-        synced.push({
-            sku: candidate.sku,
-            name: candidate.name,
-            brand: candidate.brand,
-            change: existing ? 'Update' : 'New',
-        });
+        const change = !existing ? 'New' : candidate.change === 'Photo' ? 'Photo' : 'Update';
+        synced.push({ sku: candidate.sku, name: candidate.name, brand: candidate.brand, change, photo });
 
         progress?.increment();
-        progress?.log(`${existing ? 'Updated' : 'Added'} ${candidate.sku} — ${candidate.name}`);
+        progress?.log(
+            `${existing ? 'Updated' : 'Added'} ${candidate.sku} — ${candidate.name}${photo ? ` (photo ${photo.toLowerCase()})` : ''}`
+        );
     }
 
-    return { synced, created, updated };
+    return { synced, created, updated, photosAdded, photoFailures };
 }
