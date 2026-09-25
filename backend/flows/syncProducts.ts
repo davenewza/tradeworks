@@ -4,6 +4,7 @@ import {
     ApplyResult,
     getZohoAccessToken,
     computeSyncCandidates,
+    resolveSelectedCandidates,
     applyProductSync,
 } from '../lib/zohoProductHelpers';
 
@@ -83,7 +84,11 @@ export default SyncProducts(config, async (ctx) => {
         actions: [{ label: 'Sync selected', value: 'sync', mode: 'primary' }],
     });
 
-    const selected = (selection.data.products ?? []) as SyncCandidate[];
+    // The picker returns only the columns it was shown, so the ticked rows have
+    // lost `action`, `isActive` and `zohoItemId`. Match them back to the
+    // candidates computed above before anything is applied.
+    const selectedRows = (selection.data.products ?? []) as { sku: string }[];
+    const selected = resolveSelectedCandidates(candidates, selectedRows);
 
     if (selected.length === 0) {
         return ctx.complete({
