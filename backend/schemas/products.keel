@@ -141,6 +141,12 @@ model Product {
     // SKU is new or changed — the SKU is what identifies the offer.
     @on([create, update], syncTakealotBarcode)
 
+    // The same for the product's Amazon channel code and the FNSKU on its FBA
+    // listing. An FNSKU is minted when the listing is created on Amazon, which
+    // is usually later than this, so the handler often finds nothing —
+    // ScheduledSyncChannelCodes is what catches the code once it exists.
+    @on([create, update], syncAmazonFnsku)
+
     @permission(
         roles: [Operator],
         actions: [get, list, update, delete]

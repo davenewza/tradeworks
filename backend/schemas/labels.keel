@@ -235,18 +235,29 @@ flow PrintChannelBarcodes {
 
 // Pulls every offer from the Takealot Marketplace API and sets each matched
 // product's Takealot channel code to the barcode held against the offer
-// (matched by SKU). Bulk backfill and repair; day-to-day changes are handled
-// by the syncTakealotBarcode subscriber on Product.
+// (matched by SKU). Operator-run backfill and repair, reviewed before apply;
+// the nightly ScheduledSyncChannelCodes runs the same sync unattended.
 flow SyncTakealotBarcodes {
     @permission(roles: [Operator])
 }
 
 // Pulls every FBA listing from the Amazon Selling Partner API (FBA Inventory
 // summaries) and sets each matched product's Amazon channel code to the
-// listing's FNSKU (matched by seller SKU). Bulk backfill and repair, reviewed
-// before apply, like the Takealot sync. There is no per-product subscriber:
-// an FNSKU exists once the listing is created on Amazon, not when the product
-// is created here, so a product-create hook would mostly find nothing yet.
+// listing's FNSKU (matched by seller SKU). Backfill and repair, reviewed
+// before apply, like the Takealot sync.
 flow SyncAmazonFnskus {
+    @permission(roles: [Operator])
+}
+
+// Nightly unattended run of both catalogue syncs above, applied without a
+// review page. This is the only thing that catches a code that appears or
+// changes on the channel after the product row exists — an FNSKU minted when
+// the FBA listing goes up, or a reissued Takealot product_label — because both
+// per-product subscribers only call out when a SKU is new or changed. Safe to
+// apply unreviewed: the sync never deletes or blanks a code, only upserts the
+// one the channel is reporting (lib/channelCodeSweep). Neither channel draws on
+// the shared Zoho quota, and 3am keeps it clear of ScheduledSyncStock at 2am.
+flow ScheduledSyncChannelCodes {
+    @schedule("every day at 3am")
     @permission(roles: [Operator])
 }
