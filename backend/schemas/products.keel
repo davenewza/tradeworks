@@ -129,8 +129,11 @@ model Product {
 
     actions {
         get getProduct(id)
+        // The Console's products list. Its search box matches SKU or name
+        // (full-text plus fuzzy), so an operator can type either.
         list listProducts(name?, sku?, brand.id?, abcClass?) {
             @where(product.isActive)
+            @searchable(sku, name)
             @sortable(
                 name,
                 sku,
