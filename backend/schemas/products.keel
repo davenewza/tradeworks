@@ -192,7 +192,11 @@ model Product {
         // Read-only view of what the sync has switched off. There is no action
         // to switch one back on: isActive belongs to Zoho, so the way back is to
         // make the item active there and run SyncProducts.
-        list listInactiveProducts(name?, sku?, brand.id?) {
+        //
+        // Named to sort after listProducts: the Console wires every product
+        // picker (e.g. "add product to price list") to the alphabetically first
+        // Product list tool, and as listInactiveProducts it won that race.
+        list listProductsInactive(name?, sku?, brand.id?) {
             @where(product.isActive == false)
             @sortable(name, sku)
             @orderBy(name: asc)

@@ -22,7 +22,7 @@ async function operator() {
 describe('product activation', () => {
     beforeEach(resetDatabase);
 
-    test('a deactivated product leaves listProducts and turns up in listInactiveProducts', async () => {
+    test('a deactivated product leaves listProducts and turns up in listProductsInactive', async () => {
         const authed = actions.withIdentity(await operator());
         const brand = await models.brand.create({ name: 'Acme' });
         const widget = await models.product.create({ name: 'Widget', sku: 'A-1', brandId: brand.id });
@@ -33,7 +33,7 @@ describe('product activation', () => {
         const live = await authed.listProducts({});
         expect(live.results.map((p) => p.sku)).toEqual(['A-2']);
 
-        const inactive = await authed.listInactiveProducts({});
+        const inactive = await authed.listProductsInactive({});
         expect(inactive.results.map((p) => p.sku)).toEqual(['A-1']);
     });
 
@@ -58,7 +58,7 @@ describe('product activation', () => {
         expect((await authed.listProducts({})).results).toEqual([]);
     });
 
-    test('listInactiveProducts filters within the inactive set, never outside it', async () => {
+    test('listProductsInactive filters within the inactive set, never outside it', async () => {
         const authed = actions.withIdentity(await operator());
         const acme = await models.brand.create({ name: 'Acme' });
         const other = await models.brand.create({ name: 'Other' });
@@ -67,7 +67,7 @@ describe('product activation', () => {
         // Active, and on the brand being filtered for — must not appear.
         await models.product.create({ name: 'Live Acme', sku: 'C-3', brandId: acme.id });
 
-        const byBrand = await authed.listInactiveProducts({ where: { brand: { id: { equals: acme.id } } } });
+        const byBrand = await authed.listProductsInactive({ where: { brand: { id: { equals: acme.id } } } });
         expect(byBrand.results.map((p) => p.sku)).toEqual(['C-1']);
     });
 
