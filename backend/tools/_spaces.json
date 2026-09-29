@@ -61,9 +61,9 @@
             "hidden": false
           },
           {
-            "id": "action-list-inactive-products",
+            "id": "action-list-products-inactive",
             "link": {
-              "tool_id": "list-inactive-products",
+              "tool_id": "list-products-inactive",
               "title": "Inactive",
               "display_order": 1
             },
@@ -162,7 +162,7 @@
       {
         "id": "metric-inactive-products",
         "label": "Inactive products",
-        "tool_id": "list-inactive-products",
+        "tool_id": "list-products-inactive",
         "facet_location": "$.pageInfo.totalCount",
         "display_order": 2,
         "hidden": false
