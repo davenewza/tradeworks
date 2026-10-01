@@ -1,7 +1,8 @@
 [
   {
     "id": "Product.image",
-    "image_preview": true
+    "image_preview": true,
+    "thumbnail_size": "small"
   },
   {
     "id": "Product.weightedUnitCost",
