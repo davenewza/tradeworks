@@ -1,5 +1,9 @@
 [
   {
+    "id": "Product.image",
+    "image_preview": true
+  },
+  {
     "id": "Product.weightedUnitCost",
     "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   },
