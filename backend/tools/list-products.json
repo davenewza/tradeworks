@@ -38,7 +38,7 @@
       }
     },
     "$.results[*].image": {
-      "visible": false
+      "display_order": 0
     },
     "$.results[*].lengthInCm": {
       "visible": false
