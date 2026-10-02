@@ -4,6 +4,9 @@ model Brand {
         logo File?
         products Product[]
         totalProducts Number @computed(COUNTIF(brand.products, brand.products.isActive))
+        // The brand's products Zoho has made inactive — retired items, including
+        // those imported only so their sales history has a SKU to attach to.
+        inactiveProducts Number @computed(COUNTIF(brand.products, brand.products.isActive == false))
         // How long (in days) new stock takes to arrive from this brand's
         // supplier — used to grade each product's stock-cover status. Editable on
         // the brand page; hidden from the brands list.
