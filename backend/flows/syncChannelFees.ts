@@ -11,7 +11,7 @@ import {
 } from '../lib/zohoChannelFeeHelpers';
 
 const config = {
-    title: 'Sync Channel Fees',
+    title: 'Sync Takealot Product Fees',
     description: 'Pull Takealot fees from Zoho Books',
     stages: [
         { name: 'Confirm', key: 'confirm' },
@@ -48,7 +48,7 @@ export default SyncChannelFees(config, async (ctx) => {
     // ── Page 1: confirm ──────────────────────────────────────────────────────
     await ctx.ui.page('confirm', {
         stage: 'confirm',
-        title: 'Sync channel fees from Zoho',
+        title: 'Sync Takealot product fees from Zoho',
         content: [
             ctx.ui.display.markdown({
                 content: [
