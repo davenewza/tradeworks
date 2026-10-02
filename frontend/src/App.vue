@@ -6,7 +6,7 @@
     <!-- Authentication Check -->
     <div v-else-if="!isAuthenticated" class="min-h-screen">
       <div class="max-w-6xl mx-auto px-4 py-0">
-        <LoginForm @login-success="handleLoginSuccess" />
+        <LoginForm :notice="signInNotice" @login-success="handleLoginSuccess" />
       </div>
     </div>
     
@@ -108,7 +108,8 @@ export default {
       logoOk: true,
       logoSrc: `${import.meta.env.BASE_URL}createspace-logo.png`,
       customerName: '',
-      isLoadingUser: false
+      isLoadingUser: false,
+      signInNotice: ''
     }
   },
   computed: {
@@ -116,7 +117,7 @@ export default {
       return !!this.customerId
     },
     welcomeText() {
-      const user = this.currentUser?.firstName || this.currentUser?.id || 'User'
+      const user = this.currentUser?.firstName || this.currentUser?.name || this.currentUser?.email || 'User'
       return this.customerName ? `${user} (${this.customerName})` : user
     }
   },
@@ -145,11 +146,7 @@ export default {
 
       // Always refetch user data on page refresh to ensure we have the latest information
       try {
-        this.currentUser = await authService.getCurrentUser()
-        this.customerId = authService.getCustomerId(this.currentUser)
-        await this.loadCustomerName()
-        console.log('User data refreshed on page load:', this.currentUser)
-        console.log('Customer ID refreshed on page load:', this.customerId)
+        await this.applyUser(await authService.getCurrentUser())
       } catch (error) {
         console.error('Failed to refresh user data on page load:', error)
         // If we can't get fresh user data, try to use cached data
@@ -163,41 +160,41 @@ export default {
   },
   methods: {
     async handleLoginSuccess(loginData) {
-      console.log('Login successful:', loginData)
       this.isAuthenticated = true
       this.loginData = loginData
+      this.signInNotice = ''
 
-      // Check if this is a new user (identity_created: true)
-      if (loginData.identity_created) {
-        console.log('New user detected, showing profile dialog')
-        // Show profile completion dialog for new users
-        this.showProfileDialog = true
-      } else {
-        console.log('Existing user, retrieving profile')
-        // Set loading state while fetching user data
-        this.isLoadingUser = true
-        try {
-          // Existing user, get their profile
-          this.currentUser = await authService.getCurrentUser()
-          this.customerId = authService.getCustomerId(this.currentUser)
-          await this.loadCustomerName()
-        } finally {
-          this.isLoadingUser = false
-        }
+      this.isLoadingUser = true
+      try {
+        await this.applyUser(await authService.getCurrentUser())
+      } finally {
+        this.isLoadingUser = false
       }
     },
-    
+
+    // Keel creates and links the User at sign-in, so a session without one
+    // can't reach any customer. Sign out rather than showing an empty account:
+    // signing in with a password again starts email verification, which is
+    // what links the identity back to its User.
+    async applyUser(user) {
+      if (!user) {
+        this.handleLogout()
+        this.signInNotice = 'Please sign in again to continue.'
+        return
+      }
+      this.currentUser = user
+      this.customerId = authService.getCustomerId(user)
+      this.showProfileDialog = !user.firstName
+      await this.loadCustomerName()
+    },
+
     async handleProfileSaved(profileData) {
-      console.log('Profile data received:', profileData)
       try {
-        // Create user with firstName and lastName
-        this.currentUser = await authService.createUserWithProfile(
-          profileData.firstName, 
+        this.currentUser = await authService.updateName(
+          this.currentUser.id,
+          profileData.firstName,
           profileData.lastName
         )
-        console.log('User created with profile:', this.currentUser)
-        this.customerId = authService.getCustomerId(this.currentUser)
-        await this.loadCustomerName()
         this.showProfileDialog = false
       } catch (error) {
         console.error('Failed to save profile:', error)
@@ -218,6 +215,7 @@ export default {
       this.loginData = null
       this.customerId = null
       this.customerName = ''
+      this.signInNotice = ''
     },
     async loadCustomerName() {
       try {

@@ -13,7 +13,50 @@
         </p>
       </div>
       
-      <form class="mt-8 space-y-6" @submit.prevent="handleLogin">
+      <!-- Shown instead of the form when Keel needs the email confirmed before
+           this sign-in can be linked to the person's account -->
+      <div v-if="verificationEmail" class="mt-8 space-y-6">
+        <div class="rounded-md bg-blue-50 p-4 text-sm text-blue-800 space-y-2">
+          <h3 class="font-medium">Confirm your email to continue</h3>
+          <p>
+            To keep your account secure, we need to confirm that
+            <span class="font-medium">{{ verificationEmail }}</span> belongs to you.
+          </p>
+          <p>
+            We've emailed you a link (from hi@keel.xyz, subject "[Keel] Verify your email").
+            Open it and choose a new password, then sign in here with that new password.
+            If it doesn't arrive in a few minutes, check your spam folder.
+          </p>
+        </div>
+
+        <div v-if="verificationError" class="rounded-md bg-red-50 p-4 text-sm font-medium text-red-800">
+          {{ verificationError }}
+        </div>
+
+        <div v-if="verificationResent" class="text-sm text-green-600">
+          We've sent the link again.
+        </div>
+
+        <div class="flex justify-between">
+          <button
+            type="button"
+            @click="backToSignIn"
+            class="text-sm text-indigo-600 hover:text-indigo-500"
+          >
+            Back to sign in
+          </button>
+          <button
+            type="button"
+            :disabled="verificationLoading"
+            @click="sendVerificationEmail(true)"
+            class="text-sm text-indigo-600 hover:text-indigo-500 disabled:opacity-50"
+          >
+            {{ verificationLoading ? 'Sending...' : 'Send the link again' }}
+          </button>
+        </div>
+      </div>
+
+      <form v-else class="mt-8 space-y-6" @submit.prevent="handleLogin">
         <div class="rounded-md shadow-sm -space-y-px">
           <div>
             <label for="email" class="sr-only">Email address</label>
@@ -39,6 +82,10 @@
               placeholder="Password"
             />
           </div>
+        </div>
+
+        <div v-if="notice && !error" class="rounded-md bg-blue-50 p-4 text-sm text-blue-800">
+          {{ notice }}
         </div>
 
         <div v-if="error" class="rounded-md bg-red-50 p-4">
@@ -149,12 +196,23 @@ import { authService } from '../services/authService.js'
 
 export default {
   name: 'LoginForm',
+  props: {
+    // Why the person is back at sign-in, e.g. their session lost its account
+    notice: {
+      type: String,
+      default: ''
+    }
+  },
   data() {
     return {
       email: '',
       password: '',
       loading: false,
       error: '',
+      verificationEmail: '',
+      verificationLoading: false,
+      verificationError: '',
+      verificationResent: false,
       showForgotPassword: false,
       resetEmail: '',
       resetLoading: false,
@@ -169,6 +227,12 @@ export default {
       
       try {
         const loginData = await authService.login(this.email, this.password)
+        if (loginData.email_verification_required) {
+          this.verificationEmail = this.email
+          this.password = ''
+          await this.sendVerificationEmail(false)
+          return
+        }
         this.$emit('login-success', loginData)
       } catch (error) {
         this.error = error.message || 'Login failed. Please check your credentials.'
@@ -177,6 +241,27 @@ export default {
       }
     },
     
+    async sendVerificationEmail(isResend) {
+      this.verificationLoading = true
+      this.verificationError = ''
+      this.verificationResent = false
+
+      try {
+        await authService.requestEmailVerification(this.verificationEmail)
+        this.verificationResent = isResend
+      } catch (error) {
+        this.verificationError = error.message
+      } finally {
+        this.verificationLoading = false
+      }
+    },
+
+    backToSignIn() {
+      this.verificationEmail = ''
+      this.verificationError = ''
+      this.verificationResent = false
+    },
+
     async handleForgotPassword() {
       this.resetLoading = true
       this.resetError = ''

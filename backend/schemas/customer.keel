@@ -5,11 +5,10 @@ extend model User {
         customer Customer?
     }
 
+    // No createMe: with userProvisioning auto, Keel creates the User and links
+    // it to the Identity at sign-in. A User inserted by an action is linked to
+    // nothing, so getMe never finds it and it can never be given a customer.
     actions {
-        create createMe() {
-            @set(user.firstName = ctx.identity.givenName)
-            @set(user.lastName = ctx.identity.familyName)
-        }
         get getMe() {
             @where(user == ctx.identity.user)
         }
