@@ -106,6 +106,16 @@
               "display_order": 2
             },
             "hidden": true
+          },
+          {
+            "id": "action-sync-channel-fees",
+            "link": {
+              "tool_id": "sync-channel-fees",
+              "title": "Sync Takealot product fees",
+              "description": "Pull each product’s Takealot success and fulfilment fees from Zoho Books",
+              "display_order": 3
+            },
+            "hidden": false
           }
         ]
       },
