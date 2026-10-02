@@ -6,6 +6,7 @@ import {
     buildSyncCandidates,
     computeSyncCandidates,
     ExistingProduct,
+    findKeptProducts,
     isItemInactive,
     PhotoFetcher,
     resolveSelectedCandidates,
@@ -64,7 +65,23 @@ function zohoItem(overrides: Partial<ZohoItem> & Pick<ZohoItem, 'sku' | 'name'>)
 }
 
 function existing(overrides: Partial<ExistingProduct> = {}): ExistingProduct {
-    return { name: 'Widget', brandName: 'Acme', isActive: true, hasImage: false, ...overrides };
+    return { name: 'Widget', brandName: 'Acme', isActive: true, hasImage: false, hasSales: false, ...overrides };
+}
+
+// Give a product one sale, so it can no longer be deleted.
+async function addSale(productId: string, ref = productId) {
+    const channel =
+        (await models.channel.findOne({ name: 'Takealot' })) ?? (await models.channel.create({ name: 'Takealot' }));
+    return await models.sale.create({
+        invoiceNumber: `INV-${ref}`,
+        lineItemId: ref,
+        lineKey: ref,
+        channelId: channel.id,
+        productId,
+        date: new Date('2026-01-01'),
+        quantity: 1,
+        price: 100,
+    });
 }
 
 describe('applyProductSync', () => {
@@ -300,6 +317,62 @@ describe('applyProductSync', () => {
     });
 });
 
+describe('applyProductSync — deletions', () => {
+    const deletion = (sku: string, name = 'Gone') =>
+        candidate({ sku, name, brand: 'Acme', change: 'Delete', reason: 'Not in Zoho', action: 'delete', zohoItemId: '' });
+
+    test('deletes a ticked product that has no sales', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Gone', sku: 'DEL-1', brandId: brand.id });
+        await models.product.create({ name: 'Stays', sku: 'DEL-2', brandId: brand.id });
+
+        const result = await applyProductSync([deletion('DEL-1')]);
+
+        expect(result).toMatchObject({ created: 0, updated: 0, deleted: 1, deletionsRefused: [] });
+        expect(result.synced).toEqual([
+            { sku: 'DEL-1', name: 'Gone', brand: 'Acme', change: 'Delete', reason: 'Not in Zoho', photo: '' },
+        ]);
+        expect(await models.product.findOne({ sku: 'DEL-1' })).toBeNull();
+        expect(await models.product.findOne({ sku: 'DEL-2' })).not.toBeNull();
+    });
+
+    test('keeps a product that has had a sale since the review page', async () => {
+        // Deleting it would cascade to the sale.
+        const brand = await models.brand.create({ name: 'Acme' });
+        const product = await models.product.create({ name: 'Sold', sku: 'DEL-3', brandId: brand.id });
+        const sale = await addSale(product.id);
+        const { reporter, state } = recordingProgress();
+
+        const result = await applyProductSync([deletion('DEL-3', 'Sold')], reporter);
+
+        expect(result.deleted).toBe(0);
+        expect(result.synced).toEqual([]);
+        expect(result.deletionsRefused).toEqual([{ sku: 'DEL-3', name: 'Sold', brand: 'Acme' }]);
+        expect(state.logs).toEqual(['Kept DEL-3 — it has sales']);
+        expect(await models.product.findOne({ sku: 'DEL-3' })).not.toBeNull();
+        expect(await models.sale.findOne({ id: sale.id })).not.toBeNull();
+    });
+
+    test('skips a product that is already gone, without failing the run', async () => {
+        const { reporter, state } = recordingProgress();
+
+        const result = await applyProductSync([deletion('DEL-4'), candidate({ sku: 'DEL-5', name: 'Added', brand: 'Acme' })], reporter);
+
+        expect(result).toMatchObject({ created: 1, deleted: 0, deletionsRefused: [] });
+        expect(state.current).toBe(2);
+        expect(state.logs[0]).toBe('Skipped DEL-4 — already deleted');
+    });
+
+    test('a deletion never creates a brand', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Gone', sku: 'DEL-6', brandId: brand.id });
+
+        await applyProductSync([candidate({ ...deletion('DEL-6'), brand: 'Some Other Brand' })]);
+
+        expect((await models.brand.findMany({})).map((b) => b.name)).toEqual(['Acme']);
+    });
+});
+
 describe('isItemInactive', () => {
     test('reads Zoho item status, tolerating case and padding', () => {
         expect(isItemInactive(zohoItem({ sku: 'A', name: 'A', status: 'inactive' }))).toBe(true);
@@ -441,6 +514,90 @@ describe('buildSyncCandidates', () => {
     });
 });
 
+describe('buildSyncCandidates — deletions', () => {
+    test('offers to delete a product no Zoho item carries, with the name and brand we hold', () => {
+        const held = new Map<string, ExistingProduct>([['GONE-1', existing({ name: 'Gone', brandName: 'Acme' })]]);
+
+        expect(buildSyncCandidates([], held)).toEqual([
+            {
+                sku: 'GONE-1',
+                name: 'Gone',
+                brand: 'Acme',
+                change: 'Delete',
+                reason: 'Not in Zoho',
+                photo: '',
+                imageName: null,
+                isActive: false,
+                zohoItemId: '',
+                action: 'delete',
+            },
+        ]);
+    });
+
+    test('never deletes a product whose item is in Zoho, active or inactive', () => {
+        const held = new Map<string, ExistingProduct>([
+            ['ON-1', existing()],
+            ['OFF-1', existing({ isActive: false })],
+            ['GONE-1', existing()],
+        ]);
+        const items = [
+            zohoItem({ sku: 'ON-1', name: 'Widget' }),
+            zohoItem({ sku: 'OFF-1', name: 'Widget', status: 'inactive' }),
+        ];
+
+        expect(buildSyncCandidates(items, held).map((c) => [c.sku, c.change])).toEqual([['GONE-1', 'Delete']]);
+    });
+
+    test('never offers to delete a product with sales', () => {
+        const held = new Map<string, ExistingProduct>([
+            ['SOLD-1', existing({ hasSales: true })],
+            ['SOLD-2', existing({ hasSales: true, isActive: false })],
+        ]);
+
+        expect(buildSyncCandidates([], held)).toEqual([]);
+    });
+
+    test('a product whose Zoho item lost its SKU is offered for deletion — nothing carries its SKU', () => {
+        const held = new Map<string, ExistingProduct>([['W-1', existing()]]);
+
+        const candidates = buildSyncCandidates([zohoItem({ sku: '  ', name: 'Widget', item_id: 'zoho-W-1' })], held);
+
+        expect(candidates.map((c) => [c.sku, c.change])).toEqual([['W-1', 'Delete']]);
+    });
+
+    test('deletions come after the item-driven changes', () => {
+        const held = new Map<string, ExistingProduct>([
+            ['GONE-1', existing()],
+            ['N-1', existing({ name: 'Old' })],
+        ]);
+
+        const candidates = buildSyncCandidates(
+            [zohoItem({ sku: 'N-1', name: 'New' }), zohoItem({ sku: 'A-1', name: 'Added' })],
+            held
+        );
+
+        expect(candidates.map((c) => [c.sku, c.change])).toEqual([
+            ['N-1', 'Update'],
+            ['A-1', 'New'],
+            ['GONE-1', 'Delete'],
+        ]);
+    });
+});
+
+describe('findKeptProducts', () => {
+    test('lists the products missing from Zoho that have sales — and only those', () => {
+        const held = new Map<string, ExistingProduct>([
+            ['SOLD-1', existing({ name: 'Sold', brandName: 'Acme', hasSales: true })],
+            ['GONE-1', existing()],
+            ['ON-1', existing({ hasSales: true })],
+        ]);
+
+        expect(findKeptProducts([zohoItem({ sku: 'ON-1', name: 'Widget' })], held)).toEqual([
+            { sku: 'SOLD-1', name: 'Sold', brand: 'Acme' },
+        ]);
+    });
+});
+
 
 // What ctx.ui.select.table() actually hands back. Its processTableData() keeps
 // only the keys named in `columns` before the rows are sent to the browser, so
@@ -501,6 +658,19 @@ describe('the picker round trip', () => {
 
         expect(result).toMatchObject({ deactivated: 1, updated: 0 });
         expect((await models.product.findOne({ sku: 'RT-1' }))!.isActive).toBe(false);
+    });
+
+    test('a deletion ticked in the picker really deletes the product', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Gone', sku: 'RT-3', brandId: brand.id });
+
+        const candidates = buildSyncCandidates([], new Map([['RT-3', existing({ name: 'Gone' })]]));
+        expect(candidates[0].change).toBe('Delete');
+
+        const result = await applyProductSync(resolveSelectedCandidates(candidates, throughPicker(candidates)));
+
+        expect(result).toMatchObject({ deleted: 1, updated: 0 });
+        expect(await models.product.findOne({ sku: 'RT-3' })).toBeNull();
     });
 
     test('applying the picker rows unresolved fails loudly rather than renaming', async () => {
@@ -732,10 +902,52 @@ describe('computeSyncCandidates — photos', () => {
             throw new Error(`unexpected Zoho request: ${url}`);
         });
 
-        const candidates = await computeSyncCandidates(zohoCtx, 'token');
+        const { candidates } = await computeSyncCandidates(zohoCtx, 'token');
 
         expect(candidates.map((c) => [c.sku, c.change, c.photo])).toEqual([['S-2', 'Photo', 'Add']]);
         expect(urls.some((u) => u.includes('/image'))).toBe(false);
+    });
+});
+
+// Stub Zoho's item list and details endpoints with one page of `details`.
+function stubZohoItems(details: ZohoItem[], pageContext: unknown = { page: 1, per_page: 200, has_more_page: false }) {
+    vi.stubGlobal('fetch', async (url: string) => {
+        if (url.includes('/itemdetails')) return jsonResponse({ items: details });
+        if (url.includes('/items?')) {
+            return jsonResponse({
+                items: details.map(({ item_id, name, sku, status }) => ({ item_id, name, sku, status })),
+                page_context: pageContext,
+            });
+        }
+        throw new Error(`unexpected Zoho request: ${url}`);
+    });
+}
+
+describe('computeSyncCandidates — deletions', () => {
+    test('offers to delete products missing from Zoho, and keeps the ones with sales', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'Widget', sku: 'ON-1', brandId: brand.id });
+        await models.product.create({ name: 'Gone', sku: 'GONE-1', brandId: brand.id });
+        const sold = await models.product.create({ name: 'Sold', sku: 'SOLD-1', brandId: brand.id, isActive: false });
+        await addSale(sold.id);
+        // A sale on a product Zoho still carries doesn't make it a kept product.
+        await addSale((await models.product.findOne({ sku: 'ON-1' }))!.id);
+        stubZohoItems([zohoItem({ sku: 'ON-1', name: 'Widget' })]);
+
+        const plan = await computeSyncCandidates(zohoCtx, 'token');
+
+        expect(plan.candidates.map((c) => [c.sku, c.change, c.action])).toEqual([['GONE-1', 'Delete', 'delete']]);
+        expect(plan.kept).toEqual([{ sku: 'SOLD-1', name: 'Sold', brand: 'Acme' }]);
+    });
+
+    test('refuses a Zoho listing without page_context rather than read it as the whole catalogue', async () => {
+        // Without page_context there's no knowing whether more pages follow —
+        // every product past page 1 would look deleted.
+        const brand = await models.brand.create({ name: 'Acme' });
+        await models.product.create({ name: 'On page 2', sku: 'P2-1', brandId: brand.id });
+        stubZohoItems([zohoItem({ sku: 'P1-1', name: 'On page 1' })], null);
+
+        await expect(computeSyncCandidates(zohoCtx, 'token')).rejects.toThrow(/no page_context/);
     });
 });
 
