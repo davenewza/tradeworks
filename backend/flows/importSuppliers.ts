@@ -20,10 +20,17 @@ const config = {
 } as const satisfies FlowConfig;
 
 export default ImportSuppliers(config, async (ctx) => {
-    const vendors = (await ctx.step('fetch-vendors', { loadingMessage: 'Fetching vendors from Zoho…' }, async () => {
-        const accessToken = await getZohoAccessToken(ctx, ZOHO_CONTACTS_SCOPE);
-        return await fetchZohoVendors(ctx, accessToken);
-    })) as unknown as ZohoVendor[];
+    // A few pages at most, so a generous timeout costs nothing; one retry, not
+    // the default four, since each attempt re-reads the whole vendor list
+    // against the shared Zoho quota.
+    const vendors = (await ctx.step(
+        'fetch-vendors',
+        { loadingMessage: 'Fetching vendors from Zoho…', timeout: 5 * 60 * 1000, retries: 1 },
+        async () => {
+            const accessToken = await getZohoAccessToken(ctx, ZOHO_CONTACTS_SCOPE);
+            return await fetchZohoVendors(ctx, accessToken);
+        },
+    )) as unknown as ZohoVendor[];
 
     const candidates = (await ctx.step('candidates', async () => await loadVendorCandidates(vendors))) as VendorCandidate[];
 
