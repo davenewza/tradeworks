@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
     ZohoVendor,
     buildVendorCandidates,
+    MAX_VENDOR_PAGES,
     fetchZohoVendors,
     importVendors,
     loadVendorCandidates,
@@ -15,6 +16,7 @@ const CTX = { env: { ZOHO_BOOKS_BASE_URL: 'https://zoho.test/books/v3', ZOHO_BOO
 const vendor = (contact_id: string, contact_name: string, currency_code = 'ZAR', company_name = ''): ZohoVendor => ({
     contact_id,
     contact_name,
+    contact_type: 'vendor',
     company_name,
     currency_code,
     status: 'active',
@@ -33,10 +35,11 @@ describe('supportedCurrency', () => {
 describe('fetchZohoVendors', () => {
     afterEach(() => vi.unstubAllGlobals());
 
-    test('asks for active vendors only and follows the pages to the end', async () => {
+    test('asks the vendors listing for active vendors, follows the pages to the end, and keeps only vendors', async () => {
         const urls: string[] = [];
+        const customer = { ...vendor('9', 'A buyer'), contact_type: 'customer' };
         const pages = [
-            { code: 0, message: 'success', contacts: [vendor('1', 'Acme')], page_context: { has_more_page: true } },
+            { code: 0, message: 'success', contacts: [vendor('1', 'Acme'), customer], page_context: { has_more_page: true } },
             { code: 0, message: 'success', contacts: [vendor('2', 'Bolt')], page_context: { has_more_page: false } },
         ];
         vi.stubGlobal(
@@ -51,8 +54,22 @@ describe('fetchZohoVendors', () => {
 
         expect(vendors.map((v) => v.contact_id)).toEqual(['1', '2']);
         expect(urls).toHaveLength(2);
-        expect(urls[0]).toContain('/contacts?organization_id=org1&contact_type=vendor&filter_by=Status.Active');
+        expect(urls[0]).toContain('/vendors?organization_id=org1&filter_by=Status.Active');
         expect(urls[1]).toContain('&page=2&');
+    });
+
+    test('gives up after a bounded number of pages instead of draining the quota', async () => {
+        const fetchMock = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({ code: 0, message: 'success', contacts: [vendor('1', 'Acme')], page_context: { has_more_page: true } }),
+                    { status: 200 },
+                ),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(fetchZohoVendors(CTX, 'token')).rejects.toThrow(/ran past 25 pages/);
+        expect(fetchMock).toHaveBeenCalledTimes(MAX_VENDOR_PAGES);
     });
 
     test('fails loudly on an HTTP error or a Zoho error code, e.g. the daily quota', async () => {
