@@ -120,9 +120,7 @@ How the group figures are worked out:
 Each **supplier** carries a **lead time** (`leadTimeInDays`, default **60**).
 Set it from the supplier page via **Edit supplier**; it drives the status bands
 for every product bought from that supplier, and is the default lead time when
-[planning a purchase](purchase-planning.md). (Brands used to carry the lead
-time; `Brand.leadTimeInDays` is kept only for **Create suppliers from brands**
-to copy across, and is no longer read anywhere else.)
+[planning a purchase](purchase-planning.md).
 
 ## Reordering
 

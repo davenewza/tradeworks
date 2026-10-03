@@ -7,11 +7,6 @@ model Brand {
         // The brand's products Zoho has made inactive — retired items, including
         // those imported only so their sales history has a SKU to attach to.
         inactiveProducts Number @computed(COUNTIF(brand.products, brand.products.isActive == false))
-        // Superseded by Supplier.leadTimeInDays, which now grades stock cover
-        // and drives purchase planning. Kept only so CreateSuppliersFromBrands
-        // can carry each brand's lead time onto its supplier; drop it once
-        // that has run in production.
-        leadTimeInDays Number @default(60)
     }
 
     actions {

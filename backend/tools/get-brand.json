@@ -14,9 +14,6 @@
           }
         ]
       }
-    },
-    "$.leadTimeInDays": {
-      "visible": false
     }
   },
   "entry_activity_actions": [

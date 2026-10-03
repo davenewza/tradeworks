@@ -104,11 +104,6 @@
     "format": { "number_config": { "mode": "DECIMAL", "suffix": " months", "locale": "en-GB" } }
   },
   {
-    "id": "Brand.leadTimeInDays",
-    "display_name": "Lead time",
-    "format": { "number_config": { "mode": "DECIMAL", "suffix": " days", "locale": "en-GB" } }
-  },
-  {
     "id": "Supplier.leadTimeInDays",
     "display_name": "Lead time",
     "format": { "number_config": { "mode": "DECIMAL", "suffix": " days", "locale": "en-GB" } }

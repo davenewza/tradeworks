@@ -48,9 +48,6 @@
     "$.results[*].inactiveProducts": {
       "visible": false
     },
-    "$.results[*].leadTimeInDays": {
-      "visible": false
-    },
     "$.results[*].name": {
       "display_order": 2
     },

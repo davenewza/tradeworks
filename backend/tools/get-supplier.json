@@ -2,6 +2,9 @@
   "id": "get-supplier",
   "action_name": "getSupplier",
   "response": {
+    "$.zohoVendorId": {
+      "display_name": "Zoho vendor ID"
+    },
     "$.products": {
       "link": {
         "tool_id": "list-products",

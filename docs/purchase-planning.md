@@ -110,25 +110,32 @@ Raise the target to order less often; lower it to tie up less cash.
 
 A **supplier** is who invoices us for stock; a **brand** is what's on the box.
 They are often the same company, but not always, so they are separate records.
+Every supplier is a **vendor in Zoho Books**, linked by the vendor's Zoho
+`contact_id` (`Supplier.zohoVendorId`).
 
-- **Inventory → Suppliers** lists them; **Add a supplier** creates one with a
-  default currency and a lead time (default 60 days).
+- **Inventory → Import suppliers from Zoho** lists the active Zoho vendors that
+  aren't suppliers yet; tick the ones you buy stock from. Each becomes a
+  supplier with the vendor's name and currency (rand when Zoho's is one we
+  don't support) and a 60-day lead time — set the real one on the supplier. It
+  is one paged read of the vendor list, so a call or two against the shared
+  Zoho quota. Suppliers can't be created by hand.
+- A supplier made before suppliers came from Zoho has no vendor link. Importing
+  the vendor of the **same name** links it (shown as **Link**), keeping its
+  products, lead time and currency.
+- **Inventory → Suppliers** lists them. On a supplier, **Edit supplier** sets
+  the lead time, currency and notes; the name and Zoho link come from Zoho.
 - On a product, **Set supplier & price** assigns its supplier and records what
   they charge per unit and in which currency. A price must have a currency.
 - **Inventory → Products without a supplier** lists the active products still
   waiting for one. They go ungraded in stock cover and are left out of plans.
-- **Create suppliers from brands** is a one-off to get started: for each brand
-  you tick, it creates a supplier of the same name carrying the brand's old
-  lead time (or reuses one that already has that name) and assigns the brand's
-  unassigned products to it. Leave out brands bought through a distributor.
 
 ## Where it lives in the code
 
 | Concern | Files |
 | --- | --- |
-| Schema | `backend/schemas/products.keel` — `flow PlanPurchase`, `Product.supplier*`; `backend/schemas/suppliers.keel` — `Supplier`, `Currency`, `flow CreateSuppliersFromBrands` |
+| Schema | `backend/schemas/products.keel` — `flow PlanPurchase`, `Product.supplier*`; `backend/schemas/suppliers.keel` — `Supplier`, `Currency`, `flow ImportSuppliers` |
 | Arithmetic & loading | `backend/lib/purchasePlanHelpers.ts` (+ `.test.ts`) |
 | Grid rows, wording | `backend/lib/purchasePlanFormat.ts` |
 | Flow | `backend/flows/planPurchase.ts`, wiring test in `backend/tests/planPurchase.test.ts` |
-| Suppliers | `backend/lib/supplierHelpers.ts`, `backend/flows/createSuppliersFromBrands.ts`, `backend/tests/supplierActions.test.ts` |
+| Suppliers | `backend/lib/zohoVendorHelpers.ts` (+ `.test.ts`), `backend/flows/importSuppliers.ts`, `backend/tests/supplierActions.test.ts` |
 | Console | `backend/tools/_spaces.json` (Inventory space, Suppliers group), `get-supplier.json` (entry action), `list-suppliers.json`, `list-products-without-supplier.json` |

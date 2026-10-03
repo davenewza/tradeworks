@@ -8,20 +8,29 @@ enum Currency {
     CNY
 }
 
-// Who we buy stock from. Distinct from Brand: a brand is what's on the box, a
-// supplier is who invoices us for it. They are often the same company, but a
-// brand can come through a distributor, and one supplier can carry several
-// brands. Purchase planning and stock-cover grading work off the supplier,
-// since the lead time is theirs.
+// Who we buy stock from: a vendor in Zoho Books, brought across by
+// ImportSuppliers and linked to it by Zoho's contact id. Distinct from Brand:
+// a brand is what's on the box, a supplier is who invoices us for it. They are
+// often the same company, but a brand can come through a distributor, and one
+// supplier can carry several brands. Purchase planning and stock-cover
+// grading work off the supplier, since the lead time is theirs.
 model Supplier {
     fields {
+        // The vendor's contact_id in Zoho Books — the link back to it, so
+        // bills and purchase orders there can be matched to this supplier.
+        // Every supplier ImportSuppliers creates has one. Optional only for
+        // suppliers made before suppliers came from Zoho: importing the vendor
+        // of the same name links them.
+        zohoVendorId Text? @unique
+        // The vendor's name in Zoho, as it was when imported.
         name Text @unique
-        // What the supplier normally invoices in. Prefilled as the currency
-        // of new prices; each price still carries its own currency.
+        // What the supplier normally invoices in — the vendor's currency in
+        // Zoho, when it is one we support. Each price still carries its own.
         currency Currency @default(Currency.ZAR)
         // How long (in days) new stock takes to arrive from this supplier,
         // order to on-the-shelf — grades every product's stock-cover status
-        // and is the default lead time when planning a purchase.
+        // and is the default lead time when planning a purchase. Ours, not
+        // Zoho's: set it after importing.
         leadTimeInDays Number @default(60)
         notes Text?
         products Product[]
@@ -33,8 +42,9 @@ model Supplier {
         list listSuppliers() {
             @orderBy(name: asc)
         }
-        create createSupplier() with (name, currency?, leadTimeInDays?, notes?)
-        update updateSupplier(id) with (name?, currency?, leadTimeInDays?, notes?)
+        // No create action: a supplier only comes from a Zoho vendor, via
+        // ImportSuppliers.
+        update updateSupplier(id) with (currency?, leadTimeInDays?, notes?)
         delete deleteSupplier(id)
     }
 
@@ -42,14 +52,13 @@ model Supplier {
 
     @permission(
         roles: [Operator],
-        actions: [get, list, create, update, delete]
+        actions: [get, list, update, delete]
     )
 }
 
-// One-off: a supplier per brand whose active products have no supplier yet,
-// named after the brand and carrying its lead time, with those products
-// assigned to it. For the common case where the brand is the supplier; fix
-// up the exceptions afterwards on each product.
-flow CreateSuppliersFromBrands {
+// Lists the active vendors in Zoho Books that aren't suppliers yet and creates
+// a supplier for each one ticked, linked by its Zoho contact id. One paged
+// read of the vendor list — a call or two against the shared Zoho quota.
+flow ImportSuppliers {
     @permission(roles: [Operator])
 }
