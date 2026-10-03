@@ -243,12 +243,6 @@ describe('Product stockCoverStatus (computed enum)', () => {
         expect(await statusOf(product.id)).toBe(StockCoverStatus.InsufficientSupply);
     });
 
-    test('the brand lead time no longer grades anything', async () => {
-        const { product, brand } = await makeProduct('ST-8', 3, 60);
-        await models.brand.update({ id: brand.id }, { leadTimeInDays: 120 });
-        expect(await statusOf(product.id)).toBe(StockCoverStatus.GoodSupply);
-    });
-
     test('a product with no supplier has no lead time, so goes ungraded until it gets one', async () => {
         const brand = await models.brand.create({ name: 'B-none' });
         const product = await models.product.create({ name: 'N', sku: 'ST-9', brandId: brand.id, currentStockCover: 1 });

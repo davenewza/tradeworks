@@ -227,10 +227,11 @@
             "hidden": false
           },
           {
-            "id": "action-create-supplier",
+            "id": "action-import-suppliers",
             "link": {
-              "tool_id": "create-supplier",
-              "title": "Add a supplier",
+              "tool_id": "import-suppliers",
+              "title": "Import suppliers from Zoho",
+              "description": "Pick vendors from Zoho Books to buy stock from",
               "display_order": 1
             },
             "hidden": false
@@ -242,16 +243,6 @@
               "title": "Products without a supplier",
               "description": "Ungraded and left out of purchase planning until assigned",
               "display_order": 2
-            },
-            "hidden": false
-          },
-          {
-            "id": "action-create-suppliers-from-brands",
-            "link": {
-              "tool_id": "create-suppliers-from-brands",
-              "title": "Create suppliers from brands",
-              "description": "One-off: a supplier per brand, with the brand’s lead time and its products assigned",
-              "display_order": 3
             },
             "hidden": false
           }

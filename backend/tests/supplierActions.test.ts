@@ -1,4 +1,5 @@
-// Suppliers and the supplier price on a product: operators create suppliers,
+// Suppliers and the supplier price on a product: suppliers come from Zoho
+// vendors (see lib/zohoVendorHelpers.test.ts); operators set their lead times,
 // assign products to them and record what each charges, in its own currency.
 
 import { actions, models, resetDatabase } from '@teamkeel/testing';
@@ -29,26 +30,26 @@ async function operator() {
 }
 
 describe('suppliers', () => {
-    test('an operator creates a supplier, defaulting to rand and a 60-day lead time', async () => {
+    test('an operator edits the lead time, currency and notes; the Zoho link and name stay put', async () => {
+        const uk = await models.supplier.create({ name: 'UK Tools Ltd', zohoVendorId: 'zv-1', currency: Currency.GBP });
+        expect(uk).toMatchObject({ currency: Currency.GBP, leadTimeInDays: 60 });
         const authed = await operator();
-        const local = await authed.createSupplier({ name: 'Local Co' });
-        expect(local).toMatchObject({ currency: Currency.ZAR, leadTimeInDays: 60 });
 
-        const uk = await authed.createSupplier({ name: 'UK Tools Ltd', currency: Currency.GBP, leadTimeInDays: 90 });
-        const updated = await authed.updateSupplier({ where: { id: uk.id }, values: { leadTimeInDays: 75, notes: 'Sea freight' } });
-        expect(updated).toMatchObject({ currency: Currency.GBP, leadTimeInDays: 75, notes: 'Sea freight' });
-
-        const { results } = await authed.listSuppliers();
-        expect(results.map((s) => s.name)).toEqual(['Local Co', 'UK Tools Ltd']);
-    });
-
-    test('names are unique and lead times must be at least a day', async () => {
-        const authed = await operator();
-        await authed.createSupplier({ name: 'Dup' });
-        await expect(authed.createSupplier({ name: 'Dup' })).rejects.toThrow();
-        expect(await ruleViolated(authed.createSupplier({ name: 'Zero', leadTimeInDays: 0 }))).toBe(
+        const updated = await authed.updateSupplier({
+            where: { id: uk.id },
+            values: { leadTimeInDays: 75, notes: 'Sea freight', currency: Currency.EUR },
+        });
+        expect(updated).toMatchObject({
+            name: 'UK Tools Ltd', zohoVendorId: 'zv-1', currency: Currency.EUR, leadTimeInDays: 75, notes: 'Sea freight',
+        });
+        expect(await ruleViolated(authed.updateSupplier({ where: { id: uk.id }, values: { leadTimeInDays: 0 } }))).toBe(
             "A supplier's lead time should be at least 1 day",
         );
+    });
+
+    test('a Zoho vendor links to at most one supplier', async () => {
+        await models.supplier.create({ name: 'One', zohoVendorId: 'zv-1' });
+        await expect(models.supplier.create({ name: 'Two', zohoVendorId: 'zv-1' })).rejects.toThrow();
     });
 
     test('counts its active products, whichever brand they are', async () => {
@@ -64,8 +65,9 @@ describe('suppliers', () => {
     });
 
     test('requires an operator', async () => {
+        const supplier = await models.supplier.create({ name: 'Nope', zohoVendorId: 'zv-9' });
         await expect(actions.listSuppliers()).rejects.toThrow();
-        await expect(actions.createSupplier({ name: 'Nope' })).rejects.toThrow();
+        await expect(actions.updateSupplier({ where: { id: supplier.id }, values: { notes: 'x' } })).rejects.toThrow();
     });
 });
 
