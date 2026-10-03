@@ -1,4 +1,5 @@
-import { models, InlineFile } from '@teamkeel/sdk';
+import { models, InlineFile, useDatabase } from '@teamkeel/sdk';
+import { sql } from 'kysely';
 import { ProgressReporter } from './progress';
 
 // ─── Zoho types ─────────────────────────────────────────────────────────────
@@ -51,7 +52,8 @@ export interface ZohoProductCtx {
     secrets: { ZOHO_CLIENT_SECRET: string };
 }
 
-// A single add/update/deactivate candidate produced by the read-only diff pass.
+// A single add/update/deactivate/delete candidate produced by the read-only
+// diff pass.
 // All fields are JSON-serializable so the whole array can flow through
 // ctx.step() unchanged.
 //
@@ -63,7 +65,7 @@ export interface SyncCandidate {
     sku: string;
     name: string;
     brand: string;
-    change: 'New' | 'Update' | 'Deactivate' | 'Reactivate' | 'Photo';
+    change: 'New' | 'Update' | 'Deactivate' | 'Reactivate' | 'Photo' | 'Delete';
     // Why this row is here, in the operator's terms.
     reason: string;
     // 'Add' when the product will be active, has no image yet, and Zoho has
@@ -75,8 +77,9 @@ export interface SyncCandidate {
     // still imported, as an inactive product, so its sales and costs have
     // something to attach to.
     isActive: boolean;
+    // Empty on a deletion — there is no Zoho item behind it.
     zohoItemId: string;
-    action: 'create' | 'update' | 'deactivate' | 'reactivate';
+    action: 'create' | 'update' | 'deactivate' | 'reactivate' | 'delete';
 }
 
 // What we already hold for a SKU, as far as the diff cares.
@@ -85,6 +88,8 @@ export interface ExistingProduct {
     brandName: string;
     isActive: boolean;
     hasImage: boolean;
+    // Any Sale row at all. A product with sales is never deleted.
+    hasSales: boolean;
 }
 
 // ─── Authentication ───────────────────────────────────────────────────────
@@ -240,6 +245,12 @@ async function fetchItemDetails(
 // is offered Zoho's, and one that already has an image (e.g. uploaded by hand)
 // is never offered a replacement. Inactive products get none — they are out of
 // the catalogue, so a download would only spend the shared Zoho quota.
+//
+// A product no Zoho item carries at all — active or inactive — is offered for
+// deletion, unless it has sales. Keel cascades a delete through every required
+// relation, so deleting it would take its sales with it, and that history is
+// exactly what the inactive imports above exist to keep. Those products are
+// listed by findKeptProducts() instead.
 export function buildSyncCandidates(
     items: ZohoItem[],
     existingBySku: Map<string, ExistingProduct>
@@ -360,7 +371,49 @@ export function buildSyncCandidates(
         // else: already matches Zoho → nothing to do, not shown.
     }
 
+    for (const [sku, product] of productsNotInZoho(items, existingBySku)) {
+        if (product.hasSales) continue;
+        candidates.push({
+            sku,
+            name: product.name,
+            brand: product.brandName,
+            change: 'Delete',
+            reason: 'Not in Zoho',
+            photo: '',
+            imageName: null,
+            isActive: false,
+            zohoItemId: '',
+            action: 'delete',
+        });
+    }
+
     return candidates;
+}
+
+// A product missing from Zoho that is kept because it has sales.
+export interface KeptProduct {
+    sku: string;
+    name: string;
+    brand: string;
+}
+
+// The products buildSyncCandidates() would have offered for deletion but for
+// their sales. Never a candidate — the review page lists them so the gap with
+// Zoho is visible rather than silently ignored.
+export function findKeptProducts(items: ZohoItem[], existingBySku: Map<string, ExistingProduct>): KeptProduct[] {
+    return productsNotInZoho(items, existingBySku)
+        .filter(([, product]) => product.hasSales)
+        .map(([sku, product]) => ({ sku, name: product.name, brand: product.brandName }));
+}
+
+// The products we hold under a SKU no Zoho item carries. An item without a SKU
+// matches nothing, so a product whose Zoho item lost its SKU is in here too.
+function productsNotInZoho(
+    items: ZohoItem[],
+    existingBySku: Map<string, ExistingProduct>
+): [string, ExistingProduct][] {
+    const zohoSkus = new Set(items.map((item) => item.sku?.trim()).filter(Boolean));
+    return [...existingBySku].filter(([sku]) => !zohoSkus.has(sku));
 }
 
 // Match the rows a picker handed back to the candidates they came from.
@@ -382,6 +435,11 @@ export function resolveSelectedCandidates(
         .filter((c): c is SyncCandidate => c !== undefined);
 }
 
+export interface SyncPlan {
+    candidates: SyncCandidate[];
+    kept: KeptProduct[];
+}
+
 // Pull every item from Zoho and work out what each one means here. Performs NO
 // writes — products are only touched later in applyProductSync(), and only for
 // the items the user chooses to sync.
@@ -389,7 +447,7 @@ export async function computeSyncCandidates(
     ctx: ZohoProductCtx,
     accessToken: string,
     progress?: ProgressReporter
-): Promise<SyncCandidate[]> {
+): Promise<SyncPlan> {
     // 1. Collect every item from Zoho (with custom_fields for brand).
     const items: ZohoItem[] = [];
     let page = 1;
@@ -432,23 +490,31 @@ export async function computeSyncCandidates(
             items.push({ ...listItem, ...details, status: details?.status ?? listItem.status });
         }
 
-        hasMorePages = itemsData.page_context?.has_more_page ?? false;
+        // A product missing from this listing is offered for deletion, so the
+        // listing has to be complete. Without page_context there is no telling
+        // whether more pages follow — stop rather than read a partial catalogue
+        // as the whole one.
+        if (!itemsData.page_context) {
+            throw new Error(`Zoho items response for page ${page} has no page_context: ${JSON.stringify(itemsData)}`);
+        }
+        hasMorePages = itemsData.page_context.has_more_page;
         progress?.set({ message: `Fetched ${items.length} item${items.length === 1 ? '' : 's'} from Zoho…` });
         page++;
     }
 
     progress?.set({ message: 'Comparing against existing products…' });
 
-    // 2. Batch-load the existing products (and their current brand names) so we
-    // can diff without a query per item.
-    const skus = [...new Set(items.map((item) => item.sku.trim()))];
-    const existingProducts =
-        skus.length > 0 ? await models.product.findMany({ where: { sku: { oneOf: skus } } }) : [];
+    // 2. Batch-load every product (and its current brand name) so we can diff
+    // without a query per item. Every one, not just the SKUs Zoho returned —
+    // the ones it didn't return are the deletions.
+    const existingProducts = await models.product.findMany({});
 
     const brandIds = [...new Set(existingProducts.map((p) => p.brandId))];
     const existingBrands =
         brandIds.length > 0 ? await models.brand.findMany({ where: { id: { oneOf: brandIds } } }) : [];
     const brandNameById = new Map(existingBrands.map((b) => [b.id, b.name]));
+
+    const productIdsWithSales = await loadProductIdsWithSales();
 
     const existingBySku = new Map<string, ExistingProduct>(
         existingProducts.map((p) => [
@@ -458,12 +524,35 @@ export async function computeSyncCandidates(
                 brandName: brandNameById.get(p.brandId) ?? '',
                 isActive: p.isActive,
                 hasImage: p.image != null,
+                hasSales: productIdsWithSales.has(p.id),
             },
         ])
     );
 
     // 3. Turn the two sides into candidates.
-    return buildSyncCandidates(items, existingBySku);
+    return {
+        candidates: buildSyncCandidates(items, existingBySku),
+        kept: findKeptProducts(items, existingBySku),
+    };
+}
+
+async function loadProductIdsWithSales(): Promise<Set<string>> {
+    const result = await sql<{ productId: string }>`
+        select distinct product_id from sale
+    `.execute(useDatabase());
+    return new Set(result.rows.map((row) => row.productId));
+}
+
+// Deletes the product unless it has sales, in one statement so a sale synced
+// since the review page still blocks it — the delete cascades, and would take
+// that sale with it. Returns whether the product was deleted.
+async function deleteProductWithoutSales(productId: string): Promise<boolean> {
+    const result = await sql`
+        delete from product
+        where id = ${productId}
+          and not exists (select 1 from sale where sale.product_id = product.id)
+    `.execute(useDatabase());
+    return Number(result.numAffectedRows ?? 0) > 0;
 }
 
 // ─── Apply pass ─────────────────────────────────────────────────────────────
@@ -472,7 +561,7 @@ export interface SyncedProduct {
     sku: string;
     name: string;
     brand: string;
-    change: 'New' | 'Update' | 'Deactivate' | 'Reactivate' | 'Photo';
+    change: 'New' | 'Update' | 'Deactivate' | 'Reactivate' | 'Photo' | 'Delete';
     reason: string;
     photo: 'Added' | 'Failed' | '';
 }
@@ -488,17 +577,23 @@ export interface ApplyResult {
     updated: number;
     deactivated: number;
     reactivated: number;
+    deleted: number;
+    // Ticked for deletion, but a sale had arrived for it by the time it was
+    // applied — so it was kept.
+    deletionsRefused: KeptProduct[];
     photosAdded: number;
     photoFailures: { sku: string; error: string }[];
 }
 
 // Apply only the selected candidates, creating any missing brands along the
 // way and downloading a photo for each ticked product that still has none.
+// A ticked deletion is re-checked for sales as it is applied, and kept if one
+// has arrived since the review page.
 // Idempotent: keyed on the unique SKU, so a step retry re-derives the same
 // result rather than duplicating records — and a photo stored on an earlier
 // attempt isn't downloaded again. `fetchPhoto` is required whenever a
 // candidate asks for a photo.
-const KNOWN_ACTIONS = new Set<SyncCandidate['action']>(['create', 'update', 'deactivate', 'reactivate']);
+const KNOWN_ACTIONS = new Set<SyncCandidate['action']>(['create', 'update', 'deactivate', 'reactivate', 'delete']);
 
 export async function applyProductSync(
     selected: SyncCandidate[],
@@ -526,6 +621,8 @@ export async function applyProductSync(
     let updated = 0;
     let deactivated = 0;
     let reactivated = 0;
+    let deleted = 0;
+    const deletionsRefused: KeptProduct[] = [];
     let photosAdded = 0;
     const photoFailures: { sku: string; error: string }[] = [];
 
@@ -565,6 +662,30 @@ export async function applyProductSync(
                 photo: '',
             });
             progress?.log(`Deactivated ${candidate.sku} — ${candidate.name}`);
+            continue;
+        }
+
+        if (candidate.action === 'delete') {
+            progress?.increment();
+            if (!existing) {
+                progress?.log(`Skipped ${candidate.sku} — already deleted`);
+                continue;
+            }
+            if (!(await deleteProductWithoutSales(existing.id))) {
+                deletionsRefused.push({ sku: candidate.sku, name: candidate.name, brand: candidate.brand });
+                progress?.log(`Kept ${candidate.sku} — it has sales`);
+                continue;
+            }
+            deleted++;
+            synced.push({
+                sku: candidate.sku,
+                name: candidate.name,
+                brand: candidate.brand,
+                change: 'Delete',
+                reason: candidate.reason,
+                photo: '',
+            });
+            progress?.log(`Deleted ${candidate.sku} — ${candidate.name}`);
             continue;
         }
 
@@ -645,5 +766,16 @@ export async function applyProductSync(
         progress?.log(`${verb} ${candidate.sku} — ${candidate.name}${photo ? ` (photo ${photo.toLowerCase()})` : ''}`);
     }
 
-    return { synced, created, createdInactive, updated, deactivated, reactivated, photosAdded, photoFailures };
+    return {
+        synced,
+        created,
+        createdInactive,
+        updated,
+        deactivated,
+        reactivated,
+        deleted,
+        deletionsRefused,
+        photosAdded,
+        photoFailures,
+    };
 }

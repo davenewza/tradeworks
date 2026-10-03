@@ -84,6 +84,30 @@ describe('product activation', () => {
         expect((await authed.getBrand({ id: brand.id }))!.totalProducts).toBe(1);
     });
 
+    test('a brand counts its inactive products, following status both ways', async () => {
+        const authed = actions.withIdentity(await operator());
+        const acme = await models.brand.create({ name: 'Acme' });
+        const other = await models.brand.create({ name: 'Other' });
+        const widget = await models.product.create({ name: 'Widget', sku: 'G-1', brandId: acme.id });
+        await models.product.create({ name: 'Gadget', sku: 'G-2', brandId: acme.id });
+        await models.product.create({ name: 'Retired', sku: 'G-3', brandId: acme.id, isActive: false });
+        // Inactive, but another brand's — must not count towards Acme.
+        await models.product.create({ name: 'Off Other', sku: 'G-4', brandId: other.id, isActive: false });
+
+        expect((await authed.getBrand({ id: acme.id }))!.inactiveProducts).toBe(1);
+
+        await models.product.update({ id: widget.id }, { isActive: false });
+        let brand = (await authed.getBrand({ id: acme.id }))!;
+        expect(brand.inactiveProducts).toBe(2);
+        expect(brand.totalProducts).toBe(1);
+
+        // The sync reactivates as well as deactivates.
+        await models.product.update({ id: widget.id }, { isActive: true });
+        brand = (await authed.getBrand({ id: acme.id }))!;
+        expect(brand.inactiveProducts).toBe(1);
+        expect(brand.totalProducts).toBe(2);
+    });
+
     test('an inactive product drops out of the price list view and its count', async () => {
         const authed = actions.withIdentity(await operator());
         const brand = await models.brand.create({ name: 'Acme' });

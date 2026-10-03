@@ -71,7 +71,15 @@ class AuthService {
       }
 
       const data = await response.json()
-      
+
+      // A password identity has to prove it owns its email before Keel links it
+      // to a User (runtime 0.489+). Until then the token reaches no User, so
+      // keeping it would sign the person in to an account with no customer.
+      // LoginForm sends the verification email instead.
+      if (data.email_verification_required) {
+        return data
+      }
+
       // Store the access token
       this.setToken(data.access_token)
       
@@ -80,7 +88,6 @@ class AuthService {
         localStorage.setItem('refresh_token', data.refresh_token)
       }
       
-      // Return data with identity_created flag to determine if profile completion is needed
       return data
     } catch (error) {
       console.error('Login error:', error)
@@ -134,15 +141,14 @@ class AuthService {
       })
 
       if (response.ok) {
+        // Null when the identity isn't linked to a User, e.g. a password
+        // sign-in whose email hasn't been verified. Keel links the User itself
+        // once it is; the caller signs the person out rather than proceeding.
         const user = await response.json()
         if (user) {
           this.setUser(user)
-          return user
-        } else {
-          // If getMe returns null, try to create the user
-          console.log('getMe returned null, creating user...')
-          return await this.createUser()
         }
+        return user
       } else {
         throw new Error('Failed to get user')
       }
@@ -152,56 +158,28 @@ class AuthService {
     }
   }
 
-  // Create user record using createMe (without profile data)
-  async createUser() {
-    try {
-      const response = await fetch(`${this.baseUrl}/createMe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getToken()}`,
-        },
-      })
+  // Save the name entered in the profile dialog onto the signed-in User
+  async updateName(id, firstName, lastName) {
+    const response = await fetch(`${this.baseUrl}/updateName`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.getToken()}`,
+      },
+      body: JSON.stringify({
+        where: { id },
+        values: { firstName, lastName },
+      }),
+    })
 
-      if (response.ok) {
-        const user = await response.json()
-        this.setUser(user)
-        return user
-      } else {
-        throw new Error('Failed to create user')
-      }
-    } catch (error) {
-      console.error('Error creating user:', error)
-      throw error
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to save your name')
     }
-  }
 
-  // Create user with firstName and lastName
-  async createUserWithProfile(firstName, lastName) {
-    try {
-      const response = await fetch(`${this.baseUrl}/createMe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getToken()}`,
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-        }),
-      })
-
-      if (response.ok) {
-        const user = await response.json()
-        this.setUser(user)
-        return user
-      } else {
-        throw new Error('Failed to create user with profile')
-      }
-    } catch (error) {
-      console.error('Error creating user with profile:', error)
-      throw error
-    }
+    const user = await response.json()
+    this.setUser(user)
+    return user
   }
 
   // Get customerId from user data
@@ -213,6 +191,23 @@ class AuthService {
   logout() {
     this.removeToken()
     this.removeUser()
+  }
+
+  // Email a link that proves the person owns this address. Keel's own page at
+  // the link has them choose a new password, then links their identity to the
+  // User with that email, so the next sign-in reaches their customer again.
+  async requestEmailVerification(email) {
+    const response = await fetch(`${this.baseUrl.replace('/api/json', '')}/auth/verify-email/request`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    if (!response.ok) {
+      throw new Error('We could not send the verification email. Please try again or contact your administrator.')
+    }
   }
 
   // Request password reset

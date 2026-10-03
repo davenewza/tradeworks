@@ -207,7 +207,7 @@
   },
   "get_entry_action": {
     "tool_id": "get-product-price",
-    "deleted": true
+    "as_dialog": true
   },
   "create_entry_action": {
     "tool_id": "create-product-price",

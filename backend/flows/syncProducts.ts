@@ -1,6 +1,6 @@
 import { SyncProducts, FlowConfig } from '@teamkeel/sdk';
 import {
-    SyncCandidate,
+    SyncPlan,
     ApplyResult,
     getZohoAccessToken,
     computeSyncCandidates,
@@ -40,6 +40,7 @@ export default SyncProducts(config, async (ctx) => {
                     '- **Deactivate** products whose Zoho item has gone **inactive**, taking them out of the catalogue.',
                     '- **Reactivate** products whose Zoho item is **active** again, bringing them back.',
                     "- **Add a photo** from Zoho to active products that don't have one yet. Existing photos are never replaced.",
+                    '- **Delete** products that are no longer in Zoho at all — no item, active or inactive, carries their SKU. Deleting a product also removes its prices (and any quote lines on them), cost lines, channel fees and channel codes. A product with **sales** is never deleted.',
                     '',
                     'A product\'s active status lives in Zoho and is only ever changed there — this sync is how it reaches us.',
                     'Product dimensions and prices are **not** touched.',
@@ -54,18 +55,30 @@ export default SyncProducts(config, async (ctx) => {
         return await getZohoAccessToken(ctx);
     })) as unknown as string;
 
-    // ── Step: read-only diff — work out what needs adding/updating ───────────
-    const candidates = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
+    // ── Step: read-only diff — work out what needs adding/updating/deleting ──
+    const { candidates, kept } = (await ctx.step('fetch-changes', { timeout: LONG_STEP_TIMEOUT }, async ({ progress }) => {
         return await computeSyncCandidates(ctx, accessToken, progress);
-    })) as unknown as SyncCandidate[];
+    })) as unknown as SyncPlan;
+
+    // Products missing from Zoho that can't be deleted because they have sales.
+    // Listed so the gap with Zoho is visible; there is nothing to tick.
+    const keptNote =
+        kept.length === 0
+            ? []
+            : [
+                  ctx.ui.display.markdown({
+                      content: `**${kept.length} product${kept.length === 1 ? ' is' : 's are'} not in Zoho but ${kept.length === 1 ? 'has' : 'have'} sales**, so ${kept.length === 1 ? 'it is' : 'they are'} kept. Deleting a product would delete its sales too.`,
+                  }),
+                  ctx.ui.display.table({ data: kept, columns: ['sku', 'name', 'brand'] }),
+              ];
 
     // Nothing to do → finish early.
     if (candidates.length === 0) {
         return ctx.complete({
             title: 'Everything is up to date',
             stage: 'complete',
-            description: 'Every product already matches Zoho.',
-            content: [],
+            description: kept.length === 0 ? 'Every product already matches Zoho.' : 'There is nothing to sync.',
+            content: keptNote,
         });
     }
 
@@ -82,6 +95,7 @@ export default SyncProducts(config, async (ctx) => {
                 columns: ['sku', 'name', 'brand', 'change', 'reason', 'photo'],
                 mode: 'multi',
             }),
+            ...keptNote,
         ],
         actions: [{ label: 'Sync selected', value: 'sync', mode: 'primary' }],
     });
@@ -110,7 +124,7 @@ export default SyncProducts(config, async (ctx) => {
     return ctx.complete({
         title: 'Product sync complete',
         stage: 'complete',
-        description: `${result.created} added, ${result.updated} updated, ${result.deactivated} deactivated, ${result.reactivated} reactivated, ${result.photosAdded} photo${result.photosAdded === 1 ? '' : 's'} added.`,
+        description: `${result.created} added, ${result.updated} updated, ${result.deactivated} deactivated, ${result.reactivated} reactivated, ${result.deleted} deleted, ${result.photosAdded} photo${result.photosAdded === 1 ? '' : 's'} added.`,
         content: [
             ctx.ui.display.keyValue({
                 data: [
@@ -119,9 +133,18 @@ export default SyncProducts(config, async (ctx) => {
                     { key: 'Products updated', value: result.updated },
                     { key: 'Products deactivated', value: result.deactivated },
                     { key: 'Products reactivated', value: result.reactivated },
+                    { key: 'Products deleted', value: result.deleted },
                     { key: 'Photos added', value: result.photosAdded },
                 ],
             }),
+            ...(result.deletionsRefused.length > 0
+                ? [
+                      ctx.ui.display.markdown({
+                          content: `**${result.deletionsRefused.length} product${result.deletionsRefused.length === 1 ? ' was' : 's were'} not deleted** — ${result.deletionsRefused.length === 1 ? 'it has' : 'they have'} sales now.`,
+                      }),
+                      ctx.ui.display.table({ data: result.deletionsRefused, columns: ['sku', 'name', 'brand'] }),
+                  ]
+                : []),
             ...(result.photoFailures.length > 0
                 ? [
                       ctx.ui.display.markdown({

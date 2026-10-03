@@ -45,6 +45,9 @@
         ]
       }
     },
+    "$.results[*].inactiveProducts": {
+      "visible": false
+    },
     "$.results[*].leadTimeInDays": {
       "visible": false
     },
