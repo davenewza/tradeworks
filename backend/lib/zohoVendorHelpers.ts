@@ -32,7 +32,9 @@ export const ZOHO_CONTACTS_SCOPE = 'ZohoBooks.contacts.READ';
 // quota for nothing.
 export const MAX_VENDOR_PAGES = 25;
 
-// Every active vendor in Zoho, paged 200 at a time.
+// Every active vendor in Zoho, paged 200 at a time. Unsorted: /vendors
+// rejects sort_column=contact_name with a 400, and the candidates are sorted
+// by name here anyway.
 //
 // From /vendors, not /contacts: Zoho ignores contact_type=vendor on /contacts
 // and returns every contact, which here means thousands of customers (one per
@@ -47,7 +49,7 @@ export async function fetchZohoVendors(ctx: ZohoVendorCtx, accessToken: string):
         }
         const url =
             `${ctx.env.ZOHO_BOOKS_BASE_URL}/vendors?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}` +
-            `&filter_by=Status.Active&sort_column=contact_name&page=${page}&per_page=200`;
+            `&filter_by=Status.Active&page=${page}&per_page=200`;
         const response = await fetch(url, {
             method: 'GET',
             headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },

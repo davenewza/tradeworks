@@ -55,6 +55,9 @@ describe('fetchZohoVendors', () => {
         expect(vendors.map((v) => v.contact_id)).toEqual(['1', '2']);
         expect(urls).toHaveLength(2);
         expect(urls[0]).toContain('/vendors?organization_id=org1&filter_by=Status.Active');
+        // /vendors answers sort_column=contact_name with a 400 ("Invalid value
+        // passed for sort_column"), failing every import.
+        expect(urls[0]).not.toContain('sort_column');
         expect(urls[1]).toContain('&page=2&');
     });
 
