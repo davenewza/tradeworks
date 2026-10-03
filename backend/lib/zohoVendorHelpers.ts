@@ -1,12 +1,13 @@
 import { Currency, models } from '@teamkeel/sdk';
 
 // Suppliers come from Zoho Books vendors — see ImportSuppliers. A vendor is a
-// Zoho contact with contact_type=vendor; its contact_id is the link we keep.
+// Zoho contact with contact_type "vendor"; its contact_id is the link we keep.
 
 // The fields of a Zoho vendor (a contact, from GET /contacts) we read.
 export interface ZohoVendor {
     contact_id: string;
     contact_name: string;
+    contact_type?: string;
     company_name?: string;
     currency_code?: string;
     status?: string;
@@ -26,14 +27,27 @@ export interface ZohoVendorCtx {
 // The scope the vendor listing needs.
 export const ZOHO_CONTACTS_SCOPE = 'ZohoBooks.contacts.READ';
 
-// Every active vendor in Zoho, paged 200 at a time — one call for most
-// organisations.
+// Far more pages than any real vendor list. Hitting it means the listing is not
+// what we think it is, and every further page would spend the shared Zoho
+// quota for nothing.
+export const MAX_VENDOR_PAGES = 25;
+
+// Every active vendor in Zoho, paged 200 at a time.
+//
+// From /vendors, not /contacts: Zoho ignores contact_type=vendor on /contacts
+// and returns every contact, which here means thousands of customers (one per
+// channel buyer) — paging through those is what timed the first import out.
 export async function fetchZohoVendors(ctx: ZohoVendorCtx, accessToken: string): Promise<ZohoVendor[]> {
     const vendors: ZohoVendor[] = [];
     for (let page = 1; ; page++) {
+        if (page > MAX_VENDOR_PAGES) {
+            throw new Error(
+                `Zoho's vendor listing ran past ${MAX_VENDOR_PAGES} pages of 200 — stopping rather than spend more of the API quota`,
+            );
+        }
         const url =
-            `${ctx.env.ZOHO_BOOKS_BASE_URL}/contacts?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}` +
-            `&contact_type=vendor&filter_by=Status.Active&sort_column=contact_name&page=${page}&per_page=200`;
+            `${ctx.env.ZOHO_BOOKS_BASE_URL}/vendors?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}` +
+            `&filter_by=Status.Active&sort_column=contact_name&page=${page}&per_page=200`;
         const response = await fetch(url, {
             method: 'GET',
             headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
@@ -44,7 +58,8 @@ export async function fetchZohoVendors(ctx: ZohoVendorCtx, accessToken: string):
         const data: ZohoContactsResponse = await response.json();
         if (data.code !== 0) throw new Error(`Zoho vendor listing failed: ${data.message}`);
 
-        vendors.push(...(data.contacts ?? []));
+        // Only vendors can be suppliers, whatever the listing hands back.
+        vendors.push(...(data.contacts ?? []).filter((c) => c.contact_type === 'vendor'));
         if (!data.page_context?.has_more_page) return vendors;
     }
 }
