@@ -1,8 +1,8 @@
-import { AbcClass, StockCoverStatus, models, useDatabase } from '@teamkeel/sdk';
+import { AbcClass, Currency, StockCoverStatus, models, useDatabase } from '@teamkeel/sdk';
 import { sql } from 'kysely';
 import { COVER_WINDOW_DAYS, estimatedMonthlySale, loadSaleAggregates, round1 } from './stockCoverHelpers';
 
-// Purchase planning for one brand — see docs/purchase-planning.md.
+// Purchase planning for one supplier — see docs/purchase-planning.md.
 //
 // The idea: every product is topped up to the SAME cover horizon. A purchase
 // order that leaves one SKU with six months of stock and another with three
@@ -49,7 +49,7 @@ export interface PurchasePlanParams {
     // between today and then, and then for the whole lead time.
     purchaseDate: Date;
     // Days from purchase to the stock being on the shelf. Defaults to the
-    // brand's setting; overridable per plan (air vs sea, a known delay).
+    // supplier's setting; overridable per plan (air vs sea, a known delay).
     leadTimeInDays: number;
     // Months of cover every product should have the day the order lands. This
     // is the common horizon — see defaultTargetCoverMonths.
@@ -111,11 +111,18 @@ export interface PlanCandidate {
     // horizon that is 2–3 units the order should carry. Null when nothing
     // sold in the window.
     monthlyDemand: number | null;
-    // Cost of goods per unit (excl VAT, excl freight) on the product's most
-    // recent supplier bill — the best guess at what the supplier will charge.
-    // Null when the product has never been billed.
+    // What the supplier will charge per unit (excl VAT, excl freight), in
+    // `currency`. The supplier's price on the product when one is set;
+    // otherwise the unit cost on the product's most recent supplier bill,
+    // which Zoho records in rand. Null when neither exists.
     unitCost: number | null;
+    currency: Currency | null;
+    costSource: CostSource | null;
 }
+
+// Where a line's unit cost came from: the supplier's quoted price, or — until
+// one is entered — the last bill, as a stand-in.
+export type CostSource = 'SupplierPrice' | 'LastBill';
 
 // Why a product got the quantity it did. Drives the "Why" column and the
 // ordering of the grid: the products in trouble come first.
@@ -155,7 +162,8 @@ export interface PlanLine extends PlanCandidate {
     // Arrival + that cover: the date this product stays in stock until.
     coveredUntil: Date | null;
     statusAtArrival: StockCoverStatus | null;
-    // orderQuantity × unitCost; null when the cost is unknown.
+    // orderQuantity × unitCost, in the candidate's currency; null when the
+    // cost is unknown.
     lineValue: number | null;
     reason: PlanReason;
 }
@@ -252,9 +260,14 @@ export interface PurchasePlanSummary {
     linesToOrder: number;
     totalUnits: number;
     // Goods value of the ordered lines whose cost is known (excl VAT, excl
-    // freight). Read alongside linesWithoutCost.
-    totalValue: number;
+    // freight), one total per currency — the plan does no FX conversion, so
+    // a supplier quoting in dollars gets a dollar total. Largest first. Read
+    // alongside linesWithoutCost.
+    valueByCurrency: CurrencyTotal[];
     linesWithoutCost: number;
+    // Ordered lines costed from the last bill because the product has no
+    // supplier price yet.
+    linesCostedFromBills: number;
     stockouts: number;
     stockUnknown: number;
     noForecast: number;
@@ -264,6 +277,11 @@ export interface PurchasePlanSummary {
     // — only possible after the buyer trims a suggestion. These are the
     // top-up orders the plan exists to avoid, so the flow calls them out.
     shortOfHorizon: PlanLine[];
+}
+
+export interface CurrencyTotal {
+    currency: Currency;
+    value: number;
 }
 
 export interface PurchasePlan {
@@ -303,8 +321,9 @@ export function buildPurchasePlan(
             products: lines.length,
             linesToOrder: ordered.length,
             totalUnits: ordered.reduce((sum, l) => sum + l.orderQuantity, 0),
-            totalValue: round2(ordered.reduce((sum, l) => sum + (l.lineValue ?? 0), 0)),
+            valueByCurrency: totalsByCurrency(ordered),
             linesWithoutCost: ordered.filter((l) => l.lineValue === null).length,
+            linesCostedFromBills: ordered.filter((l) => l.lineValue !== null && l.costSource === 'LastBill').length,
             stockouts: lines.filter((l) => l.reason === 'StockoutBeforeArrival').length,
             stockUnknown: lines.filter((l) => l.reason === 'StockUnknown').length,
             noForecast: lines.filter((l) => l.reason === 'NoForecast').length,
@@ -315,6 +334,17 @@ export function buildPurchasePlan(
             ),
         },
     };
+}
+
+function totalsByCurrency(lines: PlanLine[]): CurrencyTotal[] {
+    const totals = new Map<Currency, number>();
+    for (const l of lines) {
+        if (l.lineValue === null || l.currency === null) continue;
+        totals.set(l.currency, (totals.get(l.currency) ?? 0) + l.lineValue);
+    }
+    return [...totals.entries()]
+        .map(([currency, value]) => ({ currency, value: round2(value) }))
+        .sort((a, b) => b.value - a.value);
 }
 
 function compareLines(a: PlanLine, b: PlanLine): number {
@@ -330,49 +360,52 @@ function compareLines(a: PlanLine, b: PlanLine): number {
 
 // ─── Loading ────────────────────────────────────────────────────────────────
 
-export interface PlannableBrand {
-    brandId: string;
+export interface PlannableSupplier {
+    supplierId: string;
     name: string;
     leadTimeInDays: number;
     productCount: number;
 }
 
-// Brands with at least one active product, for the picker. A brand with
-// nothing active has nothing to plan.
-export async function loadPlannableBrands(): Promise<PlannableBrand[]> {
-    const [brands, products] = await Promise.all([
-        models.brand.findMany({}),
+// Suppliers with at least one active product, for the picker. A supplier
+// with nothing active has nothing to plan.
+export async function loadPlannableSuppliers(): Promise<PlannableSupplier[]> {
+    const [suppliers, products] = await Promise.all([
+        models.supplier.findMany({}),
         models.product.findMany({ where: { isActive: { equals: true } } }),
     ]);
     const counts = new Map<string, number>();
-    for (const p of products) counts.set(p.brandId, (counts.get(p.brandId) ?? 0) + 1);
+    for (const p of products) {
+        if (p.supplierId) counts.set(p.supplierId, (counts.get(p.supplierId) ?? 0) + 1);
+    }
 
-    return brands
-        .filter((b) => (counts.get(b.id) ?? 0) > 0)
-        .map((b) => ({
-            brandId: b.id,
-            name: b.name,
-            leadTimeInDays: b.leadTimeInDays,
-            productCount: counts.get(b.id)!,
+    return suppliers
+        .filter((s) => (counts.get(s.id) ?? 0) > 0)
+        .map((s) => ({
+            supplierId: s.id,
+            name: s.name,
+            leadTimeInDays: s.leadTimeInDays,
+            productCount: counts.get(s.id)!,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Everything the plan needs for one brand's active products, as of `now`:
+// Everything the plan needs for one supplier's active products, as of `now`:
 // the stock figures the daily sync wrote, an unrounded run-rate from the same
-// sales window that sync uses, and the latest cost per product. Pure local
-// reads — nothing here touches Zoho.
-export async function loadPlanCandidates(brandId: string, now: Date): Promise<PlanCandidate[]> {
+// sales window that sync uses, and each product's cost. Pure local reads —
+// nothing here touches Zoho.
+export async function loadPlanCandidates(supplierId: string, now: Date): Promise<PlanCandidate[]> {
     const products = await models.product.findMany({
-        where: { brandId: { equals: brandId }, isActive: { equals: true } },
+        where: { supplierId: { equals: supplierId }, isActive: { equals: true } },
     });
     if (products.length === 0) return [];
 
     const productIds = products.map((p) => p.id);
     const windowStart = addDays(now, -COVER_WINDOW_DAYS);
-    const [aggregates, unitCosts] = await Promise.all([
+    const [aggregates, billCosts] = await Promise.all([
         loadSaleAggregates(windowStart, productIds),
-        loadLatestUnitCosts(productIds),
+        // Bill costs are only a fallback, so only fetched for the unpriced.
+        loadLatestUnitCosts(products.filter((p) => p.supplierUnitCost == null).map((p) => p.id)),
     ]);
     const demandById = new Map(aggregates.map((a) => [a.productId, estimatedMonthlySale(a, now)]));
 
@@ -387,10 +420,24 @@ export async function loadPlanCandidates(brandId: string, now: Date): Promise<Pl
                 stockAvailable: p.stockAvailable ?? null,
                 stockOnWay: p.stockOnWay ?? 0,
                 monthlyDemand: demand > 0 ? demand : null,
-                unitCost: unitCosts.get(p.id) ?? null,
+                ...unitCostOf(p.supplierUnitCost ?? null, p.supplierCurrency ?? null, billCosts.get(p.id) ?? null),
             };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// The supplier's price wins; the last bill (in rand) stands in until one is
+// entered.
+function unitCostOf(
+    supplierUnitCost: number | null,
+    supplierCurrency: Currency | null,
+    billCost: number | null,
+): Pick<PlanCandidate, 'unitCost' | 'currency' | 'costSource'> {
+    if (supplierUnitCost !== null && supplierCurrency !== null) {
+        return { unitCost: Number(supplierUnitCost), currency: supplierCurrency, costSource: 'SupplierPrice' };
+    }
+    if (billCost !== null) return { unitCost: billCost, currency: Currency.ZAR, costSource: 'LastBill' };
+    return { unitCost: null, currency: null, costSource: null };
 }
 
 // Cost of goods per unit on each product's most recent supplier bill. Bills

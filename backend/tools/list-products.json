@@ -22,6 +22,18 @@
       "display_order": 3,
       "display_name": "Brand"
     },
+    "$.results[*].supplierId": {
+      "display_order": 7,
+      "display_name": "Supplier"
+    },
+    "$.results[*].supplierUnitCost": {
+      "display_order": 8,
+      "display_name": "Supplier price"
+    },
+    "$.results[*].supplierCurrency": {
+      "display_order": 9,
+      "display_name": "Currency"
+    },
     "$.results[*].id": {
       "display_order": 12,
       "link": {

@@ -1,6 +1,6 @@
 # Purchase planning
 
-Suggests a purchase order for one **brand** — which products to reorder and
+Suggests a purchase order for one **supplier** — which products to reorder and
 how many units — so that every product lands with the **same months of cover**.
 The whole order then runs down together, and the next order can wait for all of
 it, instead of a top-up order for the one product that ran out early.
@@ -11,21 +11,26 @@ directly, so a plan costs no API calls and can be re-run freely.
 
 ## Where to find it
 
-- **Products → Purchasing → Plan a purchase** — pick the brand first.
-- **A brand's page → Plan a purchase** — the brand is preset.
+- **Inventory → Plan a purchase** — pick the supplier first.
+- **A supplier's page → Plan a purchase** — the supplier is preset.
+
+Plans are per **supplier**, not per brand: an order goes to whoever invoices
+us, which may carry several brands, and the lead time is the supplier's. A
+product only takes part once it has a supplier — see
+[Suppliers](#suppliers).
 
 ## The flow
 
-1. **Brand** (skipped when launched from a brand). Only brands with active
-   products are offered.
+1. **Supplier** (skipped when launched from a supplier). Only suppliers with
+   active products are offered.
 2. **Order details**
    - **Purchase date** — when the order goes to the supplier. Defaults to today.
-   - **Lead time (days)** — purchase to on-the-shelf. Defaults to the brand's
+   - **Lead time (days)** — purchase to on-the-shelf. Defaults to the supplier's
      `leadTimeInDays`; a change here applies to this plan only.
    - **Cover on arrival (months)** — how many months of sales every product
      should have in stock the day the order lands. Defaults to **2 × the lead
      time** (in months), the middle of the *Good* status band.
-3. **Review** — an editable grid of every active product in the brand with its
+3. **Review** — an editable grid of every active product from the supplier with its
    suggested quantity, sorted so the products in trouble come first. Change any
    **Order** quantity and press **Recalculate cover** to see what it does to that
    product's cover on arrival; **Finish** produces the plan.
@@ -71,9 +76,13 @@ Points worth knowing:
 - **Trimming a suggestion** is fine, but if the product then runs out before
   the common horizon the plan says so — that product would need exactly the
   top-up order the plan exists to avoid.
-- **Goods value** is the order quantity × the unit cost on the product's most
-  recent supplier bill (excl VAT, excl freight) — the best guess at what the
-  supplier will charge. Lines with no bill on record are counted separately.
+- **Goods value** is the order quantity × the product's **supplier price**
+  (excl VAT, excl freight), in the currency the supplier quotes. Products with
+  no supplier price yet fall back to the unit cost on their most recent
+  supplier bill, in rand, marked *(last bill)*. There is no currency
+  conversion: a plan with prices in more than one currency shows one total
+  per currency (`£800.00 + R 1,200.00`). Lines with no cost at all are counted
+  separately.
 
 ### Worked example
 
@@ -86,7 +95,7 @@ Lead time 60 days, cover on arrival 4 months, ordered today. A product selling
 - Suggested: `⌈120 − 41⌉ = 80` units → lands with `(41 + 80) ÷ 30 ≈ 4.0` months
   of cover (**Good**), in stock until about 4 months after arrival.
 
-A product in the same brand selling 2.5 a month with 8 on hand needs 7. Both
+A product from the same supplier selling 2.5 a month with 8 on hand needs 7. Both
 run out on the same date.
 
 ## Why 2 × lead time
@@ -97,12 +106,29 @@ The status bands grade cover against the lead time `L` (in months): *Shortfall*
 through *Good* into *Low* — the reorder point — before the next order is due.
 Raise the target to order less often; lower it to tie up less cash.
 
+## Suppliers
+
+A **supplier** is who invoices us for stock; a **brand** is what's on the box.
+They are often the same company, but not always, so they are separate records.
+
+- **Inventory → Suppliers** lists them; **Add a supplier** creates one with a
+  default currency and a lead time (default 60 days).
+- On a product, **Set supplier & price** assigns its supplier and records what
+  they charge per unit and in which currency. A price must have a currency.
+- **Inventory → Products without a supplier** lists the active products still
+  waiting for one. They go ungraded in stock cover and are left out of plans.
+- **Create suppliers from brands** is a one-off to get started: for each brand
+  you tick, it creates a supplier of the same name carrying the brand's old
+  lead time (or reuses one that already has that name) and assigns the brand's
+  unassigned products to it. Leave out brands bought through a distributor.
+
 ## Where it lives in the code
 
 | Concern | Files |
 | --- | --- |
-| Schema | `backend/schemas/products.keel` — `flow PlanPurchase` |
+| Schema | `backend/schemas/products.keel` — `flow PlanPurchase`, `Product.supplier*`; `backend/schemas/suppliers.keel` — `Supplier`, `Currency`, `flow CreateSuppliersFromBrands` |
 | Arithmetic & loading | `backend/lib/purchasePlanHelpers.ts` (+ `.test.ts`) |
 | Grid rows, wording | `backend/lib/purchasePlanFormat.ts` |
 | Flow | `backend/flows/planPurchase.ts`, wiring test in `backend/tests/planPurchase.test.ts` |
-| Console | `backend/tools/_spaces.json` (Purchasing group), `get-brand.json` (entry action) |
+| Suppliers | `backend/lib/supplierHelpers.ts`, `backend/flows/createSuppliersFromBrands.ts`, `backend/tests/supplierActions.test.ts` |
+| Console | `backend/tools/_spaces.json` (Inventory space, Suppliers group), `get-supplier.json` (entry action), `list-suppliers.json`, `list-products-without-supplier.json` |

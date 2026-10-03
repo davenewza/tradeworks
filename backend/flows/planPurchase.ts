@@ -1,18 +1,19 @@
 import { PlanPurchase, FlowConfig } from '@teamkeel/sdk';
 import {
-    PlannableBrand,
+    PlannableSupplier,
     PurchasePlan,
     PurchasePlanParams,
     buildPurchasePlan,
     defaultTargetCoverMonths,
     loadPlanCandidates,
-    loadPlannableBrands,
+    loadPlannableSuppliers,
     parseDay,
 } from '../lib/purchasePlanHelpers';
 import {
     PlanGridRow,
     formatDate,
-    formatRand,
+    formatUnitCost,
+    formatLineValue,
     listProducts,
     statusLabel,
     summaryRows,
@@ -23,9 +24,9 @@ import { formatDay } from '../lib/cumulativeSalesHelpers';
 const config = {
     title: 'Plan a purchase',
     description:
-        'Suggest what to reorder from a brand, and how many units, so every product lands with the same months of cover',
+        'Suggest what to reorder from a supplier, and how many units, so every product lands with the same months of cover',
     stages: [
-        { name: 'Brand', key: 'brand' },
+        { name: 'Supplier', key: 'supplier' },
         { name: 'Order details', key: 'details' },
         { name: 'Review', key: 'review' },
     ],
@@ -35,12 +36,12 @@ const config = {
 const MAX_PASSES = 20;
 
 // The maths lives in lib/purchasePlanHelpers (see docs/purchase-planning.md);
-// this is the conversation around it: pick a brand, set the order's dates,
+// this is the conversation around it: pick a supplier, set the order's dates,
 // review and adjust the suggested quantities, finish with the plan as a report.
 // Nothing is written — the plan is the run's completion page.
 export default PlanPurchase(config, async (ctx, inputs) => {
-    // Set when launched from a brand's page; absent from the Products space.
-    const presetBrandId = inputs?.brandId ?? undefined;
+    // Set when launched from a supplier's page; absent from the Inventory space.
+    const presetSupplierId = inputs?.supplierId ?? undefined;
 
     // Pinned once per run. The body re-runs on every page submission, so a plan
     // left open over midnight would otherwise move its projections by a day
@@ -48,53 +49,53 @@ export default PlanPurchase(config, async (ctx, inputs) => {
     const todayIso = await ctx.step('today', async () => formatDay(new Date()));
     const today = parseDay(todayIso)!;
 
-    const brands = await ctx.step('load-brands', async () => await loadPlannableBrands());
+    const suppliers = await ctx.step('load-suppliers', async () => await loadPlannableSuppliers());
 
-    // ── Brand ───────────────────────────────────────────────────────────────
-    let picked: PlannableBrand | undefined;
-    if (presetBrandId) {
-        picked = brands.find((b) => b.brandId === presetBrandId);
+    // ── Supplier ────────────────────────────────────────────────────────────
+    let picked: PlannableSupplier | undefined;
+    if (presetSupplierId) {
+        picked = suppliers.find((s) => s.supplierId === presetSupplierId);
         if (!picked) {
             return ctx.complete({
                 stage: 'review',
-                title: 'Nothing to plan for this brand',
+                title: 'Nothing to plan for this supplier',
                 description: 'It has no active products, or it no longer exists.',
                 content: [],
             });
         }
     } else {
-        if (brands.length === 0) {
+        if (suppliers.length === 0) {
             return ctx.complete({
                 stage: 'review',
                 title: 'Nothing to plan',
-                description: 'No brand has any active products.',
+                description: 'No supplier has any active products. Assign products to their suppliers first.',
                 content: [],
             });
         }
-        const choice = await ctx.ui.page('brand', {
-            stage: 'brand',
-            title: 'Which brand are you ordering from?',
+        const choice = await ctx.ui.page('supplier', {
+            stage: 'supplier',
+            title: 'Which supplier are you ordering from?',
             content: [
-                ctx.ui.select.one('brandId', {
-                    label: 'Brand',
-                    options: brands.map((b) => ({
-                        label: `${b.name} — ${b.productCount} product(s), ${b.leadTimeInDays}-day lead time`,
-                        value: b.brandId,
+                ctx.ui.select.one('supplierId', {
+                    label: 'Supplier',
+                    options: suppliers.map((s) => ({
+                        label: `${s.name} — ${s.productCount} product(s), ${s.leadTimeInDays}-day lead time`,
+                        value: s.supplierId,
                     })),
-                    defaultValue: brands[0].brandId,
+                    defaultValue: suppliers[0].supplierId,
                 }),
             ],
             actions: [{ label: 'Continue', value: 'next', mode: 'primary' }],
         });
-        picked = brands.find((b) => b.brandId === choice.data.brandId)!;
+        picked = suppliers.find((s) => s.supplierId === choice.data.supplierId)!;
     }
-    const brand: PlannableBrand = picked;
+    const supplier: PlannableSupplier = picked;
 
     // ── Order details ───────────────────────────────────────────────────────
-    const defaultTarget = defaultTargetCoverMonths(brand.leadTimeInDays);
+    const defaultTarget = defaultTargetCoverMonths(supplier.leadTimeInDays);
     const details = await ctx.ui.page('details', {
         stage: 'details',
-        title: `Order details — ${brand.name}`,
+        title: `Order details — ${supplier.name}`,
         content: [
             ctx.ui.display.markdown({
                 content:
@@ -111,11 +112,11 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             }),
             ctx.ui.inputs.number('leadTimeInDays', {
                 label: 'Lead time (days)',
-                defaultValue: brand.leadTimeInDays,
+                defaultValue: supplier.leadTimeInDays,
                 min: 1,
                 helpText:
-                    `Purchase to on-the-shelf. ${brand.name} is set to ${brand.leadTimeInDays} days; ` +
-                    'a change here applies to this plan only — edit the brand to change it for good.',
+                    `Purchase to on-the-shelf. ${supplier.name} is set to ${supplier.leadTimeInDays} days; ` +
+                    'a change here applies to this plan only — edit the supplier to change it for good.',
             }),
             ctx.ui.inputs.number('targetCoverMonths', {
                 label: 'Cover on arrival (months)',
@@ -145,13 +146,13 @@ export default PlanPurchase(config, async (ctx, inputs) => {
         targetCoverMonths: Number(details.data.targetCoverMonths),
     };
 
-    const candidates = await ctx.step('load-candidates', async () => await loadPlanCandidates(brand.brandId, today));
+    const candidates = await ctx.step('load-candidates', async () => await loadPlanCandidates(supplier.supplierId, today));
 
     if (candidates.length === 0) {
         return ctx.complete({
             stage: 'review',
-            title: `Nothing to plan for ${brand.name}`,
-            description: 'This brand has no active products.',
+            title: `Nothing to plan for ${supplier.name}`,
+            description: 'This supplier has no active products.',
             content: [],
         });
     }
@@ -170,7 +171,7 @@ export default PlanPurchase(config, async (ctx, inputs) => {
         const page = await ctx.ui.page(`review-${pass}`, {
             stage: 'review',
             fullWidth: true,
-            title: pass === 0 ? `Suggested order — ${brand.name}` : `Recalculated — ${brand.name}`,
+            title: pass === 0 ? `Suggested order — ${supplier.name}` : `Recalculated — ${supplier.name}`,
             description:
                 `Ordered ${formatDate(params.purchaseDate)}, lands ~${formatDate(arrival)} after ` +
                 `${params.leadTimeInDays} days, and every product is topped up to ${params.targetCoverMonths} ` +
@@ -231,22 +232,27 @@ export default PlanPurchase(config, async (ctx, inputs) => {
     return ctx.complete({
         stage: 'review',
         fullWidth: true,
-        title: `Purchase plan — ${brand.name}`,
+        title: `Purchase plan — ${supplier.name}`,
         description:
             `${s.totalUnits} unit(s) across ${s.linesToOrder} product(s). Order ${formatDate(params.purchaseDate)}, ` +
             `lands ~${formatDate(s.arrival)}, in stock until ~${formatDate(s.horizon)}.`,
         content: [
             ...warningBanners(ctx, plan),
             ctx.ui.display.keyValue({ data: summaryRows(plan, params) }),
-            ctx.ui.display.header({ title: 'Order', description: 'Goods cost is the unit cost on each product’s latest supplier bill.' }),
+            ctx.ui.display.header({
+                title: 'Order',
+                description:
+                    'Unit cost is the supplier’s price, in the currency they quote. Products with no price yet fall ' +
+                    'back to the unit cost on their latest supplier bill, in rand.',
+            }),
             ctx.ui.display.table({
                 data: ordered.map((l) => ({
                     SKU: l.sku,
                     Product: l.name,
                     ABC: l.abcClass ?? '',
                     Order: l.orderQuantity,
-                    'Unit cost': l.unitCost === null ? '' : formatRand(l.unitCost),
-                    Value: l.lineValue === null ? '' : formatRand(l.lineValue),
+                    'Unit cost': formatUnitCost(l),
+                    Value: formatLineValue(l),
                     'Cover on arrival': l.coverAtArrivalMonths === null ? '' : `${l.coverAtArrivalMonths.toFixed(1)} mo`,
                     Status: statusLabel(l.statusAtArrival),
                     'In stock until': l.coveredUntil ? formatDate(l.coveredUntil) : '',

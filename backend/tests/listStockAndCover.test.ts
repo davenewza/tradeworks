@@ -21,30 +21,32 @@ async function operator() {
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
-// Two brands whose lead times differ, so the same cover grades differently.
-// Acme's 60 days is L = 2 months: Shortfall < 2, Low 2–3, Good 3–5, Oversupply ≥ 5.
-// Bolt's 30 days is L = 1 month: Shortfall < 1, Low 1–1.5, Good 1.5–2.5, Oversupply ≥ 2.5.
+// Two brands bought from two suppliers whose lead times differ, so the same
+// cover grades differently. Acme's supplier's 60 days is L = 2 months: Shortfall < 2, Low 2–3, Good 3–5, Oversupply ≥ 5.
+// Bolt's supplier's 30 days is L = 1 month: Shortfall < 1, Low 1–1.5, Good 1.5–2.5, Oversupply ≥ 2.5.
 // Cover = stock ÷ estimate, as the nightly job writes it. Values are distinct
 // per column wherever a sort needs one right answer.
 async function seed() {
-    const acme = await models.brand.create({ name: 'Acme', leadTimeInDays: 60 });
-    const bolt = await models.brand.create({ name: 'Bolt', leadTimeInDays: 30 });
+    const acme = await models.brand.create({ name: 'Acme' });
+    const bolt = await models.brand.create({ name: 'Bolt' });
+    const acmeLtd = await models.supplier.create({ name: 'Acme Ltd', leadTimeInDays: 60 });
+    const boltCo = await models.supplier.create({ name: 'Bolt Co', leadTimeInDays: 30 });
     const channel = await models.channel.create({ name: 'Shop' });
 
-    const anvil = await models.product.create({ name: 'Anvil', sku: 'ACME-A', brandId: acme.id, abcClass: AbcClass.A, stockAvailable: 10, stockOnWay: 0, estimatedMonthlySale: 10, currentStockCover: 1.0, totalStockCover: 1.0 });
-    await models.product.create({ name: 'Bellows', sku: 'ACME-B', brandId: acme.id, abcClass: AbcClass.B, stockAvailable: 50, stockOnWay: 10, estimatedMonthlySale: 20, currentStockCover: 2.5, totalStockCover: 3.0 });
-    await models.product.create({ name: 'Crate', sku: 'ACME-C', brandId: acme.id, abcClass: AbcClass.C, stockAvailable: 20, stockOnWay: 5, estimatedMonthlySale: 5, currentStockCover: 4.0, totalStockCover: 5.0 });
-    const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, abcClass: AbcClass.A, stockAvailable: 135, stockOnWay: 60, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
+    const anvil = await models.product.create({ name: 'Anvil', sku: 'ACME-A', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.A, stockAvailable: 10, stockOnWay: 0, estimatedMonthlySale: 10, currentStockCover: 1.0, totalStockCover: 1.0 });
+    await models.product.create({ name: 'Bellows', sku: 'ACME-B', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.B, stockAvailable: 50, stockOnWay: 10, estimatedMonthlySale: 20, currentStockCover: 2.5, totalStockCover: 3.0 });
+    await models.product.create({ name: 'Crate', sku: 'ACME-C', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.C, stockAvailable: 20, stockOnWay: 5, estimatedMonthlySale: 5, currentStockCover: 4.0, totalStockCover: 5.0 });
+    const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, supplierId: boltCo.id, abcClass: AbcClass.A, stockAvailable: 135, stockOnWay: 60, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
     // Never sold: no estimate, so cover, class and status are all blank.
-    await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, stockAvailable: 3 });
+    await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, supplierId: boltCo.id, stockAvailable: 3 });
     // Inactive products never appear, however alarming their figures.
-    await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
+    await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, supplierId: acmeLtd.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
 
     // Lifetime sales feed the "Total sales" column.
     await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: daysAgo(30), productId: anvil.id, quantity: 12, price: 10 });
     await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: daysAgo(20), productId: drill.id, quantity: 3, price: 10 });
 
-    return { acme, bolt };
+    return { acme, bolt, acmeLtd, boltCo };
 }
 
 type Operator = Awaited<ReturnType<typeof operator>>;
@@ -69,7 +71,7 @@ const SORTABLE = [
 ] as const;
 
 describe('listStockAndCover', () => {
-    test('lists every active product by name, with cover graded against its brand lead time', async () => {
+    test('lists every active product by name, with cover graded against its supplier lead time', async () => {
         await seed();
         const { results } = await (await operator()).listStockAndCover();
 
@@ -92,6 +94,19 @@ describe('listStockAndCover', () => {
         expect(await skus(authed, { brand: { id: { equals: acme.id } } })).toEqual(['ACME-A', 'ACME-B', 'ACME-C']);
         expect(await skus(authed, { sku: { startsWith: 'BOLT' } })).toEqual(['BOLT-D', 'BOLT-E']);
         expect(await skus(authed, { name: { contains: 'ell' } })).toEqual(['ACME-B']);
+    });
+
+    test('filters by supplier, which can span brands', async () => {
+        const { boltCo } = await seed();
+        const authed = await operator();
+        const brand = await models.brand.create({ name: 'Cog' });
+        // A Cog product bought through Bolt Co is on Bolt Co's list, graded
+        // against Bolt Co's 30 days: 2 months ≥ 1.5L → Good.
+        await models.product.create({ name: 'Cog', sku: 'COG-1', brandId: brand.id, supplierId: boltCo.id, currentStockCover: 2 });
+
+        expect(await skus(authed, { supplier: { id: { equals: boltCo.id } } })).toEqual(['COG-1', 'BOLT-D', 'BOLT-E']);
+        const { results } = await authed.listStockAndCover({ where: { sku: { equals: 'COG-1' } } });
+        expect(results[0].stockCoverStatus).toBe(StockCoverStatus.GoodSupply);
     });
 
     test('filters by ABC class and by the computed cover status', async () => {

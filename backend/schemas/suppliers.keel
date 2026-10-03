@@ -1,0 +1,55 @@
+// The currencies supplier prices are quoted in. Overseas suppliers invoice in
+// their own currency, so a price is only meaningful alongside its currency.
+enum Currency {
+    ZAR
+    USD
+    GBP
+    EUR
+    CNY
+}
+
+// Who we buy stock from. Distinct from Brand: a brand is what's on the box, a
+// supplier is who invoices us for it. They are often the same company, but a
+// brand can come through a distributor, and one supplier can carry several
+// brands. Purchase planning and stock-cover grading work off the supplier,
+// since the lead time is theirs.
+model Supplier {
+    fields {
+        name Text @unique
+        // What the supplier normally invoices in. Prefilled as the currency
+        // of new prices; each price still carries its own currency.
+        currency Currency @default(Currency.ZAR)
+        // How long (in days) new stock takes to arrive from this supplier,
+        // order to on-the-shelf — grades every product's stock-cover status
+        // and is the default lead time when planning a purchase.
+        leadTimeInDays Number @default(60)
+        notes Text?
+        products Product[]
+        totalProducts Number @computed(COUNTIF(supplier.products, supplier.products.isActive))
+    }
+
+    actions {
+        get getSupplier(id)
+        list listSuppliers() {
+            @orderBy(name: asc)
+        }
+        create createSupplier() with (name, currency?, leadTimeInDays?, notes?)
+        update updateSupplier(id) with (name?, currency?, leadTimeInDays?, notes?)
+        delete deleteSupplier(id)
+    }
+
+    @validate(supplier.leadTimeInDays > 0, "A supplier's lead time should be at least 1 day")
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, create, update, delete]
+    )
+}
+
+// One-off: a supplier per brand whose active products have no supplier yet,
+// named after the brand and carrying its lead time, with those products
+// assigned to it. For the common case where the brand is the supplier; fix
+// up the exceptions afterwards on each product.
+flow CreateSuppliersFromBrands {
+    @permission(roles: [Operator])
+}
