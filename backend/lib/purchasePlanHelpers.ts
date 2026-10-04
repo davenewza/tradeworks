@@ -440,20 +440,31 @@ function unitCostOf(
     return { unitCost: null, currency: null, costSource: null };
 }
 
-// Cost of goods per unit on each product's most recent supplier bill. Bills
-// with no date sort last; ties on date break on the line's own creation
-// order. One DISTINCT ON query rather than a fetch per product.
+// Cost of goods per unit on each product's most recent supplier bill —
+// quantity-weighted, should the bill list the product on more than one line.
+// Bills with no date sort last; ties on date break on the order the bills
+// were stored. One DISTINCT ON query rather than a fetch per product.
 export async function loadLatestUnitCosts(productIds: string[]): Promise<Map<string, number>> {
     if (productIds.length === 0) return new Map();
     const db = useDatabase();
     const result = await sql<{ productId: string; unitCost: string | number }>`
-        select distinct on (pcl.product_id)
-            pcl.product_id,
-            pcl.unit_cost
-        from product_cost_line pcl
-        join supplier_bill sb on sb.id = pcl.supplier_bill_id
-        where pcl.product_id = any(${productIds})
-        order by pcl.product_id, sb.date desc nulls last, pcl.created_at desc
+        with per_bill as (
+            select
+                l.product_id,
+                sb.date,
+                sb.created_at,
+                case
+                    when sum(l.quantity) > 0 then sum(l.unit_cost * l.quantity) / sum(l.quantity)
+                    else avg(l.unit_cost)
+                end as unit_cost
+            from supplier_bill_line l
+            join supplier_bill sb on sb.id = l.supplier_bill_id
+            where l.product_id = any(${productIds})
+            group by l.product_id, sb.id
+        )
+        select distinct on (product_id) product_id, unit_cost
+        from per_bill
+        order by product_id, date desc nulls last, created_at desc
     `.execute(db);
 
     return new Map(result.rows.map((row) => [row.productId, Number(row.unitCost)]));

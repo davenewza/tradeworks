@@ -334,14 +334,20 @@
       ]
     },
     {
-      "id": "costLines",
+      "id": "billLines",
+      "title": "Purchases",
       "tools": [
         {
           "action_link": {
-            "tool_id": "list-product-cost-lines"
+            "tool_id": "list-supplier-bill-lines"
           },
           "response_overrides": {
-            "$.results[*].productId": false
+            "$.results[*].productId": false,
+            "$.results[*].productName": false,
+            "$.results[*].sku": false,
+            "$.results[*].name": false,
+            "$.results[*].accountName": false,
+            "$.results[*].isLandedCost": false
           }
         }
       ]

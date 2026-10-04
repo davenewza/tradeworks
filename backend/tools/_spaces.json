@@ -237,6 +237,26 @@
             "hidden": false
           },
           {
+            "id": "action-list-supplier-bills",
+            "link": {
+              "tool_id": "list-supplier-bills",
+              "title": "Supplier bills",
+              "description": "Every bill from our suppliers, line by line, with the freight allocated to each",
+              "display_order": 3
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-sync-supplier-bills",
+            "link": {
+              "tool_id": "sync-supplier-bills",
+              "title": "Sync supplier bills from Zoho",
+              "description": "Pull new and changed bills now — it also runs nightly",
+              "display_order": 4
+            },
+            "hidden": false
+          },
+          {
             "id": "action-list-products-without-supplier",
             "link": {
               "tool_id": "list-products-without-supplier",

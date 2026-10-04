@@ -34,6 +34,7 @@ model Supplier {
         leadTimeInDays Number @default(60)
         notes Text?
         products Product[]
+        bills SupplierBill[]
         totalProducts Number @computed(COUNTIF(supplier.products, supplier.products.isActive))
     }
 

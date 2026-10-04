@@ -241,5 +241,25 @@
         ]
       }
     }
+  },
+  {
+    "id": "SupplierBillLine.unitCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "SupplierBillLine.unitFreightIn",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "SupplierBillLine.landedUnitCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "SupplierBillLine.freightIn",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "SupplierBillLine.extendedUnitCost",
+    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
   }
 ]

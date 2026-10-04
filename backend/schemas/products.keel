@@ -72,18 +72,23 @@ model Product {
         views ProductViews[]
         sales Sale[]
         channelFees ProductChannelFee[]
-        costLines ProductCostLine[]
+        billLines SupplierBillLine[]
         prices ProductPrice[]
         channelCodes ProductChannelCode[]
         // Weighted-average cost of goods and freight-in across the product's
-        // supplier bills, weighted by units received. SUM is COALESCE'd to 0, so
-        // the IF guards the no-cost-lines 0/0 case.
-        weightedUnitCost Decimal? @computed(IF(SUM(product.costLines.quantity) > 0, SUM(product.costLines.extendedUnitCost) / SUM(product.costLines.quantity), SUM(product.costLines.extendedUnitCost) * 0))
-        weightedFreightIn Decimal? @computed(IF(SUM(product.costLines.quantity) > 0, SUM(product.costLines.extendedFreightIn) / SUM(product.costLines.quantity), SUM(product.costLines.extendedFreightIn) * 0))
+        // supplier bill lines, weighted by units bought. Freight is averaged
+        // only over bills that have had their landed costs allocated: an
+        // import's freight arrives on later bills, and counting it as zero
+        // meanwhile would understate the landed cost. SUM is COALESCE'd to 0,
+        // so the IFs guard the no-lines 0/0 case.
+        weightedUnitCost Decimal? @computed(IF(SUM(product.billLines.quantity) > 0, SUM(product.billLines.extendedUnitCost) / SUM(product.billLines.quantity), 0))
+        weightedFreightIn Decimal? @computed(IF(SUM(product.billLines.freightedQuantity) > 0, SUM(product.billLines.freightIn) / SUM(product.billLines.freightedQuantity), 0))
         weightedLandedCost Decimal? @computed(product.weightedUnitCost + product.weightedFreightIn)
-        // Purchase history summary across the product's supplier bills.
-        totalSupplierBills Number? @computed(COUNT(product.costLines.id))
-        totalUnitsPurchased Decimal? @computed(SUM(product.costLines.quantity))
+        // Purchase history summary across the product's supplier bill lines.
+        // A bill lists a product on one line, so the line count is the bill
+        // count unless a bill splits the product across lines.
+        totalSupplierBills Number? @computed(COUNT(product.billLines.id))
+        totalUnitsPurchased Decimal? @computed(SUM(product.billLines.quantity))
         // Sales history summary across the product's synced sales. Revenue and
         // average price use the realized net amount (excl VAT, after discount),
         // so promotions/discounts are reflected — not the list price.

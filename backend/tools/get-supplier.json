@@ -74,6 +74,20 @@
           }
         }
       ]
+    },
+    {
+      "id": "bills",
+      "title": "Bills",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-supplier-bills"
+          },
+          "response_overrides": {
+            "$.results[*].supplierId": false
+          }
+        }
+      ]
     }
   ]
 }
