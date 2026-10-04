@@ -131,5 +131,12 @@
     "config": "{\"query\":{\"measures\":[\"product.stock_value\"],\"dimensions\":[\"product.abc_class\",\"product.sku\",\"product.name\",\"brand.name\",\"product.stock_available\",\"product.current_stock_cover\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]},{\"member\":\"product.stock_cover_status\",\"operator\":\"equals\",\"values\":[\"Oversupply\"]}],\"order\":[[\"product.stock_value\",\"desc\"]],\"limit\":500},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{\"product.abc_class\":\"Class\",\"product.sku\":\"SKU\",\"product.name\":\"Product\",\"brand.name\":\"Brand\",\"product.stock_available\":\"Stock available\",\"product.current_stock_cover\":\"Current cover (months)\",\"product.stock_value\":\"Stock value (landed cost)\"},\"pageSize\":25,\"pivot\":{\"x\":[\"product.abc_class\",\"product.sku\",\"product.name\",\"brand.name\",\"product.stock_available\",\"product.current_stock_cover\",\"measures\"],\"y\":[]}},\"version\":3}",
     "createdAt": "2026-09-24T09:00:00.000000Z",
     "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "chart_3KB6fLe7TRsLwbJ07KBdYEyHGct",
+    "name": "Retail prices by price list (incl VAT)",
+    "config": "{\"query\":{\"measures\":[\"product_price.price_incl_vat_max\"],\"dimensions\":[\"brand.name\",\"product.sku\",\"product.name\",\"price_list.name\"],\"filters\":[{\"member\":\"product.is_active\",\"operator\":\"equals\",\"values\":[\"true\"]}],\"order\":[[\"brand.name\",\"asc\"],[\"product.name\",\"asc\"],[\"price_list.name\",\"asc\"]],\"limit\":10000},\"settings\":{\"chartType\":\"table\",\"columns\":null,\"columnTitles\":{\"brand_name\":\"Brand\",\"product_sku\":\"SKU\",\"product_name\":\"Product\"},\"pageSize\":25,\"pivot\":{\"x\":[\"brand.name\",\"product.sku\",\"product.name\",\"measures\"],\"y\":[\"price_list.name\"]}},\"version\":3}",
+    "createdAt": "2026-10-03T09:00:00.000000Z",
+    "updatedAt": "2026-10-03T09:00:00.000000Z"
   }
 ]
