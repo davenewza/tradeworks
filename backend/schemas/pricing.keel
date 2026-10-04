@@ -33,6 +33,14 @@ model PriceList {
         expression: ctx.isAuthenticated,
         actions: [get, create, list, update, delete]
     )
+
+    // Redundant for the API, but reporting reads roles only: without this the
+    // `price_list` cube is denied and the Price comparison dashboard's columns
+    // and Price list filter fail in hosted. See Channel for the full story.
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
 }
 
 model ProductPrice {
@@ -139,6 +147,14 @@ model ProductPrice {
     @permission(
         expression: ctx.isAuthenticated,
         actions: [get, create, list, update, delete]
+    )
+
+    // Redundant for the API, but reporting reads roles only: without this the
+    // `product_price` cube behind the Price comparison dashboard is denied in
+    // hosted. See Channel for the full story.
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
     )
 }
 

@@ -30,5 +30,13 @@
     "filters": "[{\"id\":\"f_stockcoverbrand\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\"},{\"id\":\"f_stockcoverclass\",\"name\":\"ABC class\",\"type\":\"text\",\"member\":\"product.abc_class\",\"defaultOperator\":\"equals\"},{\"id\":\"f_stockcoverstatus\",\"name\":\"Status\",\"type\":\"text\",\"member\":\"product.stock_cover_status\",\"defaultOperator\":\"equals\"}]",
     "createdAt": "2026-09-24T09:00:00.000000Z",
     "updatedAt": "2026-09-24T09:00:00.000000Z"
+  },
+  {
+    "id": "dashboard_3KB6fEmUSHFQG6Qx7LbzpBoFCiF",
+    "name": "Price comparison",
+    "items": "[{\"id\":\"item-1791018715564-pricematrix\",\"chartId\":\"chart_3KB6fLe7TRsLwbJ07KBdYEyHGct\",\"layout\":{\"i\":\"item-1791018715564-pricematrix\",\"x\":0,\"y\":0,\"w\":24,\"h\":16,\"minW\":4,\"minH\":3}}]",
+    "filters": "[{\"id\":\"f_pricecompbrand\",\"name\":\"Brand\",\"type\":\"text\",\"member\":\"brand.name\",\"defaultOperator\":\"equals\"},{\"id\":\"f_pricecomplist\",\"name\":\"Price list\",\"type\":\"text\",\"member\":\"price_list.name\",\"defaultOperator\":\"equals\"}]",
+    "createdAt": "2026-10-03T09:00:00.000000Z",
+    "updatedAt": "2026-10-03T09:00:00.000000Z"
   }
 ]
