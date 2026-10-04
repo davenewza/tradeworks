@@ -40,7 +40,7 @@ export default SyncProducts(config, async (ctx) => {
                     '- **Deactivate** products whose Zoho item has gone **inactive**, taking them out of the catalogue.',
                     '- **Reactivate** products whose Zoho item is **active** again, bringing them back.',
                     "- **Add a photo** from Zoho to active products that don't have one yet. Existing photos are never replaced.",
-                    '- **Delete** products that are no longer in Zoho at all — no item, active or inactive, carries their SKU. Deleting a product also removes its prices (and any quote lines on them), cost lines, channel fees and channel codes. A product with **sales** is never deleted.',
+                    '- **Delete** products that are no longer in Zoho at all — no item, active or inactive, carries their SKU. Deleting a product also removes its prices (and any quote lines on them), channel fees and channel codes; its lines on supplier bills stay, unlinked. A product with **sales** is never deleted.',
                     '',
                     'A product\'s active status lives in Zoho and is only ever changed there — this sync is how it reaches us.',
                     'Product dimensions and prices are **not** touched.',

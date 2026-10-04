@@ -330,6 +330,11 @@ describe('loading', () => {
             price: 10,
             netAmount: quantity * 10,
         });
+    const bill = (billNumber: string, date: Date | null) =>
+        models.supplierBill.create({ zohoBillId: `zb-${billNumber}`, billNumber, date, zohoModifiedAt: NOW });
+    let lineCount = 0;
+    const billLine = (supplierBillId: string, productId: string, unitCost: number, quantity: number) =>
+        models.supplierBillLine.create({ supplierBillId, productId, unitCost, quantity, zohoLineItemId: `li-${++lineCount}`, position: lineCount });
 
     test('loadPlannableSuppliers lists suppliers with active products, with their lead times and counts', async () => {
         const brand = await models.brand.create({ name: 'Acme' });
@@ -382,11 +387,11 @@ describe('loading', () => {
         // Widget has no supplier price, so it falls back to its bills: the
         // later one's cost wins, regardless of insert order. Dormant has a
         // supplier price, which wins over its bill.
-        const newer = await models.supplierBill.create({ billNumber: 'B-2', date: new Date('2026-05-01') });
-        const older = await models.supplierBill.create({ billNumber: 'B-1', date: new Date('2025-01-01') });
-        await models.productCostLine.create({ productId: widget.id, supplierBillId: newer.id, unitCost: 55, quantity: 100, zohoRecordId: 'z2' });
-        await models.productCostLine.create({ productId: widget.id, supplierBillId: older.id, unitCost: 40, quantity: 100, zohoRecordId: 'z1' });
-        await models.productCostLine.create({ productId: dormant.id, supplierBillId: newer.id, unitCost: 140, quantity: 10, zohoRecordId: 'z3' });
+        const newer = await bill('B-2', new Date('2026-05-01'));
+        const older = await bill('B-1', new Date('2025-01-01'));
+        await billLine(newer.id, widget.id, 55, 100);
+        await billLine(older.id, widget.id, 40, 100);
+        await billLine(newer.id, dormant.id, 140, 10);
 
         const candidates = await loadPlanCandidates(acme.id, NOW);
 
@@ -416,12 +421,25 @@ describe('loading', () => {
     test('loadLatestUnitCosts puts undated bills last and handles an empty request', async () => {
         const brand = await models.brand.create({ name: 'Acme' });
         const product = await models.product.create({ name: 'P', sku: 'P', brandId: brand.id });
-        const undated = await models.supplierBill.create({ billNumber: 'U' });
-        const dated = await models.supplierBill.create({ billNumber: 'D', date: new Date('2024-01-01') });
-        await models.productCostLine.create({ productId: product.id, supplierBillId: undated.id, unitCost: 99, zohoRecordId: 'u' });
-        await models.productCostLine.create({ productId: product.id, supplierBillId: dated.id, unitCost: 12, zohoRecordId: 'd' });
+        const undated = await bill('U', null);
+        const dated = await bill('D', new Date('2024-01-01'));
+        await billLine(undated.id, product.id, 99, 1);
+        await billLine(dated.id, product.id, 12, 1);
 
         expect(await loadLatestUnitCosts([product.id])).toEqual(new Map([[product.id, 12]]));
         expect(await loadLatestUnitCosts([])).toEqual(new Map());
+    });
+
+    test('loadLatestUnitCosts weights a product split over two lines of its latest bill', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        const product = await models.product.create({ name: 'P', sku: 'P', brandId: brand.id });
+        const older = await bill('OLD', new Date('2024-01-01'));
+        const latest = await bill('NEW', new Date('2025-01-01'));
+        await billLine(older.id, product.id, 99, 10);
+        // 30 @ 10 and 10 @ 14 → (300 + 140) / 40 = 11.
+        await billLine(latest.id, product.id, 10, 30);
+        await billLine(latest.id, product.id, 14, 10);
+
+        expect(await loadLatestUnitCosts([product.id])).toEqual(new Map([[product.id, 11]]));
     });
 });

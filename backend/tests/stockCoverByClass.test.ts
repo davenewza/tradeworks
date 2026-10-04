@@ -15,10 +15,10 @@ async function operator() {
     return actions.withIdentity(await models.identity.create({ email, userId: user.id }));
 }
 
-// One supplier bill per product, so its weighted landed cost is that bill's unit cost.
+// One supplier bill line per product, so its weighted landed cost is that line's unit cost.
 async function costAt(productId: string, unitCost: number) {
-    const bill = await models.supplierBill.create({ billNumber: `B-${productId}`, date: new Date() });
-    await models.productCostLine.create({ productId, supplierBillId: bill.id, unitCost, quantity: 100, zohoRecordId: `z-${productId}` });
+    const bill = await models.supplierBill.create({ zohoBillId: `zb-${productId}`, billNumber: `B-${productId}`, date: new Date(), zohoModifiedAt: new Date() });
+    await models.supplierBillLine.create({ supplierBillId: bill.id, productId, unitCost, quantity: 100, zohoLineItemId: `li-${productId}`, position: 1 });
 }
 
 //  class  product  brand  stock  est/month  landed cost  value

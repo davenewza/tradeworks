@@ -119,7 +119,7 @@
     "$.results[*].channelFees": {
       "visible": false
     },
-    "$.results[*].costLines": {
+    "$.results[*].billLines": {
       "visible": false
     },
     "$.results[*].prices": {

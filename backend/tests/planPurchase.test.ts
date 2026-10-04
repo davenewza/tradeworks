@@ -31,8 +31,8 @@ async function seedSupplier() {
     // First sold years ago (12 months active), 360 in the trailing year → 30/month.
     await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: daysAgo(3 * 365), productId: widget.id, quantity: 1, price: 10 });
     await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: daysAgo(200), productId: widget.id, quantity: 360, price: 10 });
-    const bill = await models.supplierBill.create({ billNumber: 'B-1', date: daysAgo(100) });
-    await models.productCostLine.create({ productId: widget.id, supplierBillId: bill.id, unitCost: 50, quantity: 200, zohoRecordId: 'z1' });
+    const bill = await models.supplierBill.create({ zohoBillId: 'zb-1', billNumber: 'B-1', date: daysAgo(100), zohoModifiedAt: new Date() });
+    await models.supplierBillLine.create({ supplierBillId: bill.id, productId: widget.id, unitCost: 50, quantity: 200, zohoLineItemId: 'li-1', position: 1 });
     return { supplier, widget, gadget };
 }
 

@@ -1,0 +1,37 @@
+{
+  "id": "list-supplier-bills",
+  "action_name": "listSupplierBills",
+  "name": "Supplier bills",
+  "title": "Supplier bills",
+  "icon": "emoji:🧾",
+  "help_text": "Every bill from every supplier linked to a Zoho vendor, mirrored nightly by Sync supplier bills. Products price off their lines: cost of goods and freight-in are averages over them, weighted by units bought.",
+  "response": {
+    "$.results[*].date": { "display_order": 0 },
+    "$.results[*].billNumber": { "display_name": "Bill number", "display_order": 1 },
+    "$.results[*].supplierId": { "display_name": "Supplier", "display_order": 2 },
+    "$.results[*].status": { "display_order": 3 },
+    "$.results[*].currencyCode": { "display_name": "Currency", "display_order": 4 },
+    "$.results[*].total": { "display_name": "Total incl VAT", "display_order": 5 },
+    "$.results[*].synchronisedAt": { "display_name": "Synced", "display_order": 6 },
+    "$.results[*].supplierName": { "visible": false },
+    "$.results[*].zohoBillId": { "display_name": "Zoho bill ID", "visible": false },
+    "$.results[*].zohoModifiedAt": { "display_name": "Modified in Zoho", "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": {
+      "display_order": 10,
+      "link": {
+        "tool_id": "get-supplier-bill",
+        "display_order": 0,
+        "data_mapping": [{ "key": "$.id", "path": { "path": "$.results[*].id" } }]
+      }
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "get-supplier-bill",
+      "title": "View bill",
+      "display_order": 0
+    }
+  ]
+}

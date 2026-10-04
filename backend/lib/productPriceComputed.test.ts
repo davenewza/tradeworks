@@ -9,6 +9,20 @@ beforeEach(resetDatabase);
 
 const num = (v: unknown) => Number(v);
 
+async function createBill(billNumber: string, date: Date | null = null) {
+    return await models.supplierBill.create({ zohoBillId: `zb-${billNumber}`, billNumber, date, zohoModifiedAt: new Date() });
+}
+
+let lineCount = 0;
+async function createBillLine(
+    supplierBillId: string,
+    productId: string | null,
+    line: { unitCost: number; quantity: number; freightIn?: number; freightAllocated?: boolean; isLandedCost?: boolean }
+) {
+    lineCount++;
+    return await models.supplierBillLine.create({ supplierBillId, productId, zohoLineItemId: `li-${lineCount}`, position: lineCount, ...line });
+}
+
 // Product with a bill landing at 253.12/unit, 11% success + R42 fulfilment on the
 // Takealot channel, plus a 20% success fee on a DIFFERENT channel (must be ignored).
 async function seed() {
@@ -25,8 +39,9 @@ async function seed() {
     await models.productChannelFee.create({ productId: product.id, channelFeeId: fulfil.id });
     await models.productChannelFee.create({ productId: product.id, channelFeeId: otherSuccess.id });
 
-    const bill = await models.supplierBill.create({ billNumber: 'BILL-1', date: new Date('2021-02-19') });
-    await models.productCostLine.create({ productId: product.id, supplierBillId: bill.id, unitCost: 193.1, unitFreightIn: 60.02, quantity: 100, zohoRecordId: 'c1' });
+    // 100 units at 193.10, with 6002 of freight allocated across them (60.02 each).
+    const bill = await createBill('BILL-1', new Date('2021-02-19'));
+    await createBillLine(bill.id, product.id, { unitCost: 193.1, quantity: 100, freightIn: 6002, freightAllocated: true });
 
     return { product, takealot, other, success };
 }
@@ -201,22 +216,92 @@ describe('ProductPrice computed pricing', () => {
 });
 
 describe('Product purchase details', () => {
+    async function kit(sku = 'K-1') {
+        const brand = (await models.brand.findMany({ where: { name: { equals: 'B' } } }))[0] ?? (await models.brand.create({ name: 'B' }));
+        return await models.product.create({ name: 'Kit', sku, brandId: brand.id });
+    }
+
     test('summarises cost, freight and volumes across supplier bills', async () => {
-        const brand = await models.brand.create({ name: 'B' });
-        const product = await models.product.create({ name: 'Kit', sku: 'K-1', brandId: brand.id });
-        const bill1 = await models.supplierBill.create({ billNumber: 'B1' });
-        const bill2 = await models.supplierBill.create({ billNumber: 'B2' });
-        // 10 @ 100/60 and 30 @ 120/20.
-        await models.productCostLine.create({ productId: product.id, supplierBillId: bill1.id, unitCost: 100, unitFreightIn: 60, quantity: 10, zohoRecordId: 'c1' });
-        await models.productCostLine.create({ productId: product.id, supplierBillId: bill2.id, unitCost: 120, unitFreightIn: 20, quantity: 30, zohoRecordId: 'c2' });
+        const product = await kit();
+        // 10 @ 100 with 600 of freight (60 each), and 30 @ 120 with 600 (20 each).
+        await createBillLine((await createBill('B1')).id, product.id, { unitCost: 100, quantity: 10, freightIn: 600, freightAllocated: true });
+        await createBillLine((await createBill('B2')).id, product.id, { unitCost: 120, quantity: 30, freightIn: 600, freightAllocated: true });
 
         const p = await models.product.findOne({ id: product.id });
         expect(num(p!.totalSupplierBills)).toBe(2);
         expect(num(p!.totalUnitsPurchased)).toBe(40);
-        // (100*10 + 120*30)/40 = 115 ; (60*10 + 20*30)/40 = 30
+        // (100*10 + 120*30)/40 = 115 ; (600 + 600)/40 = 30
         expect(num(p!.weightedUnitCost)).toBeCloseTo(115, 6);
         expect(num(p!.weightedFreightIn)).toBeCloseTo(30, 6);
         expect(num(p!.weightedLandedCost)).toBeCloseTo(145, 6);
+    });
+
+    test('averages freight only over bills whose landed costs have been allocated', async () => {
+        const product = await kit();
+        await createBillLine((await createBill('B1')).id, product.id, { unitCost: 100, quantity: 10, freightIn: 600, freightAllocated: true });
+        await createBillLine((await createBill('B2')).id, product.id, { unitCost: 120, quantity: 30, freightIn: 600, freightAllocated: true });
+        // An import billed before its freight: its goods cost counts at once,
+        // but it must not drag the freight average down as if it were free.
+        await createBillLine((await createBill('B3')).id, product.id, { unitCost: 130, quantity: 40 });
+
+        const p = await models.product.findOne({ id: product.id });
+        // (1000 + 3600 + 5200) / 80 = 122.5 ; freight still (600 + 600) / 40 = 30
+        expect(num(p!.weightedUnitCost)).toBeCloseTo(122.5, 6);
+        expect(num(p!.weightedFreightIn)).toBeCloseTo(30, 6);
+        expect(num(p!.weightedLandedCost)).toBeCloseTo(152.5, 6);
+        expect(num(p!.totalUnitsPurchased)).toBe(80);
+    });
+
+    test('costs a product bought only on bills with no landed costs at its unit cost', async () => {
+        // A local supplier: no freight is ever allocated.
+        const product = await kit();
+        await createBillLine((await createBill('L1')).id, product.id, { unitCost: 80, quantity: 5 });
+
+        const p = await models.product.findOne({ id: product.id });
+        expect(num(p!.weightedUnitCost)).toBe(80);
+        expect(num(p!.weightedFreightIn)).toBe(0);
+        expect(num(p!.weightedLandedCost)).toBe(80);
+    });
+
+    test('counts a product split across two lines of one bill as one purchase at their weighted cost', async () => {
+        const product = await kit();
+        const bill = await createBill('B1');
+        await createBillLine(bill.id, product.id, { unitCost: 10, quantity: 30, freightIn: 60, freightAllocated: true });
+        await createBillLine(bill.id, product.id, { unitCost: 14, quantity: 10, freightIn: 20, freightAllocated: true });
+
+        const p = await models.product.findOne({ id: product.id });
+        // (300 + 140) / 40 = 11 ; (60 + 20) / 40 = 2
+        expect(num(p!.weightedUnitCost)).toBeCloseTo(11, 6);
+        expect(num(p!.weightedFreightIn)).toBeCloseTo(2, 6);
+        expect(num(p!.totalUnitsPurchased)).toBe(40);
+    });
+
+    test("ignores a bill's lines that aren't the product", async () => {
+        const product = await kit();
+        const bill = await createBill('B1');
+        await createBillLine(bill.id, product.id, { unitCost: 50, quantity: 10, freightIn: 100, freightAllocated: true });
+        // The bill's own customs charge, and another product's line.
+        await createBillLine(bill.id, null, { unitCost: 300, quantity: 1, freightAllocated: true, isLandedCost: true });
+        await createBillLine(bill.id, (await kit('K-2')).id, { unitCost: 999, quantity: 1, freightIn: 900, freightAllocated: true });
+
+        const p = await models.product.findOne({ id: product.id });
+        expect(num(p!.weightedUnitCost)).toBe(50);
+        expect(num(p!.weightedFreightIn)).toBe(10);
+        expect(num(p!.totalSupplierBills)).toBe(1);
+    });
+
+    test('feeds the bill lines through to the price', async () => {
+        const product = await kit();
+        await createBillLine((await createBill('B1')).id, product.id, { unitCost: 100, quantity: 10, freightIn: 250, freightAllocated: true });
+        const priceList = await models.priceList.create({ name: 'Retail' });
+        const created = await models.productPrice.create({ productId: product.id, priceListId: priceList.id, priceInclVat: 230 });
+
+        const pp = await models.productPrice.findOne({ id: created.id });
+        expect(num(pp!.unitCost)).toBe(100);
+        expect(num(pp!.unitFreightIn)).toBe(25);
+        expect(num(pp!.landedUnitCost)).toBe(125);
+        // 230 incl VAT → 200 excl, less 125 landed and no channel or ad costs.
+        expect(num(pp!.grossProfit)).toBeCloseTo(75, 6);
     });
 
     test('is empty for a product with no bills', async () => {

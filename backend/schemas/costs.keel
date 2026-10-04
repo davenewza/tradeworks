@@ -1,22 +1,43 @@
-// Product cost of goods, split by supplier bill. Freight-in differs per bill
-// (air vs sea especially), so cost is tracked per (product, bill) rather than as
-// a single figure on the product. The pricing calculator collapses these into a
-// single representative landed cost (weighted-average by default) and shows the
-// per-bill spread as a margin sensitivity. Synced from Zoho Books.
-// A supplier bill (purchase). Identified by its bill number, the natural key
-// shared with Zoho. Created on sync from the cost-of-goods records.
+// Product cost of goods and freight-in, from what our suppliers bill us.
+// SyncSupplierBills mirrors every bill from every supplier linked to a Zoho
+// vendor, line by line, from Zoho Inventory. Freight-in differs per bill (air
+// vs sea especially), so the lines keep it per bill; Product collapses them
+// into quantity-weighted averages, which the pricing calculator, stock value
+// and purchase planning all price off.
+//
+// Both models are a copy of Zoho with no local edits, so a sync is free to
+// rewrite them, and they can be dropped and re-imported at any time.
+
+// A bill from one of our suppliers.
 model SupplierBill {
     fields {
-        billNumber Text @unique
-        vendorName Text?
+        // Zoho's bill_id. Bill numbers are the supplier's own invoice
+        // numbers, so they are only unique per supplier.
+        zohoBillId Text @unique
+        // Optional so that deleting a supplier keeps its bills, and with them
+        // the cost history its products are priced from. Importing the vendor
+        // again links them back on the next sync.
+        supplier Supplier?
+        billNumber Text
         date Date?
-        costLines ProductCostLine[]
+        // Zoho's status: open, overdue, partially_paid, paid… A bill voided in
+        // Zoho is removed here.
+        status Text?
+        currencyCode Text?
+        // Incl VAT, in the bill's currency.
+        total Decimal?
+        lines SupplierBillLine[]
+        // Zoho's last_modified_time as at the last read. A sync reads the
+        // bill again only when Zoho's has moved on. Allocating freight from
+        // another bill (a forwarder's or a courier's) moves it too.
+        zohoModifiedAt Timestamp
+        supplierName Text? @computed(supplierBill.supplier.name)
         synchronisedAt Timestamp?
     }
 
     actions {
         get getSupplierBill(id)
-        list listSupplierBills(billNumber?) {
+        list listSupplierBills(supplier.id?, billNumber?) {
             @orderBy(date: desc)
         }
     }
@@ -27,46 +48,61 @@ model SupplierBill {
     )
 }
 
-// One product's cost as recorded on a single supplier bill: cost of goods plus
-// the freight-in allocated per unit, both excl VAT. `landedUnitCost` is the sum
-// the calculator prices off. Cost records are shared lookups keyed on their Zoho
-// record; a product has at most one line per bill.
-model ProductCostLine {
+// One line of a supplier bill, as Zoho holds it: a stock item, or anything
+// else billed alongside (a freight or customs charge, a prepayment,
+// packaging). Every amount is excl VAT and in rand, whatever the bill's
+// currency.
+model SupplierBillLine {
     fields {
-        product Product
         supplierBill SupplierBill
-        // Cost of goods per unit on this bill, excl VAT.
+        // The stock item on the line, matched by SKU. Unset on lines that
+        // aren't stock, and on SKUs with no product here yet; a sync links
+        // those once Sync Products brings the product in.
+        product Product?
+        sku Text?
+        name Text?
+        // The account Zoho books the line to, e.g. "Inventory Asset" or
+        // "Advance to Suppliers".
+        accountName Text?
+        quantity Decimal
+        // Cost of goods per unit: the line's total after discount, excl VAT,
+        // divided by its quantity.
         unitCost Decimal
-        // Freight-in allocated per unit on this bill, excl VAT. Defaults to 0
-        // when a bill carries no freight (e.g. local stock).
-        unitFreightIn Decimal @default(0.0)
-        // Units received on this bill — the weight for a weighted-average cost.
-        quantity Decimal?
-        landedUnitCost Decimal @computed(productCostLine.unitCost + productCostLine.unitFreightIn)
-        // Quantity-weighted contributions, so a product's weighted-average cost of
-        // goods / freight are SUM(extended…) / SUM(quantity) (SUM can't take a
-        // product of two fields directly).
-        extendedUnitCost Decimal? @computed(productCostLine.unitCost * productCostLine.quantity)
-        extendedFreightIn Decimal? @computed(productCostLine.unitFreightIn * productCostLine.quantity)
-        // Display copies of the linked records, so a product's cost history is
-        // legible in one table without following each lookup. Optional to stay
-        // migration-safe, matching the channel-fee models.
-        productName Text? @computed(productCostLine.product.name)
-        productSku Text? @computed(productCostLine.product.sku)
-        billNumber Text? @computed(productCostLine.supplierBill.billNumber)
-        billDate Date? @computed(productCostLine.supplierBill.date)
-        zohoRecordId Text @unique
-        synchronisedAt Timestamp?
+        // The freight, duties and fees Zoho allocated to this line from the
+        // bill's landed costs, in total (not per unit).
+        freightIn Decimal @default(0.0)
+        // Whether the bill has had landed costs allocated to it. Until it
+        // has, its freight is unknown rather than zero: an import is billed
+        // before the forwarder's and customs bills arrive. Such lines count
+        // towards a product's cost of goods but not its freight-in.
+        freightAllocated Boolean @default(false)
+        // A landed cost itself (a freight or customs charge on the bill).
+        // Zoho spreads its amount over the stock lines' freightIn.
+        isLandedCost Boolean @default(false)
+        unitFreightIn Decimal? @computed(IF(supplierBillLine.quantity > 0, supplierBillLine.freightIn / supplierBillLine.quantity, 0))
+        landedUnitCost Decimal? @computed(supplierBillLine.unitCost + supplierBillLine.unitFreightIn)
+        // Quantity-weighted contributions, so a product's weighted averages
+        // are SUMs over its lines (SUM can't take a product of two fields).
+        extendedUnitCost Decimal? @computed(supplierBillLine.unitCost * supplierBillLine.quantity)
+        freightedQuantity Decimal? @computed(IF(supplierBillLine.freightAllocated, supplierBillLine.quantity, 0))
+        // Display copies of the linked records, so a product's purchase
+        // history is legible in one table.
+        billNumber Text? @computed(supplierBillLine.supplierBill.billNumber)
+        billDate Date? @computed(supplierBillLine.supplierBill.date)
+        productName Text? @computed(supplierBillLine.product.name)
+        // Zoho's line_item_id. Not a stable key: Zoho issues new ones when a
+        // bill is saved, so a sync replaces a changed bill's lines outright.
+        zohoLineItemId Text
+        // The line's position on the bill, from 1.
+        position Number
     }
 
     actions {
-        get getProductCostLine(id)
-        list listProductCostLines(product.id?, supplierBill.id?) {
-            @orderBy(billDate: desc)
+        get getSupplierBillLine(id)
+        list listSupplierBillLines(supplierBill.id?, product.id?) {
+            @orderBy(billDate: desc, position: asc)
         }
     }
-
-    @unique([product, supplierBill])
 
     @permission(
         roles: [Operator],
@@ -74,10 +110,18 @@ model ProductCostLine {
     )
 }
 
-flow SyncSupplierCosts {
-    inputs {
-        dateFrom Date
-        dateTo Date
-    }
+// Mirrors every bill from every supplier linked to a Zoho vendor (see
+// ImportSuppliers), with its lines and the freight Zoho allocated to them.
+// Bills unchanged since the last run are skipped on the strength of one list
+// call per supplier, so after the first run this costs a handful of calls
+// against the shared Zoho quota.
+flow SyncSupplierBills {
+    @permission(roles: [Operator])
+}
+
+// The same sync, nightly. 4am keeps it clear of ScheduledSyncStock (2am) and
+// ScheduledSyncChannelCodes (3am).
+flow ScheduledSyncSupplierBills {
+    @schedule("every day at 4am")
     @permission(roles: [Operator])
 }
