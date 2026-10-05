@@ -8,12 +8,6 @@
     "$.results[*].supplierId": {
       "visible": false
     },
-    "$.results[*].supplierUnitCost": {
-      "visible": false
-    },
-    "$.results[*].supplierCurrency": {
-      "visible": false
-    },
     "$.results[*].sku": {
       "display_order": 1
     },

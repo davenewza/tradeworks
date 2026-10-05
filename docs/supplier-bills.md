@@ -8,7 +8,7 @@ costs:
   costs, gross profit and margin on every price list
 - the **stock value** measure on the Stock cover dashboard
 - **purchase planning**, whose goods value falls back to the most recent bill's
-  unit cost when a product has no supplier price
+  unit cost when a product is on no purchase price list
 
 ## Where the bills come from
 

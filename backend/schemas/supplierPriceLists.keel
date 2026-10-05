@@ -1,0 +1,104 @@
+// What our stock costs to buy: the purchase price lists in Zoho, item by item.
+// SyncSupplierPriceLists mirrors every one of them from Zoho Inventory, and
+// they are where a product's supplier price comes from.
+//
+// A copy of Zoho with no local edits. There are no actions to create, change
+// or delete a list or its items here; only the sync writes them, and the
+// tables can be emptied and re-imported at any time.
+//
+// Not to be confused with PriceList (pricing.keel), which is what we sell at.
+// A list isn't tied to a supplier: a product's page shows every list it is on.
+// See docs/supplier-price-lists.md.
+
+// A purchase price list, as Zoho Inventory holds it.
+model SupplierPriceList {
+    fields {
+        // Zoho's pricebook_id.
+        zohoPriceListId Text @unique
+        name Text
+        description Text?
+        // Zoho's currency code, e.g. GBP. Text rather than the Currency enum,
+        // so a list in a currency we don't otherwise use still syncs; purchase
+        // planning only prices from lists in one it knows.
+        currencyCode Text
+        // Inactive in Zoho: kept and shown, but no longer used to price a
+        // purchase plan.
+        isActive Boolean @default(true)
+        // per_item: a rate for each item. fixed_percentage: a mark-up or
+        // mark-down on each item's own rate, which Zoho doesn't list per
+        // item, so such a list syncs with no items.
+        priceListType Text?
+        // unit: one rate per item. volume: rates by quantity bracket, so its
+        // items sync without a single rate.
+        pricingScheme Text?
+        items SupplierPriceListItem[]
+        totalItems Number @computed(COUNT(supplierPriceList.items.id))
+        // Zoho's last_modified_time as at the last read. The nightly sync
+        // reads the list again only when Zoho's has moved on.
+        zohoModifiedAt Timestamp
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getSupplierPriceList(id)
+        list listSupplierPriceLists() {
+            @orderBy(name: asc)
+        }
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}
+
+// One item's price on a purchase price list.
+model SupplierPriceListItem {
+    fields {
+        priceList SupplierPriceList
+        // Matched by SKU. Unset for an item with no product here yet; a sync
+        // links it once Sync Products brings the product in.
+        product Product?
+        // Zoho's item_id, and the item's SKU and name in Zoho as at the sync.
+        zohoItemId Text
+        sku Text?
+        name Text?
+        // Per unit, in the list's currency, as Zoho holds it. Unset on a
+        // volume-priced list, which has no single rate.
+        rate Decimal?
+        // Display copies of the list and product, so a product's prices are
+        // legible in one table.
+        priceListName Text? @computed(supplierPriceListItem.priceList.name)
+        currencyCode Text? @computed(supplierPriceListItem.priceList.currencyCode)
+        isActive Boolean? @computed(supplierPriceListItem.priceList.isActive)
+        productName Text? @computed(supplierPriceListItem.product.name)
+    }
+
+    actions {
+        get getSupplierPriceListItem(id)
+        list listSupplierPriceListItems(priceList.id?, product.id?, sku?) {
+            @orderBy(priceListName: asc, sku: asc)
+        }
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}
+
+// Mirrors every purchase price list in Zoho, with its items. Reads every list
+// in full, so a price changed without Zoho moving the list's modified time is
+// still picked up: a call per list, plus a few to match items to SKUs.
+flow SyncSupplierPriceLists {
+    @permission(roles: [Operator])
+}
+
+// The same sync, nightly, reading only the lists Zoho has modified since the
+// last read, so an unchanged night costs one call. 5am keeps it clear of
+// ScheduledSyncStock (2am), ScheduledSyncChannelCodes (3am) and
+// ScheduledSyncSupplierBills (4am).
+flow ScheduledSyncSupplierPriceLists {
+    @schedule("every day at 5am")
+    @permission(roles: [Operator])
+}

@@ -1,0 +1,25 @@
+{
+  "id": "list-supplier-price-list-items",
+  "action_name": "listSupplierPriceListItems",
+  "name": "Supplier price list items",
+  "title": "Supplier price list items",
+  "help_text": "Every item's price on every purchase price list in Zoho, per unit and in the list's currency. Read-only here: prices change in Zoho, then sync. A blank rate is an item on a volume-priced list, whose rates go by quantity.",
+  "inputs": {
+    "$.where.sku": { "display_name": "SKU" }
+  },
+  "response": {
+    "$.results[*].priceListId": { "display_name": "Price list", "display_order": 0 },
+    "$.results[*].productId": { "display_name": "Product", "display_order": 1 },
+    "$.results[*].sku": { "display_name": "SKU", "display_order": 2 },
+    "$.results[*].name": { "display_name": "Name in Zoho", "display_order": 3 },
+    "$.results[*].rate": { "display_name": "Price", "display_order": 4 },
+    "$.results[*].currencyCode": { "display_name": "Currency", "display_order": 5 },
+    "$.results[*].isActive": { "display_name": "Active list", "display_order": 6 },
+    "$.results[*].priceListName": { "visible": false },
+    "$.results[*].productName": { "visible": false },
+    "$.results[*].zohoItemId": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": { "visible": false }
+  }
+}

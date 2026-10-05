@@ -180,16 +180,6 @@
       "display_name": "Supplier",
       "display_order": 0,
       "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
-    },
-    "$.supplierUnitCost": {
-      "display_name": "Supplier price",
-      "display_order": 1,
-      "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
-    },
-    "$.supplierCurrency": {
-      "display_name": "Currency",
-      "display_order": 2,
-      "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
     }
   },
   "sections": [
@@ -226,7 +216,7 @@
     {
       "name": "a1b2c3d4-0000-4000-8000-supplierxxxx",
       "title": "Supplier",
-      "description": "Who we buy it from and what they charge per unit (excl VAT & freight), in their currency.",
+      "description": "Who we buy it from. What they charge is on the purchase price lists in Zoho, under Supplier prices.",
       "display_order": 3,
       "visible": true
     }
@@ -238,7 +228,7 @@
     },
     {
       "tool_id": "update-product-supplier",
-      "title": "Set supplier & price",
+      "title": "Set supplier",
       "as_dialog": true,
       "display_order": 1
     },
@@ -342,6 +332,23 @@
             "tool_id": "list-channel-fees-always-applied",
             "title": "Global Fees",
             "display_order": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "supplierPrices",
+      "title": "Supplier prices",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-supplier-price-list-items"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false,
+            "$.results[*].productName": false,
+            "$.results[*].sku": false,
+            "$.results[*].name": false
           }
         }
       ]

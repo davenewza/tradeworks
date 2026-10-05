@@ -1,6 +1,7 @@
-// Suppliers and the supplier price on a product: suppliers come from Zoho
-// vendors (see lib/zohoVendorHelpers.test.ts); operators set their lead times,
-// assign products to them and record what each charges, in its own currency.
+// Suppliers and a product's supplier: suppliers come from Zoho vendors (see
+// lib/zohoVendorHelpers.test.ts); operators set their lead times and assign
+// products to them. What a supplier charges comes from the purchase price lists
+// in Zoho (see lib/zohoSupplierPriceListHelpers.test.ts), not from here.
 
 import { actions, models, resetDatabase } from '@teamkeel/testing';
 import { Currency, Team } from '@teamkeel/sdk';
@@ -79,29 +80,15 @@ describe('updateProductSupplier', () => {
         return { supplier, product };
     }
 
-    test('assigns a supplier and records its price with a currency', async () => {
-        const { supplier, product } = await seed();
-        const updated = await (await operator()).updateProductSupplier({
-            where: { id: product.id },
-            values: { supplier: { id: supplier.id }, supplierUnitCost: 12.5, supplierCurrency: Currency.USD },
-        });
-        expect(updated).toMatchObject({ supplierId: supplier.id, supplierUnitCost: 12.5, supplierCurrency: Currency.USD });
-    });
-
-    test('rejects a price without a currency, and a negative price', async () => {
+    test('assigns a supplier, and unassigns it', async () => {
         const { supplier, product } = await seed();
         const authed = await operator();
 
-        expect(
-            await ruleViolated(
-                authed.updateProductSupplier({ where: { id: product.id }, values: { supplier: { id: supplier.id }, supplierUnitCost: 12.5 } }),
-            ),
-        ).toBe('A supplier price should have a currency');
-        expect(
-            await ruleViolated(
-                authed.updateProductSupplier({ where: { id: product.id }, values: { supplierUnitCost: -1, supplierCurrency: Currency.USD } }),
-            ),
-        ).toBe('A supplier price should not be negative');
+        const assigned = await authed.updateProductSupplier({ where: { id: product.id }, values: { supplier: { id: supplier.id } } });
+        expect(assigned.supplierId).toBe(supplier.id);
+
+        const unassigned = await authed.updateProductSupplier({ where: { id: product.id }, values: { supplier: null } });
+        expect(unassigned.supplierId).toBeNull();
     });
 
     test('products without a supplier are listed until one is assigned', async () => {

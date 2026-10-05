@@ -44,13 +44,11 @@ model Product {
     fields {
         name Text
         brand Brand
-        // Who we buy it from, and what they charge per unit (excl VAT, excl
-        // freight) in the currency they quote. Unset until someone assigns
-        // it; a product with no supplier has no lead time, so it goes
-        // ungraded and is left out of purchase planning.
+        // Who we buy it from. Unset until someone assigns it; a product with
+        // no supplier has no lead time, so it goes ungraded and is left out
+        // of purchase planning. What they charge comes from the purchase price
+        // lists in Zoho (supplierPrices), not from here.
         supplier Supplier?
-        supplierUnitCost Decimal?
-        supplierCurrency Currency?
         sku Text @unique
         image File?
         lengthInCm Decimal?
@@ -74,6 +72,8 @@ model Product {
         channelFees ProductChannelFee[]
         billLines SupplierBillLine[]
         purchaseOrderLines PurchaseOrderLine[]
+        // The product's price on every purchase price list in Zoho it is on.
+        supplierPrices SupplierPriceListItem[]
         prices ProductPrice[]
         channelCodes ProductChannelCode[]
         // Weighted-average cost of goods and freight-in across the product's
@@ -207,11 +207,7 @@ model Product {
             weightInGrams,
         )
         update updateProduct(id) with (name?, brand.id?, sku?)
-        update updateProductSupplier(id) with (
-            supplier.id?,
-            supplierUnitCost?,
-            supplierCurrency?,
-        )
+        update updateProductSupplier(id) with (supplier.id?)
         // Active products nobody has assigned a supplier to yet — ungraded and
         // out of purchase planning until someone does.
         list listProductsWithoutSupplier(name?, sku?, brand.id?) {
@@ -243,16 +239,6 @@ model Product {
     // is usually later than this, so the handler often finds nothing —
     // ScheduledSyncChannelCodes is what catches the code once it exists.
     @on([create, update], syncAmazonFnsku)
-
-    // A price means nothing without its currency.
-    @validate(
-        product.supplierUnitCost == null || product.supplierCurrency != null,
-        "A supplier price should have a currency"
-    )
-    @validate(
-        product.supplierUnitCost == null || product.supplierUnitCost >= 0,
-        "A supplier price should not be negative"
-    )
 
     @permission(
         roles: [Operator],

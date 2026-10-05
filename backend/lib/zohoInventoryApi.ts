@@ -2,13 +2,13 @@ import { ZohoFeeCtx, getZohoAccessToken } from './zohoChannelFeeHelpers';
 import { isZohoDailyRateLimit } from './zohoSalesHelpers';
 
 // A read-only client for the Zoho Inventory API, shared by the syncs that read
-// it: supplier bills, purchase orders and stock on hand.
+// it: supplier bills, purchase orders, supplier price lists and stock on hand.
 //
 // The token endpoint rate-limits hard on repeated fetches, so a run fetches one
 // token and passes it to everything it reads.
 
 // The self-client is already authorised for this scope (verified against the
-// org); it covers bills, purchase orders and items.
+// org); it covers bills, purchase orders, price books and items.
 const INVENTORY_SCOPE = 'ZohoInventory.FullAccess.READ';
 const INVENTORY_BASE = 'https://www.zohoapis.com/inventory/v1';
 

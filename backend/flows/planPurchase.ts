@@ -242,8 +242,8 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             ctx.ui.display.header({
                 title: 'Order',
                 description:
-                    'Unit cost is the supplier’s price, in the currency they quote. Products with no price yet fall ' +
-                    'back to the unit cost on their latest supplier bill, in rand.',
+                    'Unit cost is the product’s price on a purchase price list in Zoho, in that list’s currency. ' +
+                    'Products on no price list fall back to the unit cost on their latest supplier bill, in rand.',
             }),
             ctx.ui.display.table({
                 data: ordered.map((l) => ({
