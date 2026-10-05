@@ -112,17 +112,17 @@ export interface PlanCandidate {
     // sold in the window.
     monthlyDemand: number | null;
     // What the supplier will charge per unit (excl freight), in `currency`.
-    // The product's rate on a purchase price list in Zoho when it is on one
-    // (see pickSupplierPrice); otherwise the unit cost on the product's most
-    // recent supplier bill, which Zoho records in rand. Null when neither
-    // exists.
+    // The product's rate on one of the supplier's own price lists when one
+    // gives it (see pickSupplierPrice); otherwise the unit cost on the
+    // product's most recent supplier bill, which Zoho records in rand. Null
+    // when neither exists.
     unitCost: number | null;
     currency: Currency | null;
     costSource: CostSource | null;
 }
 
-// Where a line's unit cost came from: a purchase price list, or — for a
-// product on none — the last bill, as a stand-in.
+// Where a line's unit cost came from: the supplier's price list, or — for a
+// product its lists don't price — the last bill, as a stand-in.
 export type CostSource = 'PriceList' | 'LastBill';
 
 // Why a product got the quantity it did. Drives the "Why" column and the
@@ -266,8 +266,8 @@ export interface PurchasePlanSummary {
     // alongside linesWithoutCost.
     valueByCurrency: CurrencyTotal[];
     linesWithoutCost: number;
-    // Ordered lines costed from the last bill because the product is on no
-    // purchase price list.
+    // Ordered lines costed from the last bill because the supplier's price
+    // lists don't price the product.
     linesCostedFromBills: number;
     stockouts: number;
     stockUnknown: number;
@@ -368,50 +368,41 @@ export interface PlannableSupplier {
     productCount: number;
 }
 
-// Suppliers with at least one active product on their price lists, for the
-// picker. A supplier with nothing active has nothing to plan.
+// Suppliers with at least one active product, for the picker. A supplier
+// with nothing active has nothing to plan.
 export async function loadPlannableSuppliers(): Promise<PlannableSupplier[]> {
-    const rows = await useDatabase()
-        .selectFrom('supplier as s')
-        .innerJoin('supplier_price_list as l', 'l.supplierId', 's.id')
-        .innerJoin('supplier_price_list_item as i', 'i.priceListId', 'l.id')
-        .innerJoin('product as p', 'p.id', 'i.productId')
-        .where('p.isActive', '=', true)
-        .groupBy(['s.id', 's.name', 's.leadTimeInDays'])
-        .select(['s.id', 's.name', 's.leadTimeInDays'])
-        .select((eb) => eb.fn.count<string>('p.id').distinct().as('productCount'))
-        .execute();
+    const [suppliers, products] = await Promise.all([
+        models.supplier.findMany({}),
+        models.product.findMany({ where: { isActive: { equals: true } } }),
+    ]);
+    const counts = new Map<string, number>();
+    for (const p of products) {
+        if (p.supplierId) counts.set(p.supplierId, (counts.get(p.supplierId) ?? 0) + 1);
+    }
 
-    return rows
-        .map((r) => ({ supplierId: r.id, name: r.name, leadTimeInDays: r.leadTimeInDays, productCount: Number(r.productCount) }))
+    return suppliers
+        .filter((s) => (counts.get(s.id) ?? 0) > 0)
+        .map((s) => ({
+            supplierId: s.id,
+            name: s.name,
+            leadTimeInDays: s.leadTimeInDays,
+            productCount: counts.get(s.id)!,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// The supplier's products: the active ones on any of its price lists.
-async function loadSupplierProductIds(supplierId: string): Promise<string[]> {
-    const rows = await useDatabase()
-        .selectFrom('supplier_price_list_item as i')
-        .innerJoin('supplier_price_list as l', 'l.id', 'i.priceListId')
-        .innerJoin('product as p', 'p.id', 'i.productId')
-        .where('l.supplierId', '=', supplierId)
-        .where('p.isActive', '=', true)
-        .select('p.id')
-        .distinct()
-        .execute();
-    return rows.map((r) => r.id);
-}
-
-// Everything the plan needs for one supplier's active products — those on
-// its price lists — as of `now`: the stock figures the daily sync wrote, an
-// unrounded run-rate from the same sales window that sync uses, and each
-// product's cost from the supplier's own lists. Pure local reads — nothing
-// here touches Zoho.
+// Everything the plan needs for one supplier's active products, as of `now`:
+// the stock figures the daily sync wrote, an unrounded run-rate from the same
+// sales window that sync uses, and each product's cost from the supplier's
+// own price lists. Pure local reads — nothing here touches Zoho.
 export async function loadPlanCandidates(supplierId: string, now: Date): Promise<PlanCandidate[]> {
-    const productIds = await loadSupplierProductIds(supplierId);
-    if (productIds.length === 0) return [];
-    const products = await models.product.findMany({ where: { id: { oneOf: productIds } } });
+    const products = await models.product.findMany({
+        where: { supplierId: { equals: supplierId }, isActive: { equals: true } },
+    });
+    if (products.length === 0) return [];
 
     const supplier = await models.supplier.findOne({ id: supplierId });
+    const productIds = products.map((p) => p.id);
     const windowStart = addDays(now, -COVER_WINDOW_DAYS);
     const [aggregates, priceRows] = await Promise.all([
         loadSaleAggregates(windowStart, productIds),
@@ -444,7 +435,7 @@ export async function loadPlanCandidates(supplierId: string, now: Date): Promise
 }
 
 // The supplier's price list price wins; the last bill (in rand) stands in
-// for a product its lists give no rate for.
+// for a product its lists don't price.
 function unitCostOf(price: SupplierPrice | null, billCost: number | null): Pick<PlanCandidate, 'unitCost' | 'currency' | 'costSource'> {
     if (price) return { unitCost: price.rate, currency: price.currency, costSource: 'PriceList' };
     if (billCost !== null) return { unitCost: billCost, currency: Currency.ZAR, costSource: 'LastBill' };
@@ -485,7 +476,9 @@ export function pickSupplierPrice(rows: SupplierPriceRow[], supplierCurrency: Cu
 }
 
 // Every rate the given products have on the supplier's active price lists,
-// by product. Items with no rate (on a volume-priced list) can't price a plan.
+// by product. Only lists linked to the supplier count: an unlinked list could
+// be anyone's prices, and another supplier's are not what this one charges.
+// Items with no rate (on a volume-priced list) can't price a plan.
 export async function loadSupplierPrices(supplierId: string, productIds: string[]): Promise<Map<string, SupplierPriceRow[]>> {
     const byProduct = new Map<string, SupplierPriceRow[]>();
     if (productIds.length === 0) return byProduct;

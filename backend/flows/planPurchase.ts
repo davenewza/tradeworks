@@ -68,7 +68,7 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             return ctx.complete({
                 stage: 'review',
                 title: 'Nothing to plan',
-                description: 'No supplier has any active products on its price lists. Link each price list to its supplier first.',
+                description: 'No supplier has any active products. Assign products to their suppliers first.',
                 content: [],
             });
         }
@@ -242,8 +242,8 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             ctx.ui.display.header({
                 title: 'Order',
                 description:
-                    'Unit cost is the product’s price on a purchase price list in Zoho, in that list’s currency. ' +
-                    'Products on no price list fall back to the unit cost on their latest supplier bill, in rand.',
+                    'Unit cost is the product’s price on the supplier’s price list, in that list’s currency. ' +
+                    'Products its lists don’t price fall back to the unit cost on their latest supplier bill, in rand.',
             }),
             ctx.ui.display.table({
                 data: ordered.map((l) => ({

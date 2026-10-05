@@ -225,7 +225,7 @@ describe('runSupplierPriceListSync', () => {
         expect(await models.supplierPriceListItem.findMany({})).toHaveLength(0);
     });
 
-    test("keeps the supplier an operator linked a list to when the list is read again", async () => {
+    test('keeps the supplier an operator linked a list to when the list is read again', async () => {
         await sync(fakeZoho([farnellList()]).get);
         const farnell = await models.supplier.create({ name: 'Premier Farnell (GBP)', zohoVendorId: 'v-farnell' });
         const list = (await models.supplierPriceList.findOne({ zohoPriceListId: 'zpl-farnell' }))!;

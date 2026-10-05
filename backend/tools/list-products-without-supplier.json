@@ -4,7 +4,7 @@
   "name": "Products without a supplier",
   "title": "Products without a supplier",
   "icon": "emoji:❓",
-  "help_text": "Active products on no price list linked to a supplier. They have no lead time, so their stock cover goes ungraded and purchase planning leaves them out. A product's suppliers come from its price lists: link the list it is on to its supplier under Inventory → Suppliers → Supplier price lists, or add the product to a supplier's price list in Zoho and sync.",
+  "help_text": "Active products with no supplier yet. They have no lead time, so their stock cover goes ungraded and purchase planning leaves them out. Open one and use Set supplier & price.",
   "response": {
     "$.results[*].sku": {
       "display_name": "SKU",
@@ -33,6 +33,14 @@
       }
     }
   },
+  "entry_activity_actions": [
+    {
+      "tool_id": "update-product-supplier",
+      "title": "Set supplier & price",
+      "as_dialog": true,
+      "display_order": 0
+    }
+  ],
   "pagination": {
     "page_size": {
       "default_value": 100

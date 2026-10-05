@@ -5,6 +5,22 @@
     "$.zohoVendorId": {
       "display_name": "Zoho vendor ID"
     },
+    "$.products": {
+      "link": {
+        "tool_id": "list-products",
+        "data_mapping": [
+          {
+            "key": "$.where.supplier.id.equals",
+            "path": {
+              "path": "$.id"
+            }
+          }
+        ]
+      }
+    },
+    "$.totalProducts": {
+      "display_name": "Active products"
+    },
     "$.totalPriceLists": {
       "display_name": "Price lists"
     }
@@ -29,7 +45,7 @@
       "title": "View stock & cover",
       "data_mapping": [
         {
-          "key": "$.where.supplierPrices.priceList.supplier.id.equals",
+          "key": "$.where.supplier.id.equals",
           "path": {
             "path": "$.id"
           }
@@ -38,30 +54,30 @@
       "display_order": 1
     },
     {
-      "tool_id": "list-products",
-      "title": "View products",
-      "data_mapping": [
-        {
-          "key": "$.where.supplierPrices.priceList.supplier.id.equals",
-          "path": {
-            "path": "$.id"
-          }
-        }
-      ],
-      "display_order": 2
-    },
-    {
       "tool_id": "update-supplier",
       "title": "Edit supplier",
       "as_dialog": true,
-      "display_order": 3
+      "display_order": 2
     },
     {
       "tool_id": "delete-supplier",
-      "display_order": 4
+      "display_order": 3
     }
   ],
   "embedded_tools": [
+    {
+      "id": "products",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-products"
+          },
+          "response_overrides": {
+            "$.results[*].supplierId": false
+          }
+        }
+      ]
+    },
     {
       "id": "priceLists",
       "title": "Price lists",

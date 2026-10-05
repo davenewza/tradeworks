@@ -82,7 +82,7 @@ export interface VendorCandidate {
     currency: string;
     // 'Create' makes a new supplier; 'Link' attaches the vendor to the existing
     // supplier of the same name that has no Zoho vendor yet (one made before
-    // suppliers came from Zoho), keeping its price lists, lead time and currency.
+    // suppliers came from Zoho), keeping its products, lead time and currency.
     action: 'Create' | 'Link';
     zohoVendorId: string;
 }

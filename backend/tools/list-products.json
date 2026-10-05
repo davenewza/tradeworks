@@ -6,9 +6,6 @@
     "$.where.sku": {
       "display_name": "SKU"
     },
-    "$.where.supplierPrices.priceList.supplier.id": {
-      "display_name": "Supplier"
-    },
     "$.where.abcClass": {
       "display_name": "ABC class"
     }
@@ -25,9 +22,9 @@
       "display_order": 3,
       "display_name": "Brand"
     },
-    "$.results[*].leadTimeInDays": {
+    "$.results[*].supplierId": {
       "display_order": 7,
-      "display_name": "Lead time"
+      "display_name": "Supplier"
     },
     "$.results[*].id": {
       "display_order": 12,

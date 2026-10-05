@@ -15,9 +15,9 @@ These aren't the same as **price lists** (`PriceList`), which are what we
   appear on several.
 - **Inventory → Suppliers → Supplier price lists:** every list, and the price of
   every item on it.
-- **Purchase planning** prices from them. See
-  [purchase-planning.md](purchase-planning.md) for which list wins when a
-  product is on several.
+- **On a supplier:** the **Price lists** linked to it.
+- **Purchase planning** prices each supplier's plans from that supplier's
+  lists. See [purchase-planning.md](purchase-planning.md).
 
 Prices are read-only here. Nothing in the app can create, change or delete a
 list or a price. Change it in Zoho, then sync.
@@ -29,22 +29,11 @@ supplier. Link each new list yourself: **Link to supplier** on the list, or on
 its row under Supplier price lists. It's the one thing about a list edited
 here, and the sync leaves it alone, even when it re-reads the list.
 
-That link is what makes a product a supplier's. **A product's suppliers are
-the suppliers of the lists it is on**, and there is no supplier on the product
-itself. From it:
-
-- **Stock cover status** grades the product against the **shortest** lead time
-  of its suppliers ([stock-cover.md](stock-cover.md)). On no linked list, it
-  is ungraded and listed under **Products without a supplier**.
-- **Purchase planning** for a supplier covers the active products on its
-  lists, priced from those lists
-  ([purchase-planning.md](purchase-planning.md)).
-- The **supplier filter** on the products list and the stock grid, and a
-  supplier's **View products** and **View stock & cover**, show the products on
-  its lists.
-
-A new list arrives unlinked, so its products stay ungraded and out of planning
-until someone links it.
+A purchase plan for a supplier prices only from the lists linked to that
+supplier. A new list arrives unlinked, so its prices aren't used until
+someone links it. A product's own supplier (*Set supplier* on the product)
+is separate: it still decides which supplier's plans and lead time a product
+belongs to. Linking a list doesn't change it.
 
 Margins on our selling price lists don't come from these. They use the actual
 landed cost from supplier bills (see [supplier-bills.md](supplier-bills.md)),
@@ -75,13 +64,13 @@ twin **ScheduledSyncSupplierPriceLists** (5am) mirror every purchase price list
 - If Zoho answers without a list of price lists, the run fails rather than
   reading it as "no lists" and deleting them all.
 
-Lists are a copy of Zoho with no local edits, so the tables can be emptied and
-re-imported at any time.
+Lists are a copy of Zoho apart from their supplier links. Emptying the tables
+and re-importing restores the lists, but each one then has to be linked to its
+supplier again.
 
 ## Replaces
 
-Before price lists, each product had a supplier and a hand-entered **supplier
-price** and currency (`Product.supplier`, `supplierUnitCost`,
-`supplierCurrency`, set with *Set supplier & price*). All three are gone. The
-supplier now comes from the price lists the product is on, and the price from
-those lists.
+Before price lists, each product had a hand-entered **supplier price** and
+currency (`Product.supplierUnitCost` / `supplierCurrency`, set with *Set
+supplier & price*). Those fields are gone. **Set supplier** now only assigns
+the supplier.

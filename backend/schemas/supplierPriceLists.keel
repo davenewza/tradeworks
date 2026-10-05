@@ -9,9 +9,8 @@
 //
 // Not to be confused with PriceList (pricing.keel), which is what we sell at.
 // Zoho doesn't say whose prices a list holds, so an operator links each list to
-// its supplier here. That link is what makes a product a supplier's: a
-// product's suppliers are the suppliers of the lists it is on. See
-// docs/supplier-price-lists.md.
+// its supplier here, and a supplier's purchase plans price from its own lists.
+// See docs/supplier-price-lists.md.
 
 // A purchase price list, as Zoho Inventory holds it.
 model SupplierPriceList {
@@ -20,8 +19,9 @@ model SupplierPriceList {
         zohoPriceListId Text @unique
         // Who the list's prices are from. Ours, not Zoho's: the sync can't
         // tell, so an operator links each list to its supplier after it
-        // arrives, and the sync leaves the link alone. A product's suppliers
-        // are the suppliers of the lists it is on.
+        // arrives, and the sync leaves the link alone. A supplier's purchase
+        // plans price from its own lists. Separate from the product's own
+        // supplier, which still says who a product is bought from.
         supplier Supplier?
         name Text
         description Text?
@@ -82,9 +82,6 @@ model SupplierPriceListItem {
         currencyCode Text? @computed(supplierPriceListItem.priceList.currencyCode)
         isActive Boolean? @computed(supplierPriceListItem.priceList.isActive)
         supplierName Text? @computed(supplierPriceListItem.priceList.supplier.name)
-        // The lead time of the list's supplier; unset while the list has none.
-        // Feeds the product's own lead time.
-        supplierLeadTimeInDays Number? @computed(supplierPriceListItem.priceList.supplier.leadTimeInDays)
         productName Text? @computed(supplierPriceListItem.product.name)
     }
 

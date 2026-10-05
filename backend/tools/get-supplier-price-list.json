@@ -37,8 +37,7 @@
             "$.results[*].priceListName": false,
             "$.results[*].currencyCode": false,
             "$.results[*].isActive": false,
-            "$.results[*].supplierName": false,
-            "$.results[*].supplierLeadTimeInDays": false
+            "$.results[*].supplierName": false
           }
         }
       ]
