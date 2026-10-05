@@ -1,6 +1,7 @@
 import { models, useDatabase } from '@teamkeel/sdk';
 import { sql } from 'kysely';
-import { ZohoFeeCtx, getZohoAccessToken } from './zohoChannelFeeHelpers';
+import { ZohoFeeCtx } from './zohoChannelFeeHelpers';
+import { ZohoGet, getZohoInventoryToken, parseZohoTime, zohoInventoryGet } from './zohoInventoryApi';
 import { ProgressReporter } from './progress';
 
 // Mirrors our suppliers' bills from Zoho Inventory, line by line, into
@@ -23,23 +24,10 @@ import { ProgressReporter } from './progress';
 // bill's creation). The token endpoint rate-limits hard, so a run fetches one
 // token and reuses it.
 
-// Inventory scope for the bills + landed-cost endpoints. The self-client is
-// already authorised for it (verified against the org).
-const INVENTORY_SCOPE = 'ZohoInventory.FullAccess.READ';
-const INVENTORY_BASE = 'https://www.zohoapis.com/inventory/v1';
-
-// Spacing between Zoho API calls, to stay under the per-minute cap.
-const CALL_SPACING_MS = 350;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 // Far more pages of 200 than any supplier's bill history. Hitting it means the
 // listing is not what we think it is, and every further page would spend the
 // shared Zoho quota for nothing.
 export const MAX_BILL_PAGES = 25;
-
-export async function getZohoInventoryToken(ctx: ZohoFeeCtx): Promise<string> {
-    return getZohoAccessToken(ctx, INVENTORY_SCOPE);
-}
 
 // ─── Zoho types (only the fields we use) ──────────────────────────────────────
 
@@ -92,28 +80,6 @@ export interface ZohoLandedCost {
 
 // ─── Reading Zoho ─────────────────────────────────────────────────────────────
 
-// A GET against the Zoho Inventory API: a path under /inventory/v1 and its
-// query, resolving to the parsed body. Injected so the sync can be tested
-// against captured payloads without the network.
-export type ZohoGet = (path: string, query?: Record<string, string>) => Promise<any>;
-
-export function zohoInventoryGet(ctx: ZohoFeeCtx, accessToken: string): ZohoGet {
-    return async (path, query = {}) => {
-        await sleep(CALL_SPACING_MS);
-        const params = new URLSearchParams({ organization_id: ctx.env.ZOHO_BOOKS_ORG_ID, ...query });
-        const url = `${INVENTORY_BASE}${path}?${params}`;
-        const res = await fetch(url, {
-            method: 'GET',
-            headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
-        });
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Zoho GET ${path} failed: ${res.status} - ${text.slice(0, 300)}`);
-        }
-        return res.json();
-    };
-}
-
 // Every bill Zoho holds for one vendor, 200 to a page.
 export async function listZohoBills(get: ZohoGet, vendorId: string): Promise<ZohoBillSummary[]> {
     const bills: ZohoBillSummary[] = [];
@@ -140,14 +106,6 @@ export async function readZohoBill(
         landedCosts.push((await get(`/bills/${billId}/landedcosts/${allocated.landed_cost_id}`)).landed_cost);
     }
     return { bill, landedCosts };
-}
-
-// Zoho writes offsets without a colon ("2026-09-07T10:43:18+0200"), which ISO
-// 8601 parsers needn't accept.
-export function parseZohoTime(value: string): Date {
-    const parsed = new Date(value.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
-    if (Number.isNaN(parsed.getTime())) throw new Error(`Unreadable Zoho timestamp "${value}"`);
-    return parsed;
 }
 
 // ─── Pure transforms ──────────────────────────────────────────────────────────

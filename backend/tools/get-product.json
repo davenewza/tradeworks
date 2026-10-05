@@ -2,6 +2,19 @@
   "id": "get-product",
   "action_name": "getProduct",
   "response": {
+    "$.purchaseOrderLines": {
+      "link": {
+        "tool_id": "list-purchase-order-lines",
+        "data_mapping": [
+          {
+            "key": "$.where.product.id.equals",
+            "path": {
+              "path": "$.id"
+            }
+          }
+        ]
+      }
+    },
     "$.stockCoverStatus": {
       "display_name": "Cover status",
       "display_order": 0,
@@ -348,6 +361,23 @@
             "$.results[*].name": false,
             "$.results[*].accountName": false,
             "$.results[*].isLandedCost": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "purchaseOrderLines",
+      "title": "Purchase orders",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-purchase-order-lines"
+          },
+          "response_overrides": {
+            "$.results[*].productId": false,
+            "$.results[*].productName": false,
+            "$.results[*].sku": false,
+            "$.results[*].name": false
           }
         }
       ]

@@ -2,7 +2,8 @@
 // lists every active product's stock and cover figures, filters by brand, SKU,
 // name, ABC class, status and either cover, and sorts on every column. The
 // figures themselves are written by ScheduledSyncStock (covered alongside the
-// lib helpers), so the rows are seeded here directly.
+// lib helpers), so the rows are seeded here directly. Stock on the way is the
+// sum of the products' purchase order lines, so it's seeded as orders.
 
 import { actions, models, resetDatabase } from '@teamkeel/testing';
 import { AbcClass, StockCoverStatus, Team } from '@teamkeel/sdk';
@@ -33,20 +34,44 @@ async function seed() {
     const boltCo = await models.supplier.create({ name: 'Bolt Co', leadTimeInDays: 30 });
     const channel = await models.channel.create({ name: 'Shop' });
 
-    const anvil = await models.product.create({ name: 'Anvil', sku: 'ACME-A', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.A, stockAvailable: 10, stockOnWay: 0, estimatedMonthlySale: 10, currentStockCover: 1.0, totalStockCover: 1.0 });
-    await models.product.create({ name: 'Bellows', sku: 'ACME-B', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.B, stockAvailable: 50, stockOnWay: 10, estimatedMonthlySale: 20, currentStockCover: 2.5, totalStockCover: 3.0 });
-    await models.product.create({ name: 'Crate', sku: 'ACME-C', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.C, stockAvailable: 20, stockOnWay: 5, estimatedMonthlySale: 5, currentStockCover: 4.0, totalStockCover: 5.0 });
-    const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, supplierId: boltCo.id, abcClass: AbcClass.A, stockAvailable: 135, stockOnWay: 60, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
+    const anvil = await models.product.create({ name: 'Anvil', sku: 'ACME-A', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.A, stockAvailable: 10, estimatedMonthlySale: 10, currentStockCover: 1.0, totalStockCover: 1.0 });
+    const bellows = await models.product.create({ name: 'Bellows', sku: 'ACME-B', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.B, stockAvailable: 50, estimatedMonthlySale: 20, currentStockCover: 2.5, totalStockCover: 3.0 });
+    const crate = await models.product.create({ name: 'Crate', sku: 'ACME-C', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.C, stockAvailable: 20, estimatedMonthlySale: 5, currentStockCover: 4.0, totalStockCover: 5.0 });
+    const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, supplierId: boltCo.id, abcClass: AbcClass.A, stockAvailable: 135, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
     // Never sold: no estimate, so cover, class and status are all blank.
     await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, supplierId: boltCo.id, stockAvailable: 3 });
     // Inactive products never appear, however alarming their figures.
     await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, supplierId: acmeLtd.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
+
+    // On order: 10 Bellows and 5 Crates on one order, and Drills on two.
+    await onOrder('PO-1', [[bellows.id, 10], [crate.id, 5], [drill.id, 40]]);
+    await onOrder('PO-2', [[drill.id, 20]]);
 
     // Lifetime sales feed the "Total sales" column.
     await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: daysAgo(30), productId: anvil.id, quantity: 12, price: 10 });
     await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: daysAgo(20), productId: drill.id, quantity: 3, price: 10 });
 
     return { acme, bolt, acmeLtd, boltCo };
+}
+
+// A placed purchase order with units still to arrive on each line.
+async function onOrder(number: string, lines: [string, number][]) {
+    const order = await models.purchaseOrder.create({
+        zohoPurchaseOrderId: `zpo-${number}`,
+        purchaseOrderNumber: number,
+        isPlaced: true,
+        zohoModifiedAt: new Date(),
+    });
+    for (const [i, [productId, quantity]] of lines.entries()) {
+        await models.purchaseOrderLine.create({
+            purchaseOrderId: order.id,
+            productId,
+            quantityOrdered: quantity,
+            quantityOnWay: quantity,
+            zohoLineItemId: `${number}-${i + 1}`,
+            position: i + 1,
+        });
+    }
 }
 
 type Operator = Awaited<ReturnType<typeof operator>>;
@@ -85,6 +110,14 @@ describe('listStockAndCover', () => {
         const bySku = Object.fromEntries(results.map((r) => [r.sku, r]));
         expect(bySku['ACME-A'].totalUnitsSold).toBe(12);
         expect(bySku['BOLT-D'].totalUnitsSold).toBe(3);
+        // Stock on the way sums a product's order lines, across orders.
+        expect(results.map((r) => [r.sku, r.stockOnWay])).toEqual([
+            ['ACME-A', 0],
+            ['ACME-B', 10],
+            ['ACME-C', 5],
+            ['BOLT-D', 60],
+            ['BOLT-E', 0],
+        ]);
     });
 
     test('filters by brand, SKU and name', async () => {
