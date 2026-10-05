@@ -23,7 +23,8 @@ async function operator() {
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
 // Two brands bought from two suppliers whose lead times differ, so the same
-// cover grades differently. Acme's supplier's 60 days is L = 2 months: Shortfall < 2, Low 2–3, Good 3–5, Oversupply ≥ 5.
+// cover grades differently. A product's supplier is the supplier of a price
+// list it is on. Acme's supplier's 60 days is L = 2 months: Shortfall < 2, Low 2–3, Good 3–5, Oversupply ≥ 5.
 // Bolt's supplier's 30 days is L = 1 month: Shortfall < 1, Low 1–1.5, Good 1.5–2.5, Oversupply ≥ 2.5.
 // Cover = stock ÷ estimate, as the nightly job writes it. Values are distinct
 // per column wherever a sort needs one right answer.
@@ -34,14 +35,16 @@ async function seed() {
     const boltCo = await models.supplier.create({ name: 'Bolt Co', leadTimeInDays: 30 });
     const channel = await models.channel.create({ name: 'Shop' });
 
-    const anvil = await models.product.create({ name: 'Anvil', sku: 'ACME-A', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.A, stockAvailable: 10, estimatedMonthlySale: 10, currentStockCover: 1.0, totalStockCover: 1.0 });
-    const bellows = await models.product.create({ name: 'Bellows', sku: 'ACME-B', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.B, stockAvailable: 50, estimatedMonthlySale: 20, currentStockCover: 2.5, totalStockCover: 3.0 });
-    const crate = await models.product.create({ name: 'Crate', sku: 'ACME-C', brandId: acme.id, supplierId: acmeLtd.id, abcClass: AbcClass.C, stockAvailable: 20, estimatedMonthlySale: 5, currentStockCover: 4.0, totalStockCover: 5.0 });
-    const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, supplierId: boltCo.id, abcClass: AbcClass.A, stockAvailable: 135, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
+    const anvil = await models.product.create({ name: 'Anvil', sku: 'ACME-A', brandId: acme.id, abcClass: AbcClass.A, stockAvailable: 10, estimatedMonthlySale: 10, currentStockCover: 1.0, totalStockCover: 1.0 });
+    const bellows = await models.product.create({ name: 'Bellows', sku: 'ACME-B', brandId: acme.id, abcClass: AbcClass.B, stockAvailable: 50, estimatedMonthlySale: 20, currentStockCover: 2.5, totalStockCover: 3.0 });
+    const crate = await models.product.create({ name: 'Crate', sku: 'ACME-C', brandId: acme.id, abcClass: AbcClass.C, stockAvailable: 20, estimatedMonthlySale: 5, currentStockCover: 4.0, totalStockCover: 5.0 });
+    const drill = await models.product.create({ name: 'Drill', sku: 'BOLT-D', brandId: bolt.id, abcClass: AbcClass.A, stockAvailable: 135, estimatedMonthlySale: 30, currentStockCover: 4.5, totalStockCover: 6.5 });
     // Never sold: no estimate, so cover, class and status are all blank.
-    await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, supplierId: boltCo.id, stockAvailable: 3 });
+    const edger = await models.product.create({ name: 'Edger', sku: 'BOLT-E', brandId: bolt.id, stockAvailable: 3 });
     // Inactive products never appear, however alarming their figures.
-    await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, supplierId: acmeLtd.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
+    const zombie = await models.product.create({ name: 'Zombie', sku: 'ACME-Z', brandId: acme.id, isActive: false, currentStockCover: 0.5, totalStockCover: 0.5 });
+    await supply(acmeLtd.id, [anvil.id, bellows.id, crate.id, zombie.id]);
+    await supply(boltCo.id, [drill.id, edger.id]);
 
     // On order: 10 Bellows and 5 Crates on one order, and Drills on two.
     await onOrder('PO-1', [[bellows.id, 10], [crate.id, 5], [drill.id, 40]]);
@@ -52,6 +55,14 @@ async function seed() {
     await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: daysAgo(20), productId: drill.id, quantity: 3, price: 10 });
 
     return { acme, bolt, acmeLtd, boltCo };
+}
+
+// A price list from the supplier, carrying the products.
+async function supply(supplierId: string, productIds: string[]) {
+    const list = await models.supplierPriceList.create({ zohoPriceListId: `zpl-${supplierId}`, name: `List ${supplierId}`, currencyCode: 'ZAR', supplierId, zohoModifiedAt: new Date() });
+    for (const productId of productIds) {
+        await models.supplierPriceListItem.create({ priceListId: list.id, productId, zohoItemId: `zi-${productId}`, rate: 1 });
+    }
 }
 
 // A placed purchase order with units still to arrive on each line.
@@ -87,6 +98,7 @@ const SORTABLE = [
     'name',
     'abcClass',
     'totalUnitsSold',
+    'leadTimeInDays',
     'stockAvailable',
     'stockOnWay',
     'estimatedMonthlySale',
@@ -135,9 +147,12 @@ describe('listStockAndCover', () => {
         const brand = await models.brand.create({ name: 'Cog' });
         // A Cog product bought through Bolt Co is on Bolt Co's list, graded
         // against Bolt Co's 30 days: 2 months ≥ 1.5L → Good.
-        await models.product.create({ name: 'Cog', sku: 'COG-1', brandId: brand.id, supplierId: boltCo.id, currentStockCover: 2 });
+        const cog = await models.product.create({ name: 'Cog', sku: 'COG-1', brandId: brand.id, currentStockCover: 2 });
+        const list = (await models.supplierPriceList.findMany({ where: { supplierId: { equals: boltCo.id } } }))[0];
+        await models.supplierPriceListItem.create({ priceListId: list.id, productId: cog.id, zohoItemId: 'zi-cog', rate: 1 });
 
-        expect(await skus(authed, { supplier: { id: { equals: boltCo.id } } })).toEqual(['COG-1', 'BOLT-D', 'BOLT-E']);
+        const bySupplier = { supplierPrices: { priceList: { supplier: { id: { equals: boltCo.id } } } } };
+        expect(await skus(authed, bySupplier)).toEqual(['COG-1', 'BOLT-D', 'BOLT-E']);
         const { results } = await authed.listStockAndCover({ where: { sku: { equals: 'COG-1' } } });
         expect(results[0].stockCoverStatus).toBe(StockCoverStatus.GoodSupply);
     });

@@ -44,11 +44,6 @@ model Product {
     fields {
         name Text
         brand Brand
-        // Who we buy it from. Unset until someone assigns it; a product with
-        // no supplier has no lead time, so it goes ungraded and is left out
-        // of purchase planning. What they charge comes from the purchase price
-        // lists in Zoho (supplierPrices), not from here.
-        supplier Supplier?
         sku Text @unique
         image File?
         lengthInCm Decimal?
@@ -73,7 +68,15 @@ model Product {
         billLines SupplierBillLine[]
         purchaseOrderLines PurchaseOrderLine[]
         // The product's price on every purchase price list in Zoho it is on.
+        // The suppliers of those lists are the product's suppliers.
         supplierPrices SupplierPriceListItem[]
+        // How long a reorder takes to arrive: the shortest lead time of the
+        // suppliers whose price lists carry the product. Unset when no list
+        // it is on has a supplier — such a product goes ungraded and is left
+        // out of purchase planning. MIN comes back as 0 rather than null when
+        // there is nothing to take it over; a supplier's lead time is at
+        // least a day, so 0 can only mean there is none.
+        leadTimeInDays Number? @computed(IF(MIN(product.supplierPrices.supplierLeadTimeInDays) > 0, MIN(product.supplierPrices.supplierLeadTimeInDays), null))
         prices ProductPrice[]
         channelCodes ProductChannelCode[]
         // Weighted-average cost of goods and freight-in across the product's
@@ -117,12 +120,13 @@ model Product {
         // cover must stay consistent with the rounded estimate it's shown beside.
         currentStockCover Decimal?
         totalStockCover Decimal?
-        // Reorder signal: current cover vs the supplier's lead time (L = days / 30):
+        // Reorder signal: current cover vs the product's lead time (L = days / 30):
         //   Shortfall (<L) · Low (L–1.5L) · Good (1.5L–2.5L) · Oversupply (≥2.5L).
         // Null when cover is unknown or there is no supplier to take a lead
-        // time from. @computed, so it re-grades the moment cover, the supplier
-        // or the supplier's lead time changes.
-        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null || product.supplier.leadTimeInDays == null, null, IF(product.currentStockCover < product.supplier.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.supplier.leadTimeInDays / 30 * 1.5, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.supplier.leadTimeInDays / 30 * 2.5, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
+        // time from. @computed, so it re-grades the moment cover changes, a
+        // price list carrying the product is linked to a supplier or unlinked,
+        // or a supplier's lead time changes.
+        stockCoverStatus StockCoverStatus? @computed(IF(product.currentStockCover == null || product.leadTimeInDays == null, null, IF(product.currentStockCover < product.leadTimeInDays / 30, StockCoverStatus.InsufficientSupply, IF(product.currentStockCover < product.leadTimeInDays / 30 * 1.5, StockCoverStatus.LowSupply, IF(product.currentStockCover < product.leadTimeInDays / 30 * 2.5, StockCoverStatus.GoodSupply, StockCoverStatus.Oversupply)))))
         // Revenue-importance grade, written by the daily job: products ranked by
         // monthly revenue run-rate — trailing-365-day realized revenue (net of
         // discount, excl VAT) ÷ months since first sale — then cut at 80% / 95%
@@ -147,7 +151,7 @@ model Product {
         get getProduct(id)
         // The Console's products list. Its search box matches SKU or name
         // (full-text plus fuzzy), so an operator can type either.
-        list listProducts(name?, sku?, brand.id?, supplier.id?, abcClass?) {
+        list listProducts(name?, sku?, brand.id?, supplierPrices.priceList.supplier.id?, abcClass?) {
             @where(product.isActive)
             @searchable(sku, name)
             @sortable(
@@ -164,15 +168,15 @@ model Product {
             @orderBy(name: asc)
         }
         // The reorder view (Inventory → View stock and cover): every active
-        // product's stock and cover figures, filterable by brand, supplier,
-        // SKU, name, ABC class, status and either cover, and sortable on every
-        // column. Brand and supplier are relations, which @sortable can't
-        // order by.
+        // product's stock and cover figures, filterable by brand, supplier
+        // (through the price lists it is on), SKU, name, ABC class, status and
+        // either cover, and sortable on every column but brand, a relation,
+        // which @sortable can't order by.
         list listStockAndCover(
             name?,
             sku?,
             brand.id?,
-            supplier.id?,
+            supplierPrices.priceList.supplier.id?,
             abcClass?,
             stockCoverStatus?,
             currentStockCover?,
@@ -184,6 +188,7 @@ model Product {
                 name,
                 abcClass,
                 totalUnitsSold,
+                leadTimeInDays,
                 stockAvailable,
                 stockOnWay,
                 estimatedMonthlySale,
@@ -195,7 +200,7 @@ model Product {
         }
         // Pooled cover and stock value per ABC class — the Stock cover
         // dashboard's figures, over the same measures its charts use.
-        aggregate stockCoverByClass(brand.id?, supplier.id?) over (abcClass) {
+        aggregate stockCoverByClass(brand.id?, supplierPrices.priceList.supplier.id?) over (abcClass) {
             @measures(stockCover, stockValue)
             @where(product.isActive)
             @orderBy(abcClass: asc)
@@ -207,11 +212,11 @@ model Product {
             weightInGrams,
         )
         update updateProduct(id) with (name?, brand.id?, sku?)
-        update updateProductSupplier(id) with (supplier.id?)
-        // Active products nobody has assigned a supplier to yet — ungraded and
-        // out of purchase planning until someone does.
+        // Active products on no price list linked to a supplier — ungraded and
+        // out of purchase planning until one is. Lead time is set exactly when
+        // a supplier is, so it stands in for "has a supplier".
         list listProductsWithoutSupplier(name?, sku?, brand.id?) {
-            @where(product.isActive && product.supplier == null)
+            @where(product.isActive && product.leadTimeInDays == null)
             @sortable(name, sku)
             @orderBy(name: asc)
         }

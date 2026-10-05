@@ -52,7 +52,7 @@ export default ImportSuppliers(config, async (ctx) => {
                     'Tick the vendors you buy stock from. Each becomes a supplier linked to its Zoho vendor, ' +
                     'in the vendor’s currency, with a 60-day lead time to start — set the real lead time on ' +
                     'the supplier afterwards. **Link** means a supplier of that name already exists here ' +
-                    'without a Zoho vendor; it is linked and keeps its products and settings.',
+                    'without a Zoho vendor; it is linked and keeps its price lists and settings.',
             }),
             ctx.ui.select.table('vendors', {
                 data: candidates,
@@ -77,7 +77,7 @@ export default ImportSuppliers(config, async (ctx) => {
         description:
             `${result.created.length} supplier(s) created, ${result.linked.length} linked` +
             (result.skipped.length > 0 ? `, ${result.skipped.length} skipped` : '') +
-            '. Set each one’s lead time, then assign its products.',
+            '. Set each one’s lead time, then link its price lists to it.',
         content: [
             ...(result.created.length > 0
                 ? [ctx.ui.display.header({ title: 'Created' }), ctx.ui.display.table({ data: result.created, columns: ['name', 'currency'] })]

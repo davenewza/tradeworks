@@ -11,16 +11,40 @@ These aren't the same as **price lists** (`PriceList`), which are what we
 ## Where to find them
 
 - **On a product:** the **Supplier prices** table shows the product's price on
-  every purchase price list it's on. Lists aren't tied to a supplier in Zoho
-  or here, so a product can appear on several.
+  every purchase price list it's on, and whose list each one is. A product can
+  appear on several.
 - **Inventory → Suppliers → Supplier price lists:** every list, and the price of
   every item on it.
 - **Purchase planning** prices from them. See
   [purchase-planning.md](purchase-planning.md) for which list wins when a
   product is on several.
 
-They are read-only here. Nothing in the app can create, change or delete a
+Prices are read-only here. Nothing in the app can create, change or delete a
 list or a price. Change it in Zoho, then sync.
+
+## Linking a list to its supplier
+
+Zoho doesn't say whose prices a list holds, so the sync can't link a list to a
+supplier. Link each new list yourself: **Link to supplier** on the list, or on
+its row under Supplier price lists. It's the one thing about a list edited
+here, and the sync leaves it alone, even when it re-reads the list.
+
+That link is what makes a product a supplier's. **A product's suppliers are
+the suppliers of the lists it is on**, and there is no supplier on the product
+itself. From it:
+
+- **Stock cover status** grades the product against the **shortest** lead time
+  of its suppliers ([stock-cover.md](stock-cover.md)). On no linked list, it
+  is ungraded and listed under **Products without a supplier**.
+- **Purchase planning** for a supplier covers the active products on its
+  lists, priced from those lists
+  ([purchase-planning.md](purchase-planning.md)).
+- The **supplier filter** on the products list and the stock grid, and a
+  supplier's **View products** and **View stock & cover**, show the products on
+  its lists.
+
+A new list arrives unlinked, so its products stay ungraded and out of planning
+until someone links it.
 
 Margins on our selling price lists don't come from these. They use the actual
 landed cost from supplier bills (see [supplier-bills.md](supplier-bills.md)),
@@ -56,7 +80,8 @@ re-imported at any time.
 
 ## Replaces
 
-Before price lists, each product had a hand-entered **supplier price** and
-currency (`Product.supplierUnitCost` / `supplierCurrency`, set with *Set
-supplier & price*). Those fields are gone. **Set supplier** now only assigns
-the supplier.
+Before price lists, each product had a supplier and a hand-entered **supplier
+price** and currency (`Product.supplier`, `supplierUnitCost`,
+`supplierCurrency`, set with *Set supplier & price*). All three are gone. The
+supplier now comes from the price lists the product is on, and the price from
+those lists.

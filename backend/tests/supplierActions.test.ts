@@ -1,7 +1,8 @@
-// Suppliers and a product's supplier: suppliers come from Zoho vendors (see
-// lib/zohoVendorHelpers.test.ts); operators set their lead times and assign
-// products to them. What a supplier charges comes from the purchase price lists
-// in Zoho (see lib/zohoSupplierPriceListHelpers.test.ts), not from here.
+// Suppliers and their price lists: suppliers come from Zoho vendors (see
+// lib/zohoVendorHelpers.test.ts) and purchase price lists from Zoho's price
+// books (lib/zohoSupplierPriceListHelpers.test.ts). Operators set suppliers'
+// lead times and link each price list to its supplier; a product's suppliers
+// are the suppliers of the lists it is on.
 
 import { actions, models, resetDatabase } from '@teamkeel/testing';
 import { Currency, Team } from '@teamkeel/sdk';
@@ -53,16 +54,14 @@ describe('suppliers', () => {
         await expect(models.supplier.create({ name: 'Two', zohoVendorId: 'zv-1' })).rejects.toThrow();
     });
 
-    test('counts its active products, whichever brand they are', async () => {
+    test('counts its price lists', async () => {
         const supplier = await models.supplier.create({ name: 'Distributor' });
-        const a = await models.brand.create({ name: 'A' });
-        const b = await models.brand.create({ name: 'B' });
-        await models.product.create({ name: 'A1', sku: 'A1', brandId: a.id, supplierId: supplier.id });
-        await models.product.create({ name: 'B1', sku: 'B1', brandId: b.id, supplierId: supplier.id });
-        await models.product.create({ name: 'B2', sku: 'B2', brandId: b.id, supplierId: supplier.id, isActive: false });
+        await priceList('GBP', supplier.id);
+        await priceList('ZAR', supplier.id);
+        await priceList('Unlinked', null);
 
         const fetched = await (await operator()).getSupplier({ id: supplier.id });
-        expect(fetched!.totalProducts).toBe(2);
+        expect(fetched!.totalPriceLists).toBe(2);
     });
 
     test('requires an operator', async () => {
@@ -72,33 +71,52 @@ describe('suppliers', () => {
     });
 });
 
-describe('updateProductSupplier', () => {
+describe("a price list's supplier", () => {
     async function seed() {
         const brand = await models.brand.create({ name: 'Acme' });
         const supplier = await models.supplier.create({ name: 'Acme Ltd', currency: Currency.USD });
         const product = await models.product.create({ name: 'Widget', sku: 'W-1', brandId: brand.id });
-        return { supplier, product };
+        const list = await priceList('Acme (USD)', null);
+        await models.supplierPriceListItem.create({ priceListId: list.id, productId: product.id, zohoItemId: 'zi-w1', rate: 12.5 });
+        return { supplier, product, list };
     }
 
-    test('assigns a supplier, and unassigns it', async () => {
-        const { supplier, product } = await seed();
+    test('links a price list to its supplier, and unlinks it', async () => {
+        const { supplier, list } = await seed();
         const authed = await operator();
 
-        const assigned = await authed.updateProductSupplier({ where: { id: product.id }, values: { supplier: { id: supplier.id } } });
-        expect(assigned.supplierId).toBe(supplier.id);
+        const linked = await authed.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: { id: supplier.id } } });
+        expect(linked.supplierId).toBe(supplier.id);
+        expect((await authed.listSupplierPriceLists({ where: { supplier: { id: { equals: supplier.id } } } })).results.map((l) => l.id)).toEqual([list.id]);
 
-        const unassigned = await authed.updateProductSupplier({ where: { id: product.id }, values: { supplier: null } });
-        expect(unassigned.supplierId).toBeNull();
+        const unlinked = await authed.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: null } });
+        expect(unlinked.supplierId).toBeNull();
     });
 
-    test('products without a supplier are listed until one is assigned', async () => {
-        const { supplier, product } = await seed();
+    test("makes the list's products the supplier's, and takes them off the without-a-supplier list", async () => {
+        const { supplier, product, list } = await seed();
         const brand = await models.brand.create({ name: 'Off' });
         await models.product.create({ name: 'Retired', sku: 'R-1', brandId: brand.id, isActive: false });
         const authed = await operator();
+        const supplierProducts = async () =>
+            (await authed.listProducts({ where: { supplierPrices: { priceList: { supplier: { id: { equals: supplier.id } } } } } })).results.map((p) => p.sku);
 
         expect((await authed.listProductsWithoutSupplier()).results.map((p) => p.sku)).toEqual(['W-1']);
-        await authed.updateProductSupplier({ where: { id: product.id }, values: { supplier: { id: supplier.id } } });
+        expect(await supplierProducts()).toEqual([]);
+
+        await authed.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: { id: supplier.id } } });
+
         expect((await authed.listProductsWithoutSupplier()).results).toEqual([]);
+        expect(await supplierProducts()).toEqual(['W-1']);
+        expect((await models.product.findOne({ id: product.id }))!.leadTimeInDays).toBe(60);
+    });
+
+    test('requires an operator', async () => {
+        const { supplier, list } = await seed();
+        await expect(actions.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: { id: supplier.id } } })).rejects.toThrow();
     });
 });
+
+async function priceList(name: string, supplierId: string | null) {
+    return await models.supplierPriceList.create({ zohoPriceListId: `zpl-${name}`, name, currencyCode: 'USD', supplierId, zohoModifiedAt: new Date() });
+}

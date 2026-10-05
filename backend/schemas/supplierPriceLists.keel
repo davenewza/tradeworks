@@ -2,19 +2,27 @@
 // SyncSupplierPriceLists mirrors every one of them from Zoho Inventory, and
 // they are where a product's supplier price comes from.
 //
-// A copy of Zoho with no local edits. There are no actions to create, change
-// or delete a list or its items here; only the sync writes them, and the
-// tables can be emptied and re-imported at any time.
+// A copy of Zoho, apart from each list's supplier. There are no actions to
+// create a list or item, or to change or delete one; only the sync writes
+// them. The one local edit is the supplier a list is linked to, which the sync
+// leaves alone.
 //
 // Not to be confused with PriceList (pricing.keel), which is what we sell at.
-// A list isn't tied to a supplier: a product's page shows every list it is on.
-// See docs/supplier-price-lists.md.
+// Zoho doesn't say whose prices a list holds, so an operator links each list to
+// its supplier here. That link is what makes a product a supplier's: a
+// product's suppliers are the suppliers of the lists it is on. See
+// docs/supplier-price-lists.md.
 
 // A purchase price list, as Zoho Inventory holds it.
 model SupplierPriceList {
     fields {
         // Zoho's pricebook_id.
         zohoPriceListId Text @unique
+        // Who the list's prices are from. Ours, not Zoho's: the sync can't
+        // tell, so an operator links each list to its supplier after it
+        // arrives, and the sync leaves the link alone. A product's suppliers
+        // are the suppliers of the lists it is on.
+        supplier Supplier?
         name Text
         description Text?
         // Zoho's currency code, e.g. GBP. Text rather than the Currency enum,
@@ -41,14 +49,16 @@ model SupplierPriceList {
 
     actions {
         get getSupplierPriceList(id)
-        list listSupplierPriceLists() {
+        list listSupplierPriceLists(supplier.id?) {
             @orderBy(name: asc)
         }
+        // The one thing about a list that is edited here.
+        update updateSupplierPriceListSupplier(id) with (supplier.id?)
     }
 
     @permission(
         roles: [Operator],
-        actions: [get, list]
+        actions: [get, list, update]
     )
 }
 
@@ -71,6 +81,10 @@ model SupplierPriceListItem {
         priceListName Text? @computed(supplierPriceListItem.priceList.name)
         currencyCode Text? @computed(supplierPriceListItem.priceList.currencyCode)
         isActive Boolean? @computed(supplierPriceListItem.priceList.isActive)
+        supplierName Text? @computed(supplierPriceListItem.priceList.supplier.name)
+        // The lead time of the list's supplier; unset while the list has none.
+        // Feeds the product's own lead time.
+        supplierLeadTimeInDays Number? @computed(supplierPriceListItem.priceList.supplier.leadTimeInDays)
         productName Text? @computed(supplierPriceListItem.product.name)
     }
 

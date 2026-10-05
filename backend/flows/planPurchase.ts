@@ -68,7 +68,7 @@ export default PlanPurchase(config, async (ctx, inputs) => {
             return ctx.complete({
                 stage: 'review',
                 title: 'Nothing to plan',
-                description: 'No supplier has any active products. Assign products to their suppliers first.',
+                description: 'No supplier has any active products on its price lists. Link each price list to its supplier first.',
                 content: [],
             });
         }

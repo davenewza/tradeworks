@@ -4,9 +4,10 @@
   "name": "Supplier price lists",
   "title": "Supplier price lists",
   "icon": "emoji:🏷️",
-  "help_text": "Every purchase price list in Zoho, mirrored nightly by Sync supplier price lists. Read-only here: change a price in Zoho, then sync. A product's page shows its price on every list, and purchase planning prices from them. See docs/supplier-price-lists.md.",
+  "help_text": "Every purchase price list in Zoho, mirrored nightly by Sync supplier price lists. Prices are read-only here: change them in Zoho, then sync. Zoho doesn't say whose prices a list holds, so link each new list to its supplier with Link to supplier. The products on a supplier's lists are its products: they are graded against its lead time and planned with its purchases, priced from its lists. See docs/supplier-price-lists.md.",
   "response": {
     "$.results[*].name": { "display_order": 0 },
+    "$.results[*].supplierId": { "display_name": "Supplier", "display_order": 1 },
     "$.results[*].currencyCode": { "display_name": "Currency", "display_order": 1 },
     "$.results[*].totalItems": { "display_name": "Items", "display_order": 2 },
     "$.results[*].isActive": { "display_name": "Active", "display_order": 3 },
@@ -27,11 +28,20 @@
       }
     }
   },
+  "inputs": {
+    "$.where.supplier.id": { "display_name": "Supplier" }
+  },
   "entry_activity_actions": [
     {
       "tool_id": "get-supplier-price-list",
       "title": "View price list",
       "display_order": 0
+    },
+    {
+      "tool_id": "update-supplier-price-list-supplier",
+      "title": "Link to supplier",
+      "as_dialog": true,
+      "display_order": 1
     }
   ]
 }

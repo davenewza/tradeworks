@@ -204,10 +204,19 @@ describe('Product stockCoverStatus (computed enum)', () => {
     // leadTimeInDays / 30 = lead time L (months). Bands: cover < L → Shortfall
     // (red); [L, 1.5L) → Low (amber); [1.5L, 2.5L) → Good (green); ≥ 2.5L →
     // Oversupply (purple).
+    //
+    // A product's supplier is the supplier of a price list it is on.
+    async function makeList(supplierId: string | null, name: string) {
+        return await models.supplierPriceList.create({ zohoPriceListId: `zpl-${name}`, name, currencyCode: 'ZAR', supplierId, zohoModifiedAt: new Date() });
+    }
+    async function putOnList(priceListId: string, productId: string) {
+        return await models.supplierPriceListItem.create({ priceListId, productId, zohoItemId: `zi-${productId}`, rate: 1 });
+    }
     async function makeProduct(sku: string, cover: number | null, leadTimeInDays = 60) {
         const brand = await models.brand.create({ name: `B-${sku}` });
         const supplier = await models.supplier.create({ name: `S-${sku}`, leadTimeInDays });
-        const product = await models.product.create({ name: sku, sku, brandId: brand.id, supplierId: supplier.id, currentStockCover: cover });
+        const product = await models.product.create({ name: sku, sku, brandId: brand.id, currentStockCover: cover });
+        await putOnList((await makeList(supplier.id, sku)).id, product.id);
         return { product, brand, supplier };
     }
     const statusOf = async (id: string) => (await models.product.findOne({ id }))!.stockCoverStatus;
@@ -243,21 +252,31 @@ describe('Product stockCoverStatus (computed enum)', () => {
         expect(await statusOf(product.id)).toBe(StockCoverStatus.InsufficientSupply);
     });
 
-    test('a product with no supplier has no lead time, so goes ungraded until it gets one', async () => {
+    test('a product on no supplier\'s price list has no lead time, so goes ungraded until it is', async () => {
         const brand = await models.brand.create({ name: 'B-none' });
         const product = await models.product.create({ name: 'N', sku: 'ST-9', brandId: brand.id, currentStockCover: 1 });
-        expect(await statusOf(product.id)).toBeNull();
+        const leadTimeOf = async () => (await models.product.findOne({ id: product.id }))!.leadTimeInDays;
+        expect([await leadTimeOf(), await statusOf(product.id)]).toEqual([null, null]);
 
+        // On a list nobody has linked to a supplier yet: still ungraded.
+        const list = await makeList(null, 'Slow list');
+        await putOnList(list.id, product.id);
+        expect([await leadTimeOf(), await statusOf(product.id)]).toEqual([null, null]);
+
+        // Linking the list to its supplier grades the product.
         const slow = await models.supplier.create({ name: 'Slow', leadTimeInDays: 120 });
-        await models.product.update({ id: product.id }, { supplierId: slow.id });
-        expect(await statusOf(product.id)).toBe(StockCoverStatus.InsufficientSupply);
+        await models.supplierPriceList.update({ id: list.id }, { supplierId: slow.id });
+        expect([await leadTimeOf(), await statusOf(product.id)]).toEqual([120, StockCoverStatus.InsufficientSupply]);
 
-        // Moving to a quicker supplier re-grades against its lead time (L=0.5).
+        // On a quicker supplier's list too: the shorter lead time wins (L=0.5).
         const quick = await models.supplier.create({ name: 'Quick', leadTimeInDays: 15 });
-        await models.product.update({ id: product.id }, { supplierId: quick.id });
-        expect(await statusOf(product.id)).toBe(StockCoverStatus.GoodSupply);
+        const quickItem = await putOnList((await makeList(quick.id, 'Quick list')).id, product.id);
+        expect([await leadTimeOf(), await statusOf(product.id)]).toEqual([15, StockCoverStatus.GoodSupply]);
 
-        await models.product.update({ id: product.id }, { supplierId: null });
-        expect(await statusOf(product.id)).toBeNull();
+        // Off the quick list again, and the slow list unlinked: ungraded.
+        await models.supplierPriceListItem.delete({ id: quickItem.id });
+        expect(await leadTimeOf()).toBe(120);
+        await models.supplierPriceList.update({ id: list.id }, { supplierId: null });
+        expect([await leadTimeOf(), await statusOf(product.id)]).toEqual([null, null]);
     });
 });

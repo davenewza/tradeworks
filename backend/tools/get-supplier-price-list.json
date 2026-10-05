@@ -3,6 +3,7 @@
   "action_name": "getSupplierPriceList",
   "response": {
     "$.name": { "display_order": 0 },
+    "$.supplierId": { "display_name": "Supplier", "display_order": 1 },
     "$.description": { "display_order": 1 },
     "$.currencyCode": { "display_name": "Currency", "display_order": 2 },
     "$.isActive": { "display_name": "Active", "display_order": 3 },
@@ -13,6 +14,15 @@
     "$.zohoModifiedAt": { "display_name": "Modified in Zoho", "display_order": 8 },
     "$.synchronisedAt": { "display_name": "Synced", "display_order": 9 }
   },
+  "entry_activity_actions": [
+    {
+      "tool_id": "update-supplier-price-list-supplier",
+      "title": "Link to supplier",
+      "as_dialog": true,
+      "emphasize": true,
+      "display_order": 0
+    }
+  ],
   "embedded_tools": [
     {
       "id": "items",
@@ -26,7 +36,9 @@
             "$.results[*].priceListId": false,
             "$.results[*].priceListName": false,
             "$.results[*].currencyCode": false,
-            "$.results[*].isActive": false
+            "$.results[*].isActive": false,
+            "$.results[*].supplierName": false,
+            "$.results[*].supplierLeadTimeInDays": false
           }
         }
       ]

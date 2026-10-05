@@ -118,10 +118,9 @@ describe('importVendors', () => {
     beforeEach(resetDatabase);
 
     test('creates linked suppliers in the vendor currency, links an existing unlinked one, and skips clashes', async () => {
-        const brand = await models.brand.create({ name: 'B' });
-        // Made before suppliers came from Zoho: no vendor, own settings, a product.
+        // Made before suppliers came from Zoho: no vendor, own settings, a price list.
         const legacy = await models.supplier.create({ name: 'Bolt', leadTimeInDays: 90, currency: Currency.ZAR });
-        await models.product.create({ name: 'P', sku: 'P', brandId: brand.id, supplierId: legacy.id });
+        await models.supplierPriceList.create({ zohoPriceListId: 'zpl-bolt', name: 'Bolt', currencyCode: 'ZAR', supplierId: legacy.id, zohoModifiedAt: new Date() });
         // Same name as a vendor, but already linked to a different one.
         await models.supplier.create({ name: 'Cog', zohoVendorId: 'other' });
 
@@ -145,9 +144,9 @@ describe('importVendors', () => {
             skipped: [{ name: 'Cog', reason: 'A supplier of this name is linked to another Zoho vendor' }],
         });
         expect(await models.supplier.findOne({ zohoVendorId: '1' })).toMatchObject({ name: 'Acme', leadTimeInDays: 60 });
-        // The linked supplier keeps its id (so its products), lead time and currency.
+        // The linked supplier keeps its id (so its price lists), lead time and currency.
         expect(await models.supplier.findOne({ zohoVendorId: '2' })).toMatchObject({
-            id: legacy.id, leadTimeInDays: 90, currency: Currency.ZAR, totalProducts: 1,
+            id: legacy.id, leadTimeInDays: 90, currency: Currency.ZAR, totalPriceLists: 1,
         });
 
         // Importing the same selection again changes nothing.

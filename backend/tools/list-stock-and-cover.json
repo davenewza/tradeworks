@@ -4,10 +4,13 @@
   "name": "View stock and cover",
   "title": "Stock and cover",
   "icon": "emoji:📦",
-  "help_text": "Every active product's stock on hand and months of cover at its current sales rate, graded against its supplier's lead time (blank until the product has a supplier). Filter by brand, supplier, SKU, name, ABC class, status or cover; click a column heading to sort by it. Figures refresh nightly — see docs/stock-cover.md.",
+  "help_text": "Every active product's stock on hand and months of cover at its current sales rate, graded against its lead time — the shortest of the suppliers whose price lists carry it (blank until a list it is on is linked to a supplier). Filter by brand, supplier, SKU, name, ABC class, status or cover; click a column heading to sort by it. Figures refresh nightly — see docs/stock-cover.md.",
   "inputs": {
     "$.where.sku": {
       "display_name": "SKU"
+    },
+    "$.where.supplierPrices.priceList.supplier.id": {
+      "display_name": "Supplier"
     },
     "$.where.abcClass": {
       "display_name": "ABC class"
@@ -34,8 +37,8 @@
       "display_name": "Brand",
       "display_order": 3
     },
-    "$.results[*].supplierId": {
-      "display_name": "Supplier",
+    "$.results[*].leadTimeInDays": {
+      "display_name": "Lead time",
       "display_order": 4
     },
     "$.results[*].abcClass": {

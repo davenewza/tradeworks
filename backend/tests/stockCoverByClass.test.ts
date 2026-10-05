@@ -76,6 +76,29 @@ describe('stockCoverByClass', () => {
         expect(Number(classes.C.stockValue)).toBeCloseTo(0, 6);
     });
 
+    test("narrows to one supplier's products, counting a product on two of its lists once", async () => {
+        await seed();
+        const supplier = await models.supplier.create({ name: 'Acme Ltd' });
+        const list = (currencyCode: string) =>
+            models.supplierPriceList.create({ zohoPriceListId: `zpl-${currencyCode}`, name: currencyCode, currencyCode, supplierId: supplier.id, zohoModifiedAt: new Date() });
+        const lists = [await list('ZAR'), await list('GBP')];
+        // Anvil is on both of the supplier's lists, Bellows on one.
+        const anvil = (await models.product.findOne({ sku: 'ANVIL' }))!;
+        const bellows = (await models.product.findOne({ sku: 'BELLOWS' }))!;
+        for (const list of lists) await models.supplierPriceListItem.create({ priceListId: list.id, productId: anvil.id, zohoItemId: 'zi-anvil', rate: 1 });
+        await models.supplierPriceListItem.create({ priceListId: lists[0].id, productId: bellows.id, zohoItemId: 'zi-bellows', rate: 1 });
+
+        const classes = byClass(
+            await (await operator()).stockCoverByClass({ where: { supplierPrices: { priceList: { supplier: { id: { equals: supplier.id } } } } } }),
+        );
+
+        expect(Object.keys(classes)).toEqual(['A', 'B']);
+        // Anvil alone: 10 ÷ 10 and 10 × 5, not doubled for being on two lists.
+        expect(Number(classes.A.stockCover)).toBeCloseTo(1, 6);
+        expect(Number(classes.A.stockValue)).toBeCloseTo(50, 6);
+        expect(Number(classes.B.stockValue)).toBeCloseTo(500, 6);
+    });
+
     test('narrows to one brand', async () => {
         const { bolt } = await seed();
         const classes = byClass(await (await operator()).stockCoverByClass({ where: { brand: { id: { equals: bolt.id } } } }));

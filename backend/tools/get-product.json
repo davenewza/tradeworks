@@ -176,8 +176,8 @@
       "display_order": 4,
       "section_name": "c4e8ab13-3e66-4990-8467-d7eddf6b0539"
     },
-    "$.supplierId": {
-      "display_name": "Supplier",
+    "$.leadTimeInDays": {
+      "display_name": "Lead time",
       "display_order": 0,
       "section_name": "a1b2c3d4-0000-4000-8000-supplierxxxx"
     }
@@ -216,7 +216,7 @@
     {
       "name": "a1b2c3d4-0000-4000-8000-supplierxxxx",
       "title": "Supplier",
-      "description": "Who we buy it from. What they charge is on the purchase price lists in Zoho, under Supplier prices.",
+      "description": "Its suppliers are the suppliers of the price lists it is on, under Supplier prices. The lead time is the shortest of theirs; blank when no list it is on is linked to a supplier.",
       "display_order": 3,
       "visible": true
     }
@@ -225,12 +225,6 @@
     {
       "tool_id": "update-product",
       "display_order": 0
-    },
-    {
-      "tool_id": "update-product-supplier",
-      "title": "Set supplier",
-      "as_dialog": true,
-      "display_order": 1
     },
     {
       "tool_id": "update-product-dimensions",
@@ -348,7 +342,8 @@
             "$.results[*].productId": false,
             "$.results[*].productName": false,
             "$.results[*].sku": false,
-            "$.results[*].name": false
+            "$.results[*].name": false,
+            "$.results[*].supplierLeadTimeInDays": false
           }
         }
       ]

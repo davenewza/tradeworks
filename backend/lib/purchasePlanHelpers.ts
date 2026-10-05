@@ -368,45 +368,54 @@ export interface PlannableSupplier {
     productCount: number;
 }
 
-// Suppliers with at least one active product, for the picker. A supplier
-// with nothing active has nothing to plan.
+// Suppliers with at least one active product on their price lists, for the
+// picker. A supplier with nothing active has nothing to plan.
 export async function loadPlannableSuppliers(): Promise<PlannableSupplier[]> {
-    const [suppliers, products] = await Promise.all([
-        models.supplier.findMany({}),
-        models.product.findMany({ where: { isActive: { equals: true } } }),
-    ]);
-    const counts = new Map<string, number>();
-    for (const p of products) {
-        if (p.supplierId) counts.set(p.supplierId, (counts.get(p.supplierId) ?? 0) + 1);
-    }
+    const rows = await useDatabase()
+        .selectFrom('supplier as s')
+        .innerJoin('supplier_price_list as l', 'l.supplierId', 's.id')
+        .innerJoin('supplier_price_list_item as i', 'i.priceListId', 'l.id')
+        .innerJoin('product as p', 'p.id', 'i.productId')
+        .where('p.isActive', '=', true)
+        .groupBy(['s.id', 's.name', 's.leadTimeInDays'])
+        .select(['s.id', 's.name', 's.leadTimeInDays'])
+        .select((eb) => eb.fn.count<string>('p.id').distinct().as('productCount'))
+        .execute();
 
-    return suppliers
-        .filter((s) => (counts.get(s.id) ?? 0) > 0)
-        .map((s) => ({
-            supplierId: s.id,
-            name: s.name,
-            leadTimeInDays: s.leadTimeInDays,
-            productCount: counts.get(s.id)!,
-        }))
+    return rows
+        .map((r) => ({ supplierId: r.id, name: r.name, leadTimeInDays: r.leadTimeInDays, productCount: Number(r.productCount) }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Everything the plan needs for one supplier's active products, as of `now`:
-// the stock figures the daily sync wrote, an unrounded run-rate from the same
-// sales window that sync uses, and each product's cost. Pure local reads —
-// nothing here touches Zoho.
+// The supplier's products: the active ones on any of its price lists.
+async function loadSupplierProductIds(supplierId: string): Promise<string[]> {
+    const rows = await useDatabase()
+        .selectFrom('supplier_price_list_item as i')
+        .innerJoin('supplier_price_list as l', 'l.id', 'i.priceListId')
+        .innerJoin('product as p', 'p.id', 'i.productId')
+        .where('l.supplierId', '=', supplierId)
+        .where('p.isActive', '=', true)
+        .select('p.id')
+        .distinct()
+        .execute();
+    return rows.map((r) => r.id);
+}
+
+// Everything the plan needs for one supplier's active products — those on
+// its price lists — as of `now`: the stock figures the daily sync wrote, an
+// unrounded run-rate from the same sales window that sync uses, and each
+// product's cost from the supplier's own lists. Pure local reads — nothing
+// here touches Zoho.
 export async function loadPlanCandidates(supplierId: string, now: Date): Promise<PlanCandidate[]> {
-    const products = await models.product.findMany({
-        where: { supplierId: { equals: supplierId }, isActive: { equals: true } },
-    });
-    if (products.length === 0) return [];
+    const productIds = await loadSupplierProductIds(supplierId);
+    if (productIds.length === 0) return [];
+    const products = await models.product.findMany({ where: { id: { oneOf: productIds } } });
 
     const supplier = await models.supplier.findOne({ id: supplierId });
-    const productIds = products.map((p) => p.id);
     const windowStart = addDays(now, -COVER_WINDOW_DAYS);
     const [aggregates, priceRows] = await Promise.all([
         loadSaleAggregates(windowStart, productIds),
-        loadSupplierPrices(productIds),
+        loadSupplierPrices(supplierId, productIds),
     ]);
     const prices = new Map<string, SupplierPrice>();
     for (const productId of productIds) {
@@ -434,8 +443,8 @@ export async function loadPlanCandidates(supplierId: string, now: Date): Promise
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// A price list's price wins; the last bill (in rand) stands in for a product
-// on no price list.
+// The supplier's price list price wins; the last bill (in rand) stands in
+// for a product its lists give no rate for.
 function unitCostOf(price: SupplierPrice | null, billCost: number | null): Pick<PlanCandidate, 'unitCost' | 'currency' | 'costSource'> {
     if (price) return { unitCost: price.rate, currency: price.currency, costSource: 'PriceList' };
     if (billCost !== null) return { unitCost: billCost, currency: Currency.ZAR, costSource: 'LastBill' };
@@ -457,12 +466,12 @@ export interface SupplierPrice {
 
 const CURRENCIES = new Set<string>(Object.values(Currency));
 
-// Which of a product's price list rates prices the plan. Price lists aren't
-// tied to suppliers, so a product on several takes, in order: a list in the
-// supplier's own currency, the list Zoho changed most recently (the newest
-// prices), then the list's name, so the pick never varies between runs. A list
-// in a currency the plan can't show is passed over. Null when no list prices
-// the product.
+// Which of a product's rates on the supplier's price lists prices the plan.
+// A supplier with several lists (one per currency, say) gives, in order: a
+// list in the supplier's own currency, the list Zoho changed most recently
+// (the newest prices), then the list's name, so the pick never varies between
+// runs. A list in a currency the plan can't show is passed over. Null when no
+// list prices the product.
 export function pickSupplierPrice(rows: SupplierPriceRow[], supplierCurrency: Currency | null): SupplierPrice | null {
     const usable = rows.filter((r) => CURRENCIES.has(r.currencyCode));
     usable.sort(
@@ -475,15 +484,16 @@ export function pickSupplierPrice(rows: SupplierPriceRow[], supplierCurrency: Cu
     return best ? { rate: best.rate, currency: best.currencyCode as Currency } : null;
 }
 
-// Every rate the given products have on an active purchase price list, by
-// product. Items with no rate (on a volume-priced list) can't price a plan.
-export async function loadSupplierPrices(productIds: string[]): Promise<Map<string, SupplierPriceRow[]>> {
+// Every rate the given products have on the supplier's active price lists,
+// by product. Items with no rate (on a volume-priced list) can't price a plan.
+export async function loadSupplierPrices(supplierId: string, productIds: string[]): Promise<Map<string, SupplierPriceRow[]>> {
     const byProduct = new Map<string, SupplierPriceRow[]>();
     if (productIds.length === 0) return byProduct;
     const rows = await useDatabase()
         .selectFrom('supplier_price_list_item as i')
         .innerJoin('supplier_price_list as l', 'l.id', 'i.priceListId')
         .select(['i.productId', 'i.rate', 'l.currencyCode', 'l.name', 'l.zohoModifiedAt'])
+        .where('l.supplierId', '=', supplierId)
         .where('i.productId', 'in', productIds)
         .where('i.rate', 'is not', null)
         .where('l.isActive', '=', true)

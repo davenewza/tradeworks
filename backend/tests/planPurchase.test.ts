@@ -20,14 +20,24 @@ async function operator() {
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
-// A supplier with one steady seller (30/month, 100 on hand, costed from its
-// last bill) and one product that has never sold.
+// A supplier's price list carrying one product, with `rate` on the list.
+async function onList(supplierId: string, productId: string, rate: number | null, name: string, currencyCode = 'ZAR') {
+    const existing = await models.supplierPriceList.findOne({ zohoPriceListId: `zpl-${name}` });
+    const list = existing ?? (await models.supplierPriceList.create({ zohoPriceListId: `zpl-${name}`, name, currencyCode, supplierId, zohoModifiedAt: new Date() }));
+    await models.supplierPriceListItem.create({ priceListId: list.id, productId, rate, zohoItemId: `zi-${productId}` });
+}
+
+// A supplier with one steady seller (30/month, 100 on hand) and one product
+// that has never sold, both on its price list. The list gives no rate (a
+// volume-priced list, say), so the seller is costed from its last bill.
 async function seedSupplier() {
     const brand = await models.brand.create({ name: 'Acme' });
     const supplier = await models.supplier.create({ name: 'Acme Ltd', leadTimeInDays: 60 });
     const channel = await models.channel.create({ name: 'Shop' });
-    const widget = await models.product.create({ name: 'Widget', sku: 'ACME-W', brandId: brand.id, supplierId: supplier.id, stockAvailable: 100 });
-    const gadget = await models.product.create({ name: 'Gadget', sku: 'ACME-G', brandId: brand.id, supplierId: supplier.id, stockAvailable: 5 });
+    const widget = await models.product.create({ name: 'Widget', sku: 'ACME-W', brandId: brand.id, stockAvailable: 100 });
+    const gadget = await models.product.create({ name: 'Gadget', sku: 'ACME-G', brandId: brand.id, stockAvailable: 5 });
+    await onList(supplier.id, widget.id, null, 'Acme');
+    await onList(supplier.id, gadget.id, null, 'Acme');
     // First sold years ago (12 months active), 360 in the trailing year → 30/month.
     await models.sale.create({ invoiceNumber: 'I1', lineItemId: 'L1', lineKey: 'L1', channelId: channel.id, date: daysAgo(3 * 365), productId: widget.id, quantity: 1, price: 10 });
     await models.sale.create({ invoiceNumber: 'I2', lineItemId: 'L2', lineKey: 'L2', channelId: channel.id, date: daysAgo(200), productId: widget.id, quantity: 360, price: 10 });
@@ -160,7 +170,8 @@ describe('PlanPurchase', () => {
     test('a supplier with no active products completes straight away with nothing to plan', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
         const supplier = await models.supplier.create({ name: 'Bare Ltd' });
-        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, supplierId: supplier.id, isActive: false });
+        const off = await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, isActive: false });
+        await onList(supplier.id, off.id, 1, 'Bare');
         const authed = flows.planPurchase.withIdentity(await operator());
 
         const run = await authed.start({ supplierId: supplier.id });
@@ -172,8 +183,7 @@ describe('PlanPurchase', () => {
 
     test("price list prices are shown and totalled in the list's currency", async () => {
         const { supplier, widget } = await seedSupplier();
-        const list = await models.supplierPriceList.create({ zohoPriceListId: 'zpl-1', name: 'Acme (GBP)', currencyCode: 'GBP', zohoModifiedAt: new Date() });
-        await models.supplierPriceListItem.create({ priceListId: list.id, productId: widget.id, rate: 3.5, zohoItemId: 'zi-1' });
+        await onList(supplier.id, widget.id, 3.5, 'Acme (GBP)', 'GBP');
         const authed = flows.planPurchase.withIdentity(await operator());
 
         let run = await authed.start({ supplierId: supplier.id });

@@ -338,22 +338,32 @@ describe('loading', () => {
     const billLine = (supplierBillId: string, productId: string, unitCost: number, quantity: number) =>
         models.supplierBillLine.create({ supplierBillId, productId, unitCost, quantity, zohoLineItemId: `li-${++lineCount}`, position: lineCount });
     let listCount = 0;
-    const priceList = (name: string, currencyCode: string, modifiedAt: string, isActive = true) =>
-        models.supplierPriceList.create({ zohoPriceListId: `zpl-${++listCount}`, name, currencyCode, isActive, zohoModifiedAt: new Date(modifiedAt) });
+    // A product's supplier is the supplier of a price list it is on.
+    const priceList = (name: string, currencyCode: string, modifiedAt: string, supplierId: string | null = null, isActive = true) =>
+        models.supplierPriceList.create({ zohoPriceListId: `zpl-${++listCount}`, name, currencyCode, supplierId, isActive, zohoModifiedAt: new Date(modifiedAt) });
     const price = (priceListId: string, productId: string, rate: number | null) =>
         models.supplierPriceListItem.create({ priceListId, productId, rate, zohoItemId: `zi-${productId}` });
+    const product = (sku: string, brandId: string, values: Record<string, unknown> = {}) =>
+        models.product.create({ name: sku, sku, brandId, ...values });
 
-    test('loadPlannableSuppliers lists suppliers with active products, with their lead times and counts', async () => {
+    test('loadPlannableSuppliers lists suppliers with active products on their lists, with their lead times and counts', async () => {
         const brand = await models.brand.create({ name: 'Acme' });
         const acme = await models.supplier.create({ name: 'Acme Ltd', leadTimeInDays: 45 });
         const zeta = await models.supplier.create({ name: 'Zeta' });
-        await models.supplier.create({ name: 'Empty' });
-        await models.product.create({ name: 'A1', sku: 'A1', brandId: brand.id, supplierId: acme.id });
-        await models.product.create({ name: 'A2', sku: 'A2', brandId: brand.id, supplierId: acme.id });
-        await models.product.create({ name: 'A3', sku: 'A3', brandId: brand.id, supplierId: acme.id, isActive: false });
-        await models.product.create({ name: 'Z1', sku: 'Z1', brandId: brand.id, supplierId: zeta.id });
-        // Unassigned products belong to no supplier's plan.
-        await models.product.create({ name: 'N1', sku: 'N1', brandId: brand.id });
+        const empty = await models.supplier.create({ name: 'Empty' });
+        const acmeZar = await priceList('Acme', 'ZAR', '2026-09-01T10:00:00Z', acme.id);
+        const acmeGbp = await priceList('Acme (GBP)', 'GBP', '2026-09-01T10:00:00Z', acme.id);
+        const a1 = await product('A1', brand.id);
+        await price(acmeZar.id, a1.id, 1);
+        // On both of Acme's lists, but one product.
+        await price(acmeGbp.id, a1.id, 1);
+        await price(acmeZar.id, (await product('A2', brand.id)).id, 1);
+        await price(acmeZar.id, (await product('A3', brand.id, { isActive: false })).id, 1);
+        await price((await priceList('Zeta', 'ZAR', '2026-09-01T10:00:00Z', zeta.id)).id, (await product('Z1', brand.id)).id, 1);
+        // A supplier whose list carries nothing active has nothing to plan.
+        await price((await priceList('Empty', 'ZAR', '2026-09-01T10:00:00Z', empty.id)).id, (await product('E1', brand.id, { isActive: false })).id, 1);
+        // A list linked to no supplier puts its products in no supplier's plan.
+        await price((await priceList('Unlinked', 'ZAR', '2026-09-01T10:00:00Z')).id, (await product('N1', brand.id)).id, 1);
 
         expect(await loadPlannableSuppliers()).toEqual([
             { supplierId: acme.id, name: 'Acme Ltd', leadTimeInDays: 45, productCount: 2 },
@@ -371,14 +381,22 @@ describe('loading', () => {
         // same supplier is in the same plan.
         const otherBrand = await models.brand.create({ name: 'Bolt' });
         const widget = await models.product.create({
-            name: 'Widget', sku: 'W-1', brandId: brand.id, supplierId: acme.id, stockAvailable: 40, abcClass: AbcClass.B,
+            name: 'Widget', sku: 'W-1', brandId: brand.id, stockAvailable: 40, abcClass: AbcClass.B,
         });
-        const trickle = await models.product.create({ name: 'Trickle', sku: 'T-1', brandId: otherBrand.id, supplierId: acme.id, stockAvailable: 3 });
-        const dormant = await models.product.create({
-            name: 'Dormant', sku: 'D-1', brandId: brand.id, supplierId: acme.id,
-        });
-        await models.product.create({ name: 'Retired', sku: 'R-1', brandId: brand.id, supplierId: acme.id, isActive: false });
-        await models.product.create({ name: 'Elsewhere', sku: 'E-1', brandId: brand.id, supplierId: other.id, stockAvailable: 9 });
+        const trickle = await models.product.create({ name: 'Trickle', sku: 'T-1', brandId: otherBrand.id, stockAvailable: 3 });
+        const dormant = await models.product.create({ name: 'Dormant', sku: 'D-1', brandId: brand.id });
+        const retired = await models.product.create({ name: 'Retired', sku: 'R-1', brandId: brand.id, isActive: false });
+        const elsewhere = await models.product.create({ name: 'Elsewhere', sku: 'E-1', brandId: brand.id, stockAvailable: 9 });
+
+        // Acme's rand list carries Widget and Trickle with no rate (volume
+        // pricing, say) and Retired; its pound list prices Dormant. Other's
+        // list prices Dormant too, which Acme's plan mustn't use.
+        const acmeZar = await priceList('Acme', 'ZAR', '2026-09-01T10:00:00Z', acme.id);
+        for (const p of [widget, trickle, retired]) await price(acmeZar.id, p.id, null);
+        await price((await priceList('Acme (GBP)', 'GBP', '2026-09-01T10:00:00Z', acme.id)).id, dormant.id, 7.25);
+        const otherList = await priceList('Other', 'GBP', '2026-10-01T10:00:00Z', other.id);
+        await price(otherList.id, dormant.id, 6);
+        await price(otherList.id, elsewhere.id, 3);
 
         // Widget: established (first sale years ago → 12 months active), 120 in
         // the window → 10/month. An old sale outside the window doesn't count.
@@ -391,10 +409,9 @@ describe('loading', () => {
         // Dormant: only ancient sales.
         await sale(dormant.id, channel.id, '2021-01-01', 30, 5);
 
-        // Widget is on no price list, so it falls back to its bills: the
-        // later one's cost wins, regardless of insert order. Dormant is on a
-        // price list, which wins over its bill.
-        await price((await priceList('Acme (GBP)', 'GBP', '2026-09-01T10:00:00Z')).id, dormant.id, 7.25);
+        // Widget has no rate on Acme's lists, so it falls back to its bills:
+        // the later one's cost wins, regardless of insert order. Dormant has a
+        // rate on Acme's list, which wins over its bill.
         const newer = await bill('B-2', new Date('2026-05-01'));
         const older = await bill('B-1', new Date('2025-01-01'));
         await billLine(newer.id, widget.id, 55, 100);
@@ -419,32 +436,37 @@ describe('loading', () => {
         });
     });
 
-    test('loadSupplierPrices reads rates on active lists only, and skips items with no rate', async () => {
+    test("loadSupplierPrices reads rates on the supplier's active lists only, and skips items with no rate", async () => {
         const brand = await models.brand.create({ name: 'Acme' });
+        const acme = await models.supplier.create({ name: 'Acme Ltd' });
+        const other = await models.supplier.create({ name: 'Other' });
         const widget = await models.product.create({ name: 'Widget', sku: 'W-1', brandId: brand.id });
         const gadget = await models.product.create({ name: 'Gadget', sku: 'G-1', brandId: brand.id });
-        const current = await priceList('Current', 'GBP', '2026-09-01T10:00:00Z');
-        const retired = await priceList('Retired', 'GBP', '2026-08-01T10:00:00Z', false);
-        const volume = await priceList('Volume', 'USD', '2026-08-01T10:00:00Z');
+        const current = await priceList('Current', 'GBP', '2026-09-01T10:00:00Z', acme.id);
+        const retired = await priceList('Retired', 'GBP', '2026-08-01T10:00:00Z', acme.id, false);
+        const volume = await priceList('Volume', 'USD', '2026-08-01T10:00:00Z', acme.id);
+        const theirs = await priceList('Theirs', 'GBP', '2026-10-01T10:00:00Z', other.id);
         await price(current.id, widget.id, 12.85);
         await price(retired.id, widget.id, 11);
         await price(volume.id, widget.id, null);
+        await price(theirs.id, widget.id, 10);
         await price(current.id, gadget.id, 124.75);
 
-        const prices = await loadSupplierPrices([widget.id]);
+        const prices = await loadSupplierPrices(acme.id, [widget.id]);
 
         expect([...prices.keys()]).toEqual([widget.id]);
         expect(prices.get(widget.id)).toEqual([
             { rate: 12.85, currencyCode: 'GBP', priceListName: 'Current', priceListModifiedAt: new Date('2026-09-01T10:00:00Z') },
         ]);
-        expect(await loadSupplierPrices([])).toEqual(new Map());
+        expect(await loadSupplierPrices(acme.id, [])).toEqual(new Map());
     });
 
     test('loadPlanCandidates is empty for a supplier with nothing active', async () => {
         const brand = await models.brand.create({ name: 'Bare' });
         const supplier = await models.supplier.create({ name: 'Bare Ltd' });
-        await models.product.create({ name: 'Off', sku: 'OFF', brandId: brand.id, supplierId: supplier.id, isActive: false });
+        await price((await priceList('Bare', 'ZAR', '2026-09-01T10:00:00Z', supplier.id)).id, (await product('OFF', brand.id, { isActive: false })).id, 1);
         expect(await loadPlanCandidates(supplier.id, NOW)).toEqual([]);
+        expect(await loadPlanCandidates((await models.supplier.create({ name: 'No lists' })).id, NOW)).toEqual([]);
     });
 
     test('loadLatestUnitCosts puts undated bills last and handles an empty request', async () => {

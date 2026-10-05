@@ -33,10 +33,10 @@ model Supplier {
         // Zoho's: set it after importing.
         leadTimeInDays Number @default(60)
         notes Text?
-        products Product[]
+        priceLists SupplierPriceList[]
         bills SupplierBill[]
         purchaseOrders PurchaseOrder[]
-        totalProducts Number @computed(COUNTIF(supplier.products, supplier.products.isActive))
+        totalPriceLists Number @computed(COUNT(supplier.priceLists.id))
     }
 
     actions {

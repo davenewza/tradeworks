@@ -10,10 +10,11 @@ matters, not just how close it is to running out.
 ## Where to find it
 
 - **Inventory → View stock and cover** — the reorder view: every active
-  product's figures in one grid. Filter by brand, supplier, SKU, name, ABC
-  class, status, and current or total cover (any comparison — less than, at
-  least, between); click any column heading to sort by it. Brand and supplier
-  are the columns that can't be sorted, because they are relations.
+  product's figures in one grid. Filter by brand, supplier (the products on
+  its price lists), SKU, name, ABC class, status, and current or total cover
+  (any comparison — less than, at least, between); click any column heading to
+  sort by it. Brand is the one column that can't be sorted, because it is a
+  relation.
 - **Stock cover dashboard** — charts of cover by ABC class; see
   [the dashboard](#stock-cover-dashboard). Its four headline figures are also
   pinned to the top of the Inventory space.
@@ -38,8 +39,11 @@ matters, not just how close it is to running out.
 
 ## Status
 
-Each product is graded by comparing its **current cover** to its supplier's
-**lead time** — how long new stock takes to arrive from them. With
+Each product is graded by comparing its **current cover** to its **lead
+time**, which is how long new stock takes to arrive. A product's suppliers are
+the suppliers of the [price lists](supplier-price-lists.md) it is on, and its
+lead time is the **shortest** of theirs, since that's the soonest a reorder
+can land. With
 `L = leadTimeInDays ÷ 30` (lead time in months):
 
 | Status | Colour | Cover | Meaning |
@@ -49,10 +53,11 @@ Each product is graded by comparing its **current cover** to its supplier's
 | **Good** | 🟢 green | `1.5 × L` to `2.5 × L` | Comfortable. |
 | **Oversupply** | 🟣 purple | `≥ 2.5 × L` | More stock than needed. |
 
-The status is **blank** when cover is unknown (no sales estimate) or the
-product has no supplier (so no lead time). It is a computed field, so it
-re-grades automatically the moment the cover, the product's supplier or that
-supplier's lead time changes.
+The status is **blank** when cover is unknown (no sales estimate) or no price
+list the product is on is linked to a supplier (so no lead time). It is a
+computed field. It re-grades the moment the cover changes, a price list
+carrying the product is linked to a supplier or unlinked, or a supplier's lead
+time changes.
 
 ## ABC class
 
@@ -121,8 +126,9 @@ How the group figures are worked out:
 ## Lead time
 
 Each **supplier** carries a **lead time** (`leadTimeInDays`, default **60**).
-Set it from the supplier page via **Edit supplier**; it drives the status bands
-for every product bought from that supplier, and is the default lead time when
+Set it from the supplier page via **Edit supplier**. It drives the status
+bands for every product on that supplier's price lists (a product on several
+suppliers' lists takes the shortest), and is the default lead time when
 [planning a purchase](purchase-planning.md).
 
 ## Reordering
