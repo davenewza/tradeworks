@@ -315,6 +315,16 @@
               "display_order": 7
             },
             "hidden": false
+          },
+          {
+            "id": "action-assign-suppliers-by-brand",
+            "link": {
+              "tool_id": "assign-suppliers-by-brand",
+              "title": "Assign suppliers by brand",
+              "description": "One-off: map each Zoho brand to its supplier and give its products that supplier",
+              "display_order": 8
+            },
+            "hidden": false
           }
         ]
       }

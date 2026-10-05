@@ -138,6 +138,12 @@ Every supplier is a **vendor in Zoho Books**, linked by the vendor's Zoho
   from its own lists (see [supplier-price-lists.md](supplier-price-lists.md)).
 - **Inventory → Products without a supplier** lists the active products still
   waiting for one. They go ungraded in stock cover and are left out of plans.
+- **Inventory → Suppliers → Assign suppliers by brand** fills them in bulk,
+  meant to be used once. It reads every item's brand from Zoho (its *Brand*
+  custom field), and you pick a supplier for each brand. Each pick starts on
+  the supplier that has billed the most of that brand's products. A review
+  shows what will change before anything is written. Products that already
+  have a supplier keep it unless you choose to replace them.
 
 ## Where it lives in the code
 
