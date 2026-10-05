@@ -134,7 +134,7 @@ export function summaryRows(plan: PurchasePlan, params: PurchasePlanParams): { k
         { key: 'Units', value: s.totalUnits },
         { key: 'Goods value (excl VAT & freight)', value },
         ...(s.linesCostedFromBills > 0
-            ? [{ key: 'Costed from last bill', value: `${s.linesCostedFromBills} line(s) with no supplier price, in rand` }]
+            ? [{ key: 'Costed from last bill', value: `${s.linesCostedFromBills} line(s) on no price list, in rand` }]
             : []),
     ];
 }

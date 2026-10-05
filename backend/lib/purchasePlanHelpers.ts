@@ -111,18 +111,19 @@ export interface PlanCandidate {
     // horizon that is 2–3 units the order should carry. Null when nothing
     // sold in the window.
     monthlyDemand: number | null;
-    // What the supplier will charge per unit (excl VAT, excl freight), in
-    // `currency`. The supplier's price on the product when one is set;
-    // otherwise the unit cost on the product's most recent supplier bill,
-    // which Zoho records in rand. Null when neither exists.
+    // What the supplier will charge per unit (excl freight), in `currency`.
+    // The product's rate on a purchase price list in Zoho when it is on one
+    // (see pickSupplierPrice); otherwise the unit cost on the product's most
+    // recent supplier bill, which Zoho records in rand. Null when neither
+    // exists.
     unitCost: number | null;
     currency: Currency | null;
     costSource: CostSource | null;
 }
 
-// Where a line's unit cost came from: the supplier's quoted price, or — until
-// one is entered — the last bill, as a stand-in.
-export type CostSource = 'SupplierPrice' | 'LastBill';
+// Where a line's unit cost came from: a purchase price list, or — for a
+// product on none — the last bill, as a stand-in.
+export type CostSource = 'PriceList' | 'LastBill';
 
 // Why a product got the quantity it did. Drives the "Why" column and the
 // ordering of the grid: the products in trouble come first.
@@ -265,8 +266,8 @@ export interface PurchasePlanSummary {
     // alongside linesWithoutCost.
     valueByCurrency: CurrencyTotal[];
     linesWithoutCost: number;
-    // Ordered lines costed from the last bill because the product has no
-    // supplier price yet.
+    // Ordered lines costed from the last bill because the product is on no
+    // purchase price list.
     linesCostedFromBills: number;
     stockouts: number;
     stockUnknown: number;
@@ -400,13 +401,20 @@ export async function loadPlanCandidates(supplierId: string, now: Date): Promise
     });
     if (products.length === 0) return [];
 
+    const supplier = await models.supplier.findOne({ id: supplierId });
     const productIds = products.map((p) => p.id);
     const windowStart = addDays(now, -COVER_WINDOW_DAYS);
-    const [aggregates, billCosts] = await Promise.all([
+    const [aggregates, priceRows] = await Promise.all([
         loadSaleAggregates(windowStart, productIds),
-        // Bill costs are only a fallback, so only fetched for the unpriced.
-        loadLatestUnitCosts(products.filter((p) => p.supplierUnitCost == null).map((p) => p.id)),
+        loadSupplierPrices(productIds),
     ]);
+    const prices = new Map<string, SupplierPrice>();
+    for (const productId of productIds) {
+        const price = pickSupplierPrice(priceRows.get(productId) ?? [], supplier?.currency ?? null);
+        if (price) prices.set(productId, price);
+    }
+    // Bill costs are only a fallback, so only fetched for the unpriced.
+    const billCosts = await loadLatestUnitCosts(productIds.filter((id) => !prices.has(id)));
     const demandById = new Map(aggregates.map((a) => [a.productId, estimatedMonthlySale(a, now)]));
 
     return products
@@ -420,24 +428,72 @@ export async function loadPlanCandidates(supplierId: string, now: Date): Promise
                 stockAvailable: p.stockAvailable ?? null,
                 stockOnWay: p.stockOnWay ?? 0,
                 monthlyDemand: demand > 0 ? demand : null,
-                ...unitCostOf(p.supplierUnitCost ?? null, p.supplierCurrency ?? null, billCosts.get(p.id) ?? null),
+                ...unitCostOf(prices.get(p.id) ?? null, billCosts.get(p.id) ?? null),
             };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// The supplier's price wins; the last bill (in rand) stands in until one is
-// entered.
-function unitCostOf(
-    supplierUnitCost: number | null,
-    supplierCurrency: Currency | null,
-    billCost: number | null,
-): Pick<PlanCandidate, 'unitCost' | 'currency' | 'costSource'> {
-    if (supplierUnitCost !== null && supplierCurrency !== null) {
-        return { unitCost: Number(supplierUnitCost), currency: supplierCurrency, costSource: 'SupplierPrice' };
-    }
+// A price list's price wins; the last bill (in rand) stands in for a product
+// on no price list.
+function unitCostOf(price: SupplierPrice | null, billCost: number | null): Pick<PlanCandidate, 'unitCost' | 'currency' | 'costSource'> {
+    if (price) return { unitCost: price.rate, currency: price.currency, costSource: 'PriceList' };
     if (billCost !== null) return { unitCost: billCost, currency: Currency.ZAR, costSource: 'LastBill' };
     return { unitCost: null, currency: null, costSource: null };
+}
+
+// A product's rate on one purchase price list.
+export interface SupplierPriceRow {
+    rate: number;
+    currencyCode: string;
+    priceListName: string;
+    priceListModifiedAt: Date;
+}
+
+export interface SupplierPrice {
+    rate: number;
+    currency: Currency;
+}
+
+const CURRENCIES = new Set<string>(Object.values(Currency));
+
+// Which of a product's price list rates prices the plan. Price lists aren't
+// tied to suppliers, so a product on several takes, in order: a list in the
+// supplier's own currency, the list Zoho changed most recently (the newest
+// prices), then the list's name, so the pick never varies between runs. A list
+// in a currency the plan can't show is passed over. Null when no list prices
+// the product.
+export function pickSupplierPrice(rows: SupplierPriceRow[], supplierCurrency: Currency | null): SupplierPrice | null {
+    const usable = rows.filter((r) => CURRENCIES.has(r.currencyCode));
+    usable.sort(
+        (a, b) =>
+            Number(b.currencyCode === supplierCurrency) - Number(a.currencyCode === supplierCurrency) ||
+            b.priceListModifiedAt.getTime() - a.priceListModifiedAt.getTime() ||
+            a.priceListName.localeCompare(b.priceListName)
+    );
+    const best = usable[0];
+    return best ? { rate: best.rate, currency: best.currencyCode as Currency } : null;
+}
+
+// Every rate the given products have on an active purchase price list, by
+// product. Items with no rate (on a volume-priced list) can't price a plan.
+export async function loadSupplierPrices(productIds: string[]): Promise<Map<string, SupplierPriceRow[]>> {
+    const byProduct = new Map<string, SupplierPriceRow[]>();
+    if (productIds.length === 0) return byProduct;
+    const rows = await useDatabase()
+        .selectFrom('supplier_price_list_item as i')
+        .innerJoin('supplier_price_list as l', 'l.id', 'i.priceListId')
+        .select(['i.productId', 'i.rate', 'l.currencyCode', 'l.name', 'l.zohoModifiedAt'])
+        .where('i.productId', 'in', productIds)
+        .where('i.rate', 'is not', null)
+        .where('l.isActive', '=', true)
+        .execute();
+    for (const row of rows) {
+        const list = byProduct.get(row.productId!) ?? [];
+        list.push({ rate: Number(row.rate), currencyCode: row.currencyCode, priceListName: row.name, priceListModifiedAt: row.zohoModifiedAt });
+        byProduct.set(row.productId!, list);
+    }
+    return byProduct;
 }
 
 // Cost of goods per unit on each product's most recent supplier bill —

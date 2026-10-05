@@ -265,6 +265,26 @@
               "display_order": 2
             },
             "hidden": false
+          },
+          {
+            "id": "action-list-supplier-price-lists",
+            "link": {
+              "tool_id": "list-supplier-price-lists",
+              "title": "Supplier price lists",
+              "description": "What every item costs to buy, from the purchase price lists in Zoho",
+              "display_order": 5
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-sync-supplier-price-lists",
+            "link": {
+              "tool_id": "sync-supplier-price-lists",
+              "title": "Sync supplier price lists from Zoho",
+              "description": "Pull every purchase price list now — it also runs nightly",
+              "display_order": 6
+            },
+            "hidden": false
           }
         ]
       }

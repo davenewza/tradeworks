@@ -5,16 +5,15 @@ import {
     LocalBill,
     ZohoBillDetail,
     ZohoBillSummary,
-    ZohoGet,
     ZohoLandedCost,
     buildBillLines,
     findUnmatchedSkus,
     linkUnmatchedLines,
-    parseZohoTime,
     planSupplierBills,
     runSupplierBillSync,
     syncSupplierBillsBatch,
 } from './zohoBillHelpers';
+import { ZohoGet, parseZohoTime } from './zohoInventoryApi';
 
 beforeEach(resetDatabase);
 

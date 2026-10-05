@@ -170,9 +170,10 @@ describe('PlanPurchase', () => {
         expect((done.ui as any).title).toBe('Nothing to plan for this supplier');
     });
 
-    test('supplier prices are shown and totalled in the currency the supplier quotes', async () => {
+    test("price list prices are shown and totalled in the list's currency", async () => {
         const { supplier, widget } = await seedSupplier();
-        await models.product.update({ id: widget.id }, { supplierUnitCost: 3.5, supplierCurrency: Currency.GBP });
+        const list = await models.supplierPriceList.create({ zohoPriceListId: 'zpl-1', name: 'Acme (GBP)', currencyCode: 'GBP', zohoModifiedAt: new Date() });
+        await models.supplierPriceListItem.create({ priceListId: list.id, productId: widget.id, rate: 3.5, zohoItemId: 'zi-1' });
         const authed = flows.planPurchase.withIdentity(await operator());
 
         let run = await authed.start({ supplierId: supplier.id });

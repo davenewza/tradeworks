@@ -109,11 +109,6 @@
     "format": { "number_config": { "mode": "DECIMAL", "suffix": " days", "locale": "en-GB" } }
   },
   {
-    "id": "Product.supplierUnitCost",
-    "display_name": "Supplier price",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
-  },
-  {
     "id": "StockCoverStatus",
     "format": {
       "enum_config": {

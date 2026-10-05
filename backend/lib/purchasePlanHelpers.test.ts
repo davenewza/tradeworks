@@ -15,7 +15,9 @@ import {
     loadLatestUnitCosts,
     loadPlanCandidates,
     loadPlannableSuppliers,
+    loadSupplierPrices,
     parseDay,
+    pickSupplierPrice,
     planLine,
 } from './purchasePlanHelpers';
 import { describeReason, formatDate, formatMoney, summaryRows, toGridRow } from './purchasePlanFormat';
@@ -43,7 +45,7 @@ function candidate(overrides: Partial<PlanCandidate> = {}): PlanCandidate {
         monthlyDemand: 30,
         unitCost: 50,
         currency: Currency.ZAR,
-        costSource: 'SupplierPrice',
+        costSource: 'PriceList',
         ...overrides,
     };
 }
@@ -308,7 +310,7 @@ describe('presentation', () => {
         const blank = toGridRow(planLine(candidate({ monthlyDemand: null, stockAvailable: null }), PARAMS), arrival);
         expect(blank).toMatchObject({ abc: 'A', stock: 0, monthly: 0, suggested: 0, order: 0, cover: '', coveredUntil: '' });
 
-        // A supplier price shows in its own currency; a last-bill stand-in says so.
+        // A price list's price shows in its own currency; a last-bill stand-in says so.
         expect(toGridRow(planLine(candidate({ currency: Currency.USD, unitCost: 2 }), PARAMS), arrival).value).toBe('$160.00');
         expect(toGridRow(planLine(candidate({ costSource: 'LastBill' }), PARAMS), arrival).value).toBe('R 4,000.00 (last bill)');
     });
@@ -335,6 +337,11 @@ describe('loading', () => {
     let lineCount = 0;
     const billLine = (supplierBillId: string, productId: string, unitCost: number, quantity: number) =>
         models.supplierBillLine.create({ supplierBillId, productId, unitCost, quantity, zohoLineItemId: `li-${++lineCount}`, position: lineCount });
+    let listCount = 0;
+    const priceList = (name: string, currencyCode: string, modifiedAt: string, isActive = true) =>
+        models.supplierPriceList.create({ zohoPriceListId: `zpl-${++listCount}`, name, currencyCode, isActive, zohoModifiedAt: new Date(modifiedAt) });
+    const price = (priceListId: string, productId: string, rate: number | null) =>
+        models.supplierPriceListItem.create({ priceListId, productId, rate, zohoItemId: `zi-${productId}` });
 
     test('loadPlannableSuppliers lists suppliers with active products, with their lead times and counts', async () => {
         const brand = await models.brand.create({ name: 'Acme' });
@@ -368,7 +375,7 @@ describe('loading', () => {
         });
         const trickle = await models.product.create({ name: 'Trickle', sku: 'T-1', brandId: otherBrand.id, supplierId: acme.id, stockAvailable: 3 });
         const dormant = await models.product.create({
-            name: 'Dormant', sku: 'D-1', brandId: brand.id, supplierId: acme.id, supplierUnitCost: 7.25, supplierCurrency: Currency.GBP,
+            name: 'Dormant', sku: 'D-1', brandId: brand.id, supplierId: acme.id,
         });
         await models.product.create({ name: 'Retired', sku: 'R-1', brandId: brand.id, supplierId: acme.id, isActive: false });
         await models.product.create({ name: 'Elsewhere', sku: 'E-1', brandId: brand.id, supplierId: other.id, stockAvailable: 9 });
@@ -384,9 +391,10 @@ describe('loading', () => {
         // Dormant: only ancient sales.
         await sale(dormant.id, channel.id, '2021-01-01', 30, 5);
 
-        // Widget has no supplier price, so it falls back to its bills: the
-        // later one's cost wins, regardless of insert order. Dormant has a
-        // supplier price, which wins over its bill.
+        // Widget is on no price list, so it falls back to its bills: the
+        // later one's cost wins, regardless of insert order. Dormant is on a
+        // price list, which wins over its bill.
+        await price((await priceList('Acme (GBP)', 'GBP', '2026-09-01T10:00:00Z')).id, dormant.id, 7.25);
         const newer = await bill('B-2', new Date('2026-05-01'));
         const older = await bill('B-1', new Date('2025-01-01'));
         await billLine(newer.id, widget.id, 55, 100);
@@ -407,8 +415,29 @@ describe('loading', () => {
         expect(byId.get(trickle.id)).toMatchObject({ unitCost: null, currency: null, costSource: null });
         expect(byId.get(dormant.id)).toMatchObject({
             monthlyDemand: null, stockAvailable: null, abcClass: null,
-            unitCost: 7.25, currency: Currency.GBP, costSource: 'SupplierPrice',
+            unitCost: 7.25, currency: Currency.GBP, costSource: 'PriceList',
         });
+    });
+
+    test('loadSupplierPrices reads rates on active lists only, and skips items with no rate', async () => {
+        const brand = await models.brand.create({ name: 'Acme' });
+        const widget = await models.product.create({ name: 'Widget', sku: 'W-1', brandId: brand.id });
+        const gadget = await models.product.create({ name: 'Gadget', sku: 'G-1', brandId: brand.id });
+        const current = await priceList('Current', 'GBP', '2026-09-01T10:00:00Z');
+        const retired = await priceList('Retired', 'GBP', '2026-08-01T10:00:00Z', false);
+        const volume = await priceList('Volume', 'USD', '2026-08-01T10:00:00Z');
+        await price(current.id, widget.id, 12.85);
+        await price(retired.id, widget.id, 11);
+        await price(volume.id, widget.id, null);
+        await price(current.id, gadget.id, 124.75);
+
+        const prices = await loadSupplierPrices([widget.id]);
+
+        expect([...prices.keys()]).toEqual([widget.id]);
+        expect(prices.get(widget.id)).toEqual([
+            { rate: 12.85, currencyCode: 'GBP', priceListName: 'Current', priceListModifiedAt: new Date('2026-09-01T10:00:00Z') },
+        ]);
+        expect(await loadSupplierPrices([])).toEqual(new Map());
     });
 
     test('loadPlanCandidates is empty for a supplier with nothing active', async () => {
@@ -441,5 +470,41 @@ describe('loading', () => {
         await billLine(latest.id, product.id, 14, 10);
 
         expect(await loadLatestUnitCosts([product.id])).toEqual(new Map([[product.id, 11]]));
+    });
+});
+
+describe('pickSupplierPrice', () => {
+    const row = (priceListName: string, currencyCode: string, rate: number, modified: string) => ({
+        rate,
+        currencyCode,
+        priceListName,
+        priceListModifiedAt: new Date(modified),
+    });
+
+    test("takes the only list a product is on, whatever the supplier's currency", () => {
+        expect(pickSupplierPrice([row('Farnell (GBP)', 'GBP', 12.85, '2026-10-05')], Currency.ZAR)).toEqual({ rate: 12.85, currency: Currency.GBP });
+    });
+
+    test("prefers a list in the supplier's own currency, then the most recently changed", () => {
+        const rows = [
+            row('Farnell (ZAR)', 'ZAR', 300, '2026-10-01'),
+            row('Farnell (GBP) old', 'GBP', 12, '2026-01-01'),
+            row('Farnell (GBP)', 'GBP', 12.85, '2026-10-05'),
+        ];
+        expect(pickSupplierPrice(rows, Currency.GBP)).toEqual({ rate: 12.85, currency: Currency.GBP });
+        expect(pickSupplierPrice(rows, Currency.ZAR)).toEqual({ rate: 300, currency: Currency.ZAR });
+        // No list in the supplier's currency: the newest list wins.
+        expect(pickSupplierPrice(rows, Currency.USD)).toEqual({ rate: 12.85, currency: Currency.GBP });
+    });
+
+    test('breaks a tie on the list name, so the pick never varies between runs', () => {
+        const rows = [row('B list', 'GBP', 2, '2026-10-05'), row('A list', 'GBP', 1, '2026-10-05')];
+        expect(pickSupplierPrice(rows, null)).toEqual({ rate: 1, currency: Currency.GBP });
+        expect(pickSupplierPrice([...rows].reverse(), null)).toEqual({ rate: 1, currency: Currency.GBP });
+    });
+
+    test("passes over a list in a currency the plan can't show, and gives nothing for no lists", () => {
+        expect(pickSupplierPrice([row('Yen', 'JPY', 1000, '2026-10-05')], null)).toBeNull();
+        expect(pickSupplierPrice([], Currency.GBP)).toBeNull();
     });
 });

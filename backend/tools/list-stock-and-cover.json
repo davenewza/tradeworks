@@ -156,12 +156,6 @@
     },
     "$.results[*].isActive": {
       "visible": false
-    },
-    "$.results[*].supplierUnitCost": {
-      "visible": false
-    },
-    "$.results[*].supplierCurrency": {
-      "visible": false
     }
   },
   "pagination": {
