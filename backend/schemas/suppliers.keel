@@ -68,3 +68,12 @@ model Supplier {
 flow ImportSuppliers {
     @permission(roles: [Operator])
 }
+
+// One-off: gives products their supplier in bulk, brand by brand. Reads every
+// item's brand from Zoho (a few calls), lets an operator map each brand to the
+// supplier its products come from — pre-filled from who has billed them — and,
+// after a review, sets the supplier on each brand's products. Leaves products
+// that already have a supplier alone unless told otherwise.
+flow AssignSuppliersByBrand {
+    @permission(roles: [Operator])
+}
