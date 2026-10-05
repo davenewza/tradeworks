@@ -355,6 +355,16 @@ describe('syncSupplierBillsBatch', () => {
         expect(num(product!.totalSupplierBills)).toBe(0);
     });
 
+    test('fails, rather than deleting every bill, when Zoho answers without a list', async () => {
+        const supplier = await createSupplier();
+        await syncSupplierBillsBatch(fakeZoho(withImport()).get, supplier, 100, NOW);
+        const odd: ZohoGet = async () => ({ code: 0, message: 'success' });
+
+        await expect(syncSupplierBillsBatch(odd, supplier, 100, NOW)).rejects.toThrow('without a list of bills');
+        expect(await models.supplierBill.findOne({ zohoBillId: 'zb-1' })).not.toBeNull();
+        expect(await linesOf('zb-1')).toHaveLength(3);
+    });
+
     test('marks a bill with no landed costs yet as not freight-allocated', async () => {
         await createProduct('RL-AE086');
         const supplier = await createSupplier();
