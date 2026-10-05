@@ -11,6 +11,9 @@
 // A bill from one of our suppliers.
 model SupplierBill {
     fields {
+        // First, because the Console labels a bill with the model's first
+        // field.
+        billNumber Text
         // Zoho's bill_id. Bill numbers are the supplier's own invoice
         // numbers, so they are only unique per supplier.
         zohoBillId Text @unique
@@ -18,7 +21,6 @@ model SupplierBill {
         // the cost history its products are priced from. Importing the vendor
         // again links them back on the next sync.
         supplier Supplier?
-        billNumber Text
         date Date?
         // Zoho's status: open, overdue, partially_paid, paid… A bill voided in
         // Zoho is removed here.

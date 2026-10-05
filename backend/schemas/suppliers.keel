@@ -16,14 +16,15 @@ enum Currency {
 // grading work off the supplier, since the lead time is theirs.
 model Supplier {
     fields {
+        // The vendor's name in Zoho, as it was when imported. First, because
+        // the Console labels a supplier with the model's first field.
+        name Text @unique
         // The vendor's contact_id in Zoho Books — the link back to it, so
         // bills and purchase orders there can be matched to this supplier.
         // Every supplier ImportSuppliers creates has one. Optional only for
         // suppliers made before suppliers came from Zoho: importing the vendor
         // of the same name links them.
         zohoVendorId Text? @unique
-        // The vendor's name in Zoho, as it was when imported.
-        name Text @unique
         // What the supplier normally invoices in — the vendor's currency in
         // Zoho, when it is one we support. Each price still carries its own.
         currency Currency @default(Currency.ZAR)

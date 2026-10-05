@@ -15,6 +15,9 @@
 // A purchase price list, as Zoho Inventory holds it.
 model SupplierPriceList {
     fields {
+        // First, because the Console labels a list with the model's first
+        // field.
+        name Text
         // Zoho's pricebook_id.
         zohoPriceListId Text @unique
         // Who the list's prices are from. Ours, not Zoho's: the sync can't
@@ -23,7 +26,6 @@ model SupplierPriceList {
         // plans price from its own lists. Separate from the product's own
         // supplier, which still says who a product is bought from.
         supplier Supplier?
-        name Text
         description Text?
         // Zoho's currency code, e.g. GBP. Text rather than the Currency enum,
         // so a list in a currency we don't otherwise use still syncs; purchase
