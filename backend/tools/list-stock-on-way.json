@@ -1,0 +1,34 @@
+{
+  "id": "list-stock-on-way",
+  "action_name": "listStockOnWay",
+  "name": "Stock on the way",
+  "title": "Stock on the way",
+  "icon": "emoji:🚚",
+  "help_text": "Every purchase order line with units still to arrive, oldest order first. These are the units behind each product's Stock on way, and they move into Stock available as they are received in Zoho. An order billed before it lands stays here until it is received. Refreshed nightly with stock — see docs/purchase-orders.md.",
+  "inputs": {
+    "$.where.sku": { "display_name": "SKU" },
+    "$.where.product.id": { "display_name": "Product" },
+    "$.where.purchaseOrder.supplier.id": { "display_name": "Supplier" }
+  },
+  "response": {
+    "$.results[*].orderDate": { "display_name": "Ordered", "display_order": 0 },
+    "$.results[*].purchaseOrderId": { "display_name": "Purchase order", "display_order": 1 },
+    "$.results[*].vendorName": { "display_name": "Vendor", "display_order": 2 },
+    "$.results[*].productId": { "display_name": "Product", "display_order": 3 },
+    "$.results[*].sku": { "display_name": "SKU", "display_order": 4 },
+    "$.results[*].quantityOrdered": { "display_name": "Ordered qty", "display_order": 5 },
+    "$.results[*].quantityReceived": { "display_name": "Received", "display_order": 6 },
+    "$.results[*].quantityBilled": { "display_name": "Billed", "display_order": 7 },
+    "$.results[*].quantityOnWay": { "display_name": "On way", "display_order": 8 },
+    "$.results[*].expectedDeliveryDate": { "display_name": "Expected", "display_order": 9 },
+    "$.results[*].name": { "visible": false },
+    "$.results[*].quantityCancelled": { "visible": false },
+    "$.results[*].purchaseOrderNumber": { "visible": false },
+    "$.results[*].productName": { "visible": false },
+    "$.results[*].position": { "visible": false },
+    "$.results[*].zohoLineItemId": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": { "visible": false }
+  }
+}

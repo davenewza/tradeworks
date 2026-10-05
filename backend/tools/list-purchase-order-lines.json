@@ -1,0 +1,28 @@
+{
+  "id": "list-purchase-order-lines",
+  "action_name": "listPurchaseOrderLines",
+  "name": "Purchase order lines",
+  "title": "Purchase order lines",
+  "help_text": "Every line of every purchase order, from Zoho. On way is what is still to arrive: ordered, less received and cancelled — 0 on a draft or cancelled order. Billing doesn't change it: an import billed before it lands is still on the way.",
+  "response": {
+    "$.results[*].orderDate": { "display_name": "Order date", "display_order": 0 },
+    "$.results[*].purchaseOrderId": { "display_name": "Purchase order", "display_order": 1 },
+    "$.results[*].productId": { "display_name": "Product", "display_order": 2 },
+    "$.results[*].sku": { "display_name": "SKU", "display_order": 3 },
+    "$.results[*].name": { "display_name": "Description", "display_order": 4 },
+    "$.results[*].quantityOrdered": { "display_name": "Ordered", "display_order": 5 },
+    "$.results[*].quantityReceived": { "display_name": "Received", "display_order": 6 },
+    "$.results[*].quantityCancelled": { "display_name": "Cancelled", "display_order": 7 },
+    "$.results[*].quantityBilled": { "display_name": "Billed", "display_order": 8 },
+    "$.results[*].quantityOnWay": { "display_name": "On way", "display_order": 9 },
+    "$.results[*].expectedDeliveryDate": { "display_name": "Expected", "display_order": 10 },
+    "$.results[*].purchaseOrderNumber": { "visible": false },
+    "$.results[*].vendorName": { "visible": false },
+    "$.results[*].productName": { "visible": false },
+    "$.results[*].position": { "visible": false },
+    "$.results[*].zohoLineItemId": { "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": { "visible": false }
+  }
+}

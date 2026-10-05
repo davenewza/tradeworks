@@ -35,6 +35,7 @@ model Supplier {
         notes Text?
         products Product[]
         bills SupplierBill[]
+        purchaseOrders PurchaseOrder[]
         totalProducts Number @computed(COUNTIF(supplier.products, supplier.products.isActive))
     }
 

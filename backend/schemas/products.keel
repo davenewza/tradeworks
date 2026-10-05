@@ -71,6 +71,7 @@ model Product {
         sales Sale[]
         channelFees ProductChannelFee[]
         billLines SupplierBillLine[]
+        purchaseOrderLines PurchaseOrderLine[]
         // The product's price on every purchase price list in Zoho it is on.
         supplierPrices SupplierPriceListItem[]
         prices ProductPrice[]
@@ -96,12 +97,16 @@ model Product {
         totalSalesValue Decimal? @computed(SUM(product.sales.netAmount))
         averageSalePrice Decimal? @computed(IF(SUM(product.sales.quantity) > 0, SUM(product.sales.netAmount) / SUM(product.sales.quantity), SUM(product.sales.netAmount) * 0))
         // ─── Stock & cover ──────────────────────────────────────────────────
-        // Refreshed daily by ScheduledSyncStock. stockAvailable mirrors Zoho's
-        // stock_on_hand (physical units on hand; can be negative when sales are
-        // billed ahead of stock). stockOnWay is units on future-dated supplier
-        // bills — Phase 2, so it stays 0 until that sync lands.
+        // Refreshed daily by ScheduledSyncStock. stockAvailable is Zoho's
+        // physical stock (actual_available_stock): units received onto the
+        // shelf, less units sold. Can be negative when sales are invoiced ahead
+        // of stock. Not Zoho's stock_on_hand, which counts a purchase order's
+        // units from the day it is billed: an import billed when it ships
+        // would show as on hand for the weeks it is at sea, and again as on
+        // the way. stockOnWay is the units on placed purchase orders not
+        // received yet.
         stockAvailable Number?
-        stockOnWay Number @default(0)
+        stockOnWay Number @computed(SUM(product.purchaseOrderLines.quantityOnWay))
         // Trailing run-rate, rounded to a whole number: units sold in the last
         // 365 days ÷ months active (capped at 12). Written by the daily job.
         estimatedMonthlySale Decimal?
@@ -245,10 +250,11 @@ flow SyncProducts {
     @permission(expression: ctx.isAuthenticated)
 }
 
-// Daily refresh of stock levels and cover. Pulls stock_on_hand from Zoho items
-// and derives the trailing monthly sales estimate and revenue-based ABC class
-// from local Sale history — a handful of Zoho calls, run off-peak to stay clear
-// of the shared daily quota.
+// Daily refresh of stock levels and cover. Pulls physical stock from Zoho
+// items, then mirrors the purchase orders (stock on the way), and derives
+// the trailing monthly sales estimate and revenue-based ABC class from local
+// Sale history — a handful of Zoho calls, plus one per new or changed order,
+// run off-peak to stay clear of the shared daily quota.
 flow ScheduledSyncStock {
     @schedule("every day at 2am")
     @permission(roles: [Operator])

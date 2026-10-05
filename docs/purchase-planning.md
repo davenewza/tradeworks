@@ -47,7 +47,7 @@ For each product, with `m` = monthly run-rate (units), `d = m ÷ 30.4375`
 
 | Figure | Formula |
 | --- | --- |
-| **Stock position** | `on hand + on the way` (on the way is 0 until the Phase 2 sync lands) |
+| **Stock position** | `on hand + on the way` — on the way is the units on placed purchase orders not yet received ([purchase-orders.md](purchase-orders.md)), counted as if already here |
 | **Demand to arrival** | `d × days from today to A` |
 | **Projected at arrival** | `position − demand to arrival` |
 | **Backorders** | `max(0, −position)` — negative on-hand is sales already billed |

@@ -88,6 +88,20 @@
           }
         }
       ]
+    },
+    {
+      "id": "purchaseOrders",
+      "title": "Purchase orders",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-purchase-orders"
+          },
+          "response_overrides": {
+            "$.results[*].vendorName": false
+          }
+        }
+      ]
     }
   ]
 }
