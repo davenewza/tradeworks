@@ -134,8 +134,8 @@ order lands with the same months of cover. See
 
 ## Refresh
 
-The `ScheduledSyncStock` flow runs **daily at ~02:00**. It mirrors the purchase
-orders from Zoho, pulls physical stock, and recomputes the monthly estimate,
+The `ScheduledSyncStock` flow runs **daily at ~02:00**. It pulls physical stock
+and then the purchase orders from Zoho, and recomputes the monthly estimate,
 cover, and ABC class. Stored values only change when it runs, so after a
 deploy — or any time you want figures to reflect a change immediately — run
 **Inventory → Refresh stock & purchase orders**.

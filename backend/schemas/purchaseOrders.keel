@@ -1,8 +1,8 @@
 // Purchase orders raised to our suppliers in Zoho, and their lines. They are
 // where "stock on the way" comes from: the units ordered on a purchase order
 // that haven't been received yet. ScheduledSyncStock mirrors them from Zoho
-// Inventory just before it reads stock on hand, so the two figures are taken
-// together and a receive moves units from one to the other, never into both.
+// Inventory straight after it reads stock on hand, so a receive between the
+// two reads is left out of both until the next run, never counted in both.
 //
 // Like the supplier bills, both models are a copy of Zoho with no local edits:
 // a sync is free to rewrite them, and they can be dropped and re-imported at

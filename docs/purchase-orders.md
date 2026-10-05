@@ -54,17 +54,19 @@ went in (2026-10-05), the two figures agreed on 423 of the 424 active items.
 The odd one out was the item on that order (MEFV22G: 200 accounting, 100
 physical, with 100 billed but not received).
 
-The daily sync reads the orders just before it reads stock. That way a receive
-can't land between the two reads and count a unit both as on hand and as on
-the way.
+The daily sync reads stock first and the orders straight after. A receive
+that lands between the two reads is then in neither figure until the next
+run: a brief undercount, never a unit counted both on hand and on the way.
+For the same reason, fresh stock is only written when the orders synced in
+full after it.
 
 ## How the sync works
 
 `ScheduledSyncStock` (daily at 2am, or **Inventory → Refresh stock & purchase
 orders** to run it now) mirrors the orders into `PurchaseOrder` and
 `PurchaseOrderLine` (`backend/schemas/purchaseOrders.keel`,
-`backend/lib/zohoPurchaseOrderHelpers.ts`). Then it reads physical stock and
-recomputes cover.
+`backend/lib/zohoPurchaseOrderHelpers.ts`), straight after reading physical
+stock, then recomputes cover.
 
 - All orders are listed in one go, whatever their status: a call per 200
   orders against the Zoho quota shared with the Takealot integration.
@@ -80,9 +82,12 @@ recomputes cover.
   match no product.
 - `Product.stockOnWay` is a computed sum of its lines' `quantityOnWay`, so it
   changes as soon as the orders do.
-- If Zoho's daily API limit is hit, the run keeps the orders it had and skips
-  the stock read. Estimates and cover still refresh from local sales, and
-  everything catches up next run.
+- If Zoho's daily API limit is hit, stock keeps last night's figures, so it
+  stays paired with the orders. Orders read before the limit are kept.
+  Estimates and cover still refresh from local sales, and everything catches
+  up next run.
+- A listing that comes back without a list of orders fails the run rather
+  than reading as "no orders", which would delete them all here.
 
 Orders are a copy of Zoho with no local edits, so the tables can be emptied
 and re-imported at any time.

@@ -1,7 +1,6 @@
 import { ScheduledSyncStock, models } from '@teamkeel/sdk';
 import { getZohoInventoryToken, zohoInventoryGet } from '../lib/zohoInventoryApi';
-import { PurchaseOrderSyncStep, runPurchaseOrderSync } from '../lib/zohoPurchaseOrderHelpers';
-import { fetchProductStock } from '../lib/zohoStockHelpers';
+import { PurchaseOrderSyncStep, syncStockAndOrders } from '../lib/zohoPurchaseOrderHelpers';
 import { COVER_WINDOW_DAYS, loadSaleAggregates, estimatedMonthlySale, computeStockCover, classifyAbc } from '../lib/stockCoverHelpers';
 
 const LOAD_CHUNK = 200;
@@ -10,11 +9,12 @@ const LONG_STEP_TIMEOUT = 10 * 60 * 1000;
 type ProductRow = Awaited<ReturnType<typeof models.product.findMany>>[number];
 
 // Daily stock & cover refresh — all from the Zoho Inventory API + local Sale history:
-//   - purchase orders: mirrored from Zoho first. Their unreceived units are each
-//     product's stockOnWay (a computed sum over the order lines).
 //   - stockAvailable: physical stock (actual_available_stock) from the Zoho items
-//     feed, read straight after the orders so a receive in between can't count
-//     a unit as both on hand and on the way.
+//     feed.
+//   - purchase orders: mirrored from Zoho straight after the stock, so a receive
+//     in between is left out of both rather than counted in both. Their
+//     unreceived units are each product's stockOnWay (a computed sum over the
+//     order lines).
 //   - estimatedMonthlySale: trailing-365-day units ÷ months active, ROUNDED to a
 //     whole number (matches the sheet, and keeps cover consistent with it).
 //   - currentStockCover / totalStockCover: stock ÷ estimate, rounded to 1 dp;
@@ -24,9 +24,9 @@ type ProductRow = Awaited<ReturnType<typeof models.product.findMany>>[number];
 //     graded on its rate, not penalised for missing most of the window).
 // Cover isn't a @computed field — the engine can't round — so the job derives and
 // stores all of these together.
-// A Zoho rate-limit degrades to a clean pause: estimates, cover and ABC classes
-// still refresh from local sales (against last-known stock and orders), and
-// stock and orders catch up next run.
+// A Zoho rate-limit degrades to a clean pause: stock keeps its last-known
+// values (so it stays paired with the orders), estimates, cover and ABC classes
+// still refresh from local sales, and everything catches up next run.
 export default ScheduledSyncStock({}, async (ctx) => {
     const now = new Date();
     const windowStart = new Date(now.getTime() - COVER_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -37,18 +37,11 @@ export default ScheduledSyncStock({}, async (ctx) => {
     const get = zohoInventoryGet(ctx, accessToken);
 
     const step: PurchaseOrderSyncStep = (name, options, fn) => ctx.step(name, options, fn as never) as never;
-    const orders = await runPurchaseOrderSync(step, get);
-
-    // Skipped when the orders already hit Zoho's daily limit: the items feed
-    // draws on the same quota.
-    const fetched = orders.rateLimited
-        ? { stock: [], rateLimited: true }
-        : await ctx.step('fetch-stock', async ({ progress }) => {
-              return await fetchProductStock(get, progress);
-          });
+    const fetched = await syncStockAndOrders(step, get);
+    const orders = fetched.orders;
 
     const summary = await ctx.step('write-stock-and-cover', { timeout: LONG_STEP_TIMEOUT }, async () => {
-        // Fresh stock readings by SKU (partial if Zoho rate-limited mid-fetch).
+        // Fresh stock readings by SKU (none if Zoho rate-limited the run).
         const stockBySku = new Map(fetched.stock.map((s) => [s.sku, s.stockAvailable]));
 
         // Whole-number monthly estimate per product, from local sales.
@@ -120,7 +113,7 @@ export default ScheduledSyncStock({}, async (ctx) => {
     });
 
     const rateLimited = fetched.rateLimited;
-    const unmatched = orders.unmatchedSkus;
+    const unmatched = orders?.unmatchedSkus ?? [];
     const unmatchedShown =
         unmatched.slice(0, 20).join(', ') + (unmatched.length > 20 ? `, … (${unmatched.length - 20} more)` : '');
 
@@ -136,7 +129,7 @@ export default ScheduledSyncStock({}, async (ctx) => {
                         : []),
                     {
                         key: 'Purchase orders (added · updated · removed)',
-                        value: `${orders.added} · ${orders.updated} · ${orders.removed}`,
+                        value: orders ? `${orders.added} · ${orders.updated} · ${orders.removed}` : 'Not synced',
                     },
                     { key: 'Zoho items with stock', value: summary.zohoItems },
                     { key: 'Products updated', value: summary.productsTouched },

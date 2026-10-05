@@ -1,6 +1,7 @@
 import { models, useDatabase } from '@teamkeel/sdk';
 import { sql } from 'kysely';
 import { ZohoApiError, ZohoGet, parseZohoTime } from './zohoInventoryApi';
+import { ProductStock, fetchProductStock } from './zohoStockHelpers';
 import { ProgressReporter } from './progress';
 
 // Mirrors the org's purchase orders from Zoho Inventory, line by line, into
@@ -11,15 +12,17 @@ import { ProgressReporter } from './progress';
 // are received into stock. That is deliberately not tied to billing: the org
 // bills an import when the supplier invoices it, often weeks before it lands,
 // and Zoho counts billed units in stock_on_hand from that day. The physical
-// stock figure (actual_available_stock) only moves on a receive, so it and
-// stock on the way never count the same unit twice (checked against the org on
-// 2026-10-05: of 424 active items, the only one whose stock_on_hand and
-// actual_available_stock differed was the one on a billed, unreceived order,
-// and by exactly its quantity).
+// stock figure (actual_available_stock) only moves on a receive, so it is the
+// one that adds to stock on the way without counting a billed order twice
+// (checked against the org on 2026-10-05: of 424 active items, the only one
+// whose stock_on_hand and actual_available_stock differed was the one on a
+// billed, unreceived order, and by exactly its quantity).
 //
 // Unlike bills, every order is listed in one go, not per supplier: the org
 // only raises purchase orders for stock. Each order is read once, then skipped
 // until Zoho's last_modified_time or quantity_yet_to_receive for it moves.
+//
+// Physical stock is read before the orders — see syncStockAndOrders.
 
 // Far more pages of 200 than the org's order history. Hitting it means the
 // listing is not what we think it is, and every further page would spend the
@@ -82,7 +85,12 @@ export async function listZohoPurchaseOrders(get: ZohoGet): Promise<ZohoPurchase
             );
         }
         const data = await get('/purchaseorders', { filter_by: 'Status.All', per_page: '200', page: String(page) });
-        orders.push(...(data.purchaseorders ?? []));
+        // An order missing from the listing is deleted here, so a response
+        // without the list must fail the sync, not read as "no orders".
+        if (!Array.isArray(data?.purchaseorders)) {
+            throw new Error(`Zoho's purchase order listing came back without a list of orders: ${JSON.stringify(data).slice(0, 300)}`);
+        }
+        orders.push(...data.purchaseorders);
         if (!data.page_context?.has_more_page) return orders;
     }
 }
@@ -467,4 +475,37 @@ export async function runPurchaseOrderSync(
     }));
 
     return { ...total, linesLinked: linking.linked, unmatchedSkus: linking.unmatchedSkus, rateLimited };
+}
+
+// ─── With stock on hand ───────────────────────────────────────────────────────
+
+export interface StockAndOrders {
+    // Fresh physical stock to write. Empty when the run was cut short, so the
+    // stored stock and the stored orders stay a matching pair.
+    stock: ProductStock[];
+    // Null when the orders weren't synced at all.
+    orders: PurchaseOrderSyncSummary | null;
+    // True when Zoho's daily quota cut the run short. Neither the stock nor
+    // anything not yet read changes; both catch up next run.
+    rateLimited: boolean;
+}
+
+// Reads physical stock, then syncs the purchase orders — in that order, so no
+// unit is counted twice. A receive moves units from on the way to on hand.
+// Read stock first and a receive that lands between the two reads is in
+// neither figure until the next run: an undercount for a few minutes' worth of
+// receiving. Read the orders first and it would be in both.
+//
+// The same goes for a run cut short. Fresh stock is only returned when the
+// orders synced in full after it; otherwise a received order not re-read yet
+// would still count as on the way. If the stock read hits Zoho's daily limit,
+// the orders aren't attempted — they draw on the same quota.
+export async function syncStockAndOrders(step: PurchaseOrderSyncStep, get: ZohoGet): Promise<StockAndOrders> {
+    const fetched = await step('fetch-stock', {}, async ({ progress }) => await fetchProductStock(get, progress));
+    if (fetched.rateLimited) return { stock: [], orders: null, rateLimited: true };
+
+    const orders = await runPurchaseOrderSync(step, get);
+    if (orders.rateLimited) return { stock: [], orders, rateLimited: true };
+
+    return { stock: fetched.stock, orders, rateLimited: false };
 }

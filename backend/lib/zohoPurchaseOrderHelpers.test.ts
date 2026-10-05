@@ -12,9 +12,9 @@ import {
     planPurchaseOrders,
     runPurchaseOrderSync,
     syncPurchaseOrdersBatch,
+    syncStockAndOrders,
 } from './zohoPurchaseOrderHelpers';
 import { ZohoApiError, ZohoGet } from './zohoInventoryApi';
-import { parseStockItems, ZohoStockItem } from './zohoStockHelpers';
 import { computeStockCover } from './stockCoverHelpers';
 
 beforeEach(resetDatabase);
@@ -334,6 +334,14 @@ describe('syncPurchaseOrdersBatch', () => {
         expect(await stockOnWayOf(microbit.id)).toBe(0);
     });
 
+    test('fails, rather than deleting every order, when Zoho answers without a list', async () => {
+        await syncPurchaseOrdersBatch(fakeZoho([order()]).get, 100, NOW);
+        const odd: ZohoGet = async () => ({ code: 0, message: 'success' });
+
+        await expect(syncPurchaseOrdersBatch(odd, 100, NOW)).rejects.toThrow('without a list of orders');
+        expect(await models.purchaseOrder.findMany({})).toHaveLength(1);
+    });
+
     test('reads at most maxReads orders, leaving the rest for the next batch', async () => {
         const orders = ['1', '2', '3'].map((n) => order({ purchaseorder_id: `zpo-${n}`, purchaseorder_number: `PO-${n}`, date: `2026-0${n}-01` }));
 
@@ -417,20 +425,110 @@ describe('runPurchaseOrderSync', () => {
 
 // ─── With stock on hand ───────────────────────────────────────────────────────
 
-describe('stock on hand and on the way together', () => {
-    test('count an order billed ahead of its delivery once, not twice', async () => {
-        // MEFV22G as Zoho had it on 2026-10-05: 100 on the shelf, and an order
-        // for 100 more billed but not received. stock_on_hand already counted
-        // the billed 100; physical stock did not.
+describe('syncStockAndOrders', () => {
+    // A fake Zoho serving both the items feed and the orders, as MEFV22G stood
+    // on 2026-10-05: 100 on the shelf, and PO-00004 for 100 more billed but not
+    // received. stock_on_hand already counts the billed 100; physical stock
+    // doesn't. receive() books the order in, as a purchase receive would.
+    function zohoWithOrder() {
+        const calls: string[] = [];
+        let shelf = 100;
+        let po = order();
+        const receive = () => {
+            shelf += 100;
+            po = order({ received_status: 'received', line_items: [{ ...order().line_items[0], quantity_received: 100 }] });
+        };
+        let onFirstOrderList: (() => void) | null = null;
+        const get: ZohoGet = async (path, query = {}) => {
+            calls.push(path);
+            if (path === '/items') {
+                return {
+                    items: [{ item_id: 'i-1', sku: 'MEFV22G', stock_on_hand: 200, actual_available_stock: shelf }],
+                    page_context: { has_more_page: false },
+                };
+            }
+            if (path === '/purchaseorders' && onFirstOrderList) {
+                onFirstOrderList();
+                onFirstOrderList = null;
+            }
+            return fakeZoho([po]).get(path, query);
+        };
+        return { get, calls, receive, receiveBeforeOrders: () => (onFirstOrderList = receive) };
+    }
+
+    function inlineSteps() {
+        const names: string[] = [];
+        const step: PurchaseOrderSyncStep = async (name, _options, fn) => {
+            names.push(name);
+            return await fn({ progress: { set() {}, increment() {}, log() {} } });
+        };
+        return { step, names };
+    }
+
+    async function onHandAndOnWay(productId: string, stock: { sku: string; stockAvailable: number }[]) {
+        return [stock.find((s) => s.sku === 'MEFV22G')?.stockAvailable ?? null, await stockOnWayOf(productId)];
+    }
+
+    test('counts an order billed ahead of its delivery once: on the way, not on hand', async () => {
         const microbit = await createProduct('MEFV22G');
-        await syncPurchaseOrdersBatch(fakeZoho([order()]).get, 100, NOW);
-        const item = { item_id: 'i-1', sku: 'MEFV22G', stock_on_hand: 200, actual_available_stock: 100 } as ZohoStockItem;
+        const zoho = zohoWithOrder();
+        const { step, names } = inlineSteps();
 
-        const [{ stockAvailable }] = parseStockItems([item]);
-        const stockOnWay = await stockOnWayOf(microbit.id);
+        const result = await syncStockAndOrders(step, zoho.get);
 
-        expect([stockAvailable, stockOnWay]).toEqual([100, 100]);
+        expect(names).toEqual(['fetch-stock', 'purchase-orders-0', 'link-purchase-orders']);
+        expect(result.rateLimited).toBe(false);
+        expect(await onHandAndOnWay(microbit.id, result.stock)).toEqual([100, 100]);
         // 20 a month: 5 months on the shelf, 10 with the order in.
-        expect(computeStockCover(stockAvailable, stockOnWay, 20)).toEqual({ current: 5, total: 10 });
+        expect(computeStockCover(100, 100, 20)).toEqual({ current: 5, total: 10 });
+    });
+
+    test('reads stock before the orders, so a receive between the two reads is never counted twice', async () => {
+        const microbit = await createProduct('MEFV22G');
+        const zoho = zohoWithOrder();
+        zoho.receiveBeforeOrders();
+
+        const result = await syncStockAndOrders(inlineSteps().step, zoho.get);
+
+        expect(zoho.calls.slice(0, 2)).toEqual(['/items', '/purchaseorders']);
+        // The 100 received in between are in neither figure until the next
+        // run, which is the safe way round: 300 would have them in both.
+        expect(await onHandAndOnWay(microbit.id, result.stock)).toEqual([100, 0]);
+
+        const next = await syncStockAndOrders(inlineSteps().step, zoho.get);
+        expect(await onHandAndOnWay(microbit.id, next.stock)).toEqual([200, 0]);
+    });
+
+    test("keeps last-known stock when the orders hit Zoho's daily limit partway", async () => {
+        const microbit = await createProduct('MEFV22G');
+        const zoho = zohoWithOrder();
+        await syncStockAndOrders(inlineSteps().step, zoho.get);
+        zoho.receive();
+
+        // The stock read goes through, then the quota runs out on the orders.
+        const limited: ZohoGet = async (path, query) => {
+            if (path === '/items') return zoho.get(path, query);
+            throw new ZohoApiError(path, 429, '{"code":45,"message":"You have reached the maximum number of API calls for the day."}');
+        };
+        const result = await syncStockAndOrders(inlineSteps().step, limited);
+
+        // Writing the fresh 200 beside the order's stale 100 on the way would
+        // count the received units twice.
+        expect(result).toMatchObject({ stock: [], rateLimited: true });
+        expect(result.orders?.rateLimited).toBe(true);
+        expect(await stockOnWayOf(microbit.id)).toBe(100);
+    });
+
+    test("doesn't try the orders when the stock read hits Zoho's daily limit", async () => {
+        const calls: string[] = [];
+        const limited: ZohoGet = async (path) => {
+            calls.push(path);
+            throw new ZohoApiError(path, 429, '{"code":45,"message":"You have reached the maximum number of API calls for the day."}');
+        };
+        const { step, names } = inlineSteps();
+
+        expect(await syncStockAndOrders(step, limited)).toEqual({ stock: [], orders: null, rateLimited: true });
+        expect(names).toEqual(['fetch-stock']);
+        expect(calls).toEqual(['/items']);
     });
 });

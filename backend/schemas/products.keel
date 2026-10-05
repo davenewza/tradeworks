@@ -264,8 +264,8 @@ flow SyncProducts {
     @permission(expression: ctx.isAuthenticated)
 }
 
-// Daily refresh of stock levels and cover. Mirrors the purchase orders in Zoho
-// (stock on the way), then pulls physical stock from Zoho items, and derives
+// Daily refresh of stock levels and cover. Pulls physical stock from Zoho
+// items, then mirrors the purchase orders (stock on the way), and derives
 // the trailing monthly sales estimate and revenue-based ABC class from local
 // Sale history — a handful of Zoho calls, plus one per new or changed order,
 // run off-peak to stay clear of the shared daily quota.
