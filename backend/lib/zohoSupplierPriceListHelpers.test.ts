@@ -225,6 +225,18 @@ describe('runSupplierPriceListSync', () => {
         expect(await models.supplierPriceListItem.findMany({})).toHaveLength(0);
     });
 
+    test('keeps the supplier an operator linked a list to when the list is read again', async () => {
+        await sync(fakeZoho([farnellList()]).get);
+        const farnell = await models.supplier.create({ name: 'Premier Farnell (GBP)', zohoVendorId: 'v-farnell' });
+        const list = (await models.supplierPriceList.findOne({ zohoPriceListId: 'zpl-farnell' }))!;
+        await models.supplierPriceList.update({ id: list.id }, { supplierId: farnell.id });
+
+        const repriced = farnellList({ name: 'Farnell 2027', pricebook_items: [{ item_id: 'zi-go', pricebook_rate: 13.1 }] });
+        await sync(fakeZoho([repriced], [summaryOf(repriced, '2026-10-06T09:00:00+0200')]).get, true);
+
+        expect(await models.supplierPriceList.findOne({ id: list.id })).toMatchObject({ name: 'Farnell 2027', supplierId: farnell.id });
+    });
+
     test('keeps an inactive list, marked inactive', async () => {
         await sync(fakeZoho([farnellList({ status: 'inactive' })]).get);
         expect((await models.supplierPriceList.findOne({ zohoPriceListId: 'zpl-farnell' }))!.isActive).toBe(false);

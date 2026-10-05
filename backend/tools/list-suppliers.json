@@ -4,7 +4,7 @@
   "name": "Suppliers",
   "title": "Suppliers",
   "icon": "emoji:🚢",
-  "help_text": "Who we buy stock from — vendors in Zoho Books, brought across with Import suppliers from Zoho. A supplier's lead time grades the stock cover of every product bought from it, and each product's supplier price is quoted in the supplier's currency.",
+  "help_text": "Who we buy stock from — vendors in Zoho Books, brought across with Import suppliers from Zoho. A supplier's lead time grades the stock cover of every product bought from it, and its purchase plans price from the price lists linked to it under Supplier price lists.",
   "response": {
     "$.results[*].name": {
       "display_order": 0
@@ -18,6 +18,10 @@
     "$.results[*].totalProducts": {
       "display_name": "Active products",
       "display_order": 3
+    },
+    "$.results[*].totalPriceLists": {
+      "display_name": "Price lists",
+      "display_order": 4
     },
     "$.results[*].notes": {
       "visible": false

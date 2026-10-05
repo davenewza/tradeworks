@@ -34,9 +34,13 @@ model Supplier {
         leadTimeInDays Number @default(60)
         notes Text?
         products Product[]
+        // The purchase price lists linked to this supplier, which its plans
+        // price from.
+        priceLists SupplierPriceList[]
         bills SupplierBill[]
         purchaseOrders PurchaseOrder[]
         totalProducts Number @computed(COUNTIF(supplier.products, supplier.products.isActive))
+        totalPriceLists Number @computed(COUNT(supplier.priceLists.id))
     }
 
     actions {

@@ -76,14 +76,16 @@ Points worth knowing:
 - **Trimming a suggestion** is fine, but if the product then runs out before
   the common horizon the plan says so — that product would need exactly the
   top-up order the plan exists to avoid.
-- **Goods value** is the order quantity × the product's price on a
-  **purchase price list** in Zoho (excl freight), in that list's currency (see
-  [supplier-price-lists.md](supplier-price-lists.md)). Price lists aren't tied
-  to suppliers, so a product on several takes the price from a list in the
-  supplier's own currency first, then from the list Zoho changed most
-  recently. Inactive lists, and lists in a currency the plan can't show, are
-  passed over. Products on no price list fall back to the unit cost on their
-  most recent supplier bill, in rand, marked *(last bill)*. There is no
+- **Goods value** is the order quantity × the product's price on one of
+  **the supplier's price lists** (excl freight), in that list's currency.
+  Those are the purchase price lists from Zoho linked to the supplier (see
+  [supplier-price-lists.md](supplier-price-lists.md)). Lists linked to another
+  supplier, or to none, are never used. A supplier with several lists (one per
+  currency, say) prices from a list in its own currency first, then from the
+  list Zoho changed most recently. Inactive lists, and lists in a currency the
+  plan can't show, are passed over. A product the supplier's lists don't
+  price falls back to the unit cost on its most recent supplier bill, in
+  rand, marked *(last bill)*. There is no
   currency conversion: a plan with prices in more than one currency shows one
   total per currency (`£800.00 + R 1,200.00`). Lines with no cost at all are
   counted separately.
@@ -130,7 +132,10 @@ Every supplier is a **vendor in Zoho Books**, linked by the vendor's Zoho
   the lead time, currency and notes; the name and Zoho link come from Zoho.
 - On a product, **Set supplier** assigns its supplier. What it costs to buy
   comes from the purchase price lists in Zoho, shown under **Supplier prices**
-  on the product (see [supplier-price-lists.md](supplier-price-lists.md)).
+  on the product.
+- Each price list is linked to its supplier with **Link to supplier**
+  (Inventory → Suppliers → Supplier price lists). A supplier's plans price
+  from its own lists (see [supplier-price-lists.md](supplier-price-lists.md)).
 - **Inventory → Products without a supplier** lists the active products still
   waiting for one. They go ungraded in stock cover and are left out of plans.
 
@@ -138,7 +143,7 @@ Every supplier is a **vendor in Zoho Books**, linked by the vendor's Zoho
 
 | Concern | Files |
 | --- | --- |
-| Schema | `backend/schemas/products.keel` — `flow PlanPurchase`, `Product.supplier`; `backend/schemas/suppliers.keel` — `Supplier`, `Currency`, `flow ImportSuppliers`; `backend/schemas/supplierPriceLists.keel` — the prices plans cost from |
+| Schema | `backend/schemas/products.keel` — `flow PlanPurchase`, `Product.supplier`; `backend/schemas/suppliers.keel` — `Supplier`, `Currency`, `flow ImportSuppliers`; `backend/schemas/supplierPriceLists.keel` — the price lists, linked to suppliers, that plans cost from |
 | Arithmetic & loading | `backend/lib/purchasePlanHelpers.ts` (+ `.test.ts`) |
 | Grid rows, wording | `backend/lib/purchasePlanFormat.ts` |
 | Flow | `backend/flows/planPurchase.ts`, wiring test in `backend/tests/planPurchase.test.ts` |

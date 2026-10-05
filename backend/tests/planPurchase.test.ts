@@ -172,7 +172,7 @@ describe('PlanPurchase', () => {
 
     test("price list prices are shown and totalled in the list's currency", async () => {
         const { supplier, widget } = await seedSupplier();
-        const list = await models.supplierPriceList.create({ zohoPriceListId: 'zpl-1', name: 'Acme (GBP)', currencyCode: 'GBP', zohoModifiedAt: new Date() });
+        const list = await models.supplierPriceList.create({ zohoPriceListId: 'zpl-1', name: 'Acme (GBP)', currencyCode: 'GBP', supplierId: supplier.id, zohoModifiedAt: new Date() });
         await models.supplierPriceListItem.create({ priceListId: list.id, productId: widget.id, rate: 3.5, zohoItemId: 'zi-1' });
         const authed = flows.planPurchase.withIdentity(await operator());
 

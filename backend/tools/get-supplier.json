@@ -20,6 +20,9 @@
     },
     "$.totalProducts": {
       "display_name": "Active products"
+    },
+    "$.totalPriceLists": {
+      "display_name": "Price lists"
     }
   },
   "entry_activity_actions": [
@@ -68,6 +71,20 @@
         {
           "action_link": {
             "tool_id": "list-products"
+          },
+          "response_overrides": {
+            "$.results[*].supplierId": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "priceLists",
+      "title": "Price lists",
+      "tools": [
+        {
+          "action_link": {
+            "tool_id": "list-supplier-price-lists"
           },
           "response_overrides": {
             "$.results[*].supplierId": false

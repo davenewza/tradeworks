@@ -1,7 +1,8 @@
-// Suppliers and a product's supplier: suppliers come from Zoho vendors (see
-// lib/zohoVendorHelpers.test.ts); operators set their lead times and assign
-// products to them. What a supplier charges comes from the purchase price lists
-// in Zoho (see lib/zohoSupplierPriceListHelpers.test.ts), not from here.
+// Suppliers, a product's supplier, and a price list's supplier: suppliers come
+// from Zoho vendors (see lib/zohoVendorHelpers.test.ts); operators set their
+// lead times, assign products to them, and link each purchase price list from
+// Zoho (lib/zohoSupplierPriceListHelpers.test.ts) to the supplier whose prices
+// it holds.
 
 import { actions, models, resetDatabase } from '@teamkeel/testing';
 import { Currency, Team } from '@teamkeel/sdk';
@@ -53,6 +54,16 @@ describe('suppliers', () => {
         await expect(models.supplier.create({ name: 'Two', zohoVendorId: 'zv-1' })).rejects.toThrow();
     });
 
+    test('counts its price lists', async () => {
+        const supplier = await models.supplier.create({ name: 'Distributor' });
+        await priceList('GBP', supplier.id);
+        await priceList('ZAR', supplier.id);
+        await priceList('Unlinked', null);
+
+        const fetched = await (await operator()).getSupplier({ id: supplier.id });
+        expect(fetched!.totalPriceLists).toBe(2);
+    });
+
     test('counts its active products, whichever brand they are', async () => {
         const supplier = await models.supplier.create({ name: 'Distributor' });
         const a = await models.brand.create({ name: 'A' });
@@ -102,3 +113,46 @@ describe('updateProductSupplier', () => {
         expect((await authed.listProductsWithoutSupplier()).results).toEqual([]);
     });
 });
+
+describe("a price list's supplier", () => {
+    async function seed() {
+        const brand = await models.brand.create({ name: 'Acme' });
+        const supplier = await models.supplier.create({ name: 'Acme Ltd', currency: Currency.USD });
+        const product = await models.product.create({ name: 'Widget', sku: 'W-1', brandId: brand.id, supplierId: supplier.id });
+        const list = await priceList('Acme (USD)', null);
+        await models.supplierPriceListItem.create({ priceListId: list.id, productId: product.id, zohoItemId: 'zi-w1', rate: 12.5 });
+        return { supplier, product, list };
+    }
+
+    test('links a price list to its supplier, and unlinks it', async () => {
+        const { supplier, list } = await seed();
+        const authed = await operator();
+
+        const linked = await authed.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: { id: supplier.id } } });
+        expect(linked.supplierId).toBe(supplier.id);
+        expect((await authed.listSupplierPriceLists({ where: { supplier: { id: { equals: supplier.id } } } })).results.map((l) => l.id)).toEqual([list.id]);
+        const [item] = (await authed.listSupplierPriceListItems({ where: { priceList: { id: { equals: list.id } } } })).results;
+        expect(item.supplierName).toBe('Acme Ltd');
+
+        const unlinked = await authed.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: null } });
+        expect(unlinked.supplierId).toBeNull();
+    });
+
+    test("leaves the product's own supplier alone", async () => {
+        const { supplier, product, list } = await seed();
+        const other = await models.supplier.create({ name: 'Other' });
+
+        await (await operator()).updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: { id: other.id } } });
+
+        expect((await models.product.findOne({ id: product.id }))!.supplierId).toBe(supplier.id);
+    });
+
+    test('requires an operator', async () => {
+        const { supplier, list } = await seed();
+        await expect(actions.updateSupplierPriceListSupplier({ where: { id: list.id }, values: { supplier: { id: supplier.id } } })).rejects.toThrow();
+    });
+});
+
+async function priceList(name: string, supplierId: string | null) {
+    return await models.supplierPriceList.create({ zohoPriceListId: `zpl-${name}`, name, currencyCode: 'USD', supplierId, zohoModifiedAt: new Date() });
+}

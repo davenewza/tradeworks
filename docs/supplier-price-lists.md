@@ -11,16 +11,29 @@ These aren't the same as **price lists** (`PriceList`), which are what we
 ## Where to find them
 
 - **On a product:** the **Supplier prices** table shows the product's price on
-  every purchase price list it's on. Lists aren't tied to a supplier in Zoho
-  or here, so a product can appear on several.
+  every purchase price list it's on, and whose list each one is. A product can
+  appear on several.
 - **Inventory → Suppliers → Supplier price lists:** every list, and the price of
   every item on it.
-- **Purchase planning** prices from them. See
-  [purchase-planning.md](purchase-planning.md) for which list wins when a
-  product is on several.
+- **On a supplier:** the **Price lists** linked to it.
+- **Purchase planning** prices each supplier's plans from that supplier's
+  lists. See [purchase-planning.md](purchase-planning.md).
 
-They are read-only here. Nothing in the app can create, change or delete a
+Prices are read-only here. Nothing in the app can create, change or delete a
 list or a price. Change it in Zoho, then sync.
+
+## Linking a list to its supplier
+
+Zoho doesn't say whose prices a list holds, so the sync can't link a list to a
+supplier. Link each new list yourself: **Link to supplier** on the list, or on
+its row under Supplier price lists. It's the one thing about a list edited
+here, and the sync leaves it alone, even when it re-reads the list.
+
+A purchase plan for a supplier prices only from the lists linked to that
+supplier. A new list arrives unlinked, so its prices aren't used until
+someone links it. A product's own supplier (*Set supplier* on the product)
+is separate: it still decides which supplier's plans and lead time a product
+belongs to. Linking a list doesn't change it.
 
 Margins on our selling price lists don't come from these. They use the actual
 landed cost from supplier bills (see [supplier-bills.md](supplier-bills.md)),
@@ -51,8 +64,9 @@ twin **ScheduledSyncSupplierPriceLists** (5am) mirror every purchase price list
 - If Zoho answers without a list of price lists, the run fails rather than
   reading it as "no lists" and deleting them all.
 
-Lists are a copy of Zoho with no local edits, so the tables can be emptied and
-re-imported at any time.
+Lists are a copy of Zoho apart from their supplier links. Emptying the tables
+and re-importing restores the lists, but each one then has to be linked to its
+supplier again.
 
 ## Replaces
 

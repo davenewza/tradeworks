@@ -9,6 +9,7 @@
   },
   "response": {
     "$.results[*].priceListId": { "display_name": "Price list", "display_order": 0 },
+    "$.results[*].supplierName": { "display_name": "Supplier", "display_order": 0 },
     "$.results[*].productId": { "display_name": "Product", "display_order": 1 },
     "$.results[*].sku": { "display_name": "SKU", "display_order": 2 },
     "$.results[*].name": { "display_name": "Name in Zoho", "display_order": 3 },

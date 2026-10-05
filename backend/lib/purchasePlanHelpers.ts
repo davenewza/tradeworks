@@ -112,17 +112,17 @@ export interface PlanCandidate {
     // sold in the window.
     monthlyDemand: number | null;
     // What the supplier will charge per unit (excl freight), in `currency`.
-    // The product's rate on a purchase price list in Zoho when it is on one
-    // (see pickSupplierPrice); otherwise the unit cost on the product's most
-    // recent supplier bill, which Zoho records in rand. Null when neither
-    // exists.
+    // The product's rate on one of the supplier's own price lists when one
+    // gives it (see pickSupplierPrice); otherwise the unit cost on the
+    // product's most recent supplier bill, which Zoho records in rand. Null
+    // when neither exists.
     unitCost: number | null;
     currency: Currency | null;
     costSource: CostSource | null;
 }
 
-// Where a line's unit cost came from: a purchase price list, or — for a
-// product on none — the last bill, as a stand-in.
+// Where a line's unit cost came from: the supplier's price list, or — for a
+// product its lists don't price — the last bill, as a stand-in.
 export type CostSource = 'PriceList' | 'LastBill';
 
 // Why a product got the quantity it did. Drives the "Why" column and the
@@ -266,8 +266,8 @@ export interface PurchasePlanSummary {
     // alongside linesWithoutCost.
     valueByCurrency: CurrencyTotal[];
     linesWithoutCost: number;
-    // Ordered lines costed from the last bill because the product is on no
-    // purchase price list.
+    // Ordered lines costed from the last bill because the supplier's price
+    // lists don't price the product.
     linesCostedFromBills: number;
     stockouts: number;
     stockUnknown: number;
@@ -393,8 +393,8 @@ export async function loadPlannableSuppliers(): Promise<PlannableSupplier[]> {
 
 // Everything the plan needs for one supplier's active products, as of `now`:
 // the stock figures the daily sync wrote, an unrounded run-rate from the same
-// sales window that sync uses, and each product's cost. Pure local reads —
-// nothing here touches Zoho.
+// sales window that sync uses, and each product's cost from the supplier's
+// own price lists. Pure local reads — nothing here touches Zoho.
 export async function loadPlanCandidates(supplierId: string, now: Date): Promise<PlanCandidate[]> {
     const products = await models.product.findMany({
         where: { supplierId: { equals: supplierId }, isActive: { equals: true } },
@@ -406,7 +406,7 @@ export async function loadPlanCandidates(supplierId: string, now: Date): Promise
     const windowStart = addDays(now, -COVER_WINDOW_DAYS);
     const [aggregates, priceRows] = await Promise.all([
         loadSaleAggregates(windowStart, productIds),
-        loadSupplierPrices(productIds),
+        loadSupplierPrices(supplierId, productIds),
     ]);
     const prices = new Map<string, SupplierPrice>();
     for (const productId of productIds) {
@@ -434,8 +434,8 @@ export async function loadPlanCandidates(supplierId: string, now: Date): Promise
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// A price list's price wins; the last bill (in rand) stands in for a product
-// on no price list.
+// The supplier's price list price wins; the last bill (in rand) stands in
+// for a product its lists don't price.
 function unitCostOf(price: SupplierPrice | null, billCost: number | null): Pick<PlanCandidate, 'unitCost' | 'currency' | 'costSource'> {
     if (price) return { unitCost: price.rate, currency: price.currency, costSource: 'PriceList' };
     if (billCost !== null) return { unitCost: billCost, currency: Currency.ZAR, costSource: 'LastBill' };
@@ -457,12 +457,12 @@ export interface SupplierPrice {
 
 const CURRENCIES = new Set<string>(Object.values(Currency));
 
-// Which of a product's price list rates prices the plan. Price lists aren't
-// tied to suppliers, so a product on several takes, in order: a list in the
-// supplier's own currency, the list Zoho changed most recently (the newest
-// prices), then the list's name, so the pick never varies between runs. A list
-// in a currency the plan can't show is passed over. Null when no list prices
-// the product.
+// Which of a product's rates on the supplier's price lists prices the plan.
+// A supplier with several lists (one per currency, say) gives, in order: a
+// list in the supplier's own currency, the list Zoho changed most recently
+// (the newest prices), then the list's name, so the pick never varies between
+// runs. A list in a currency the plan can't show is passed over. Null when no
+// list prices the product.
 export function pickSupplierPrice(rows: SupplierPriceRow[], supplierCurrency: Currency | null): SupplierPrice | null {
     const usable = rows.filter((r) => CURRENCIES.has(r.currencyCode));
     usable.sort(
@@ -475,15 +475,18 @@ export function pickSupplierPrice(rows: SupplierPriceRow[], supplierCurrency: Cu
     return best ? { rate: best.rate, currency: best.currencyCode as Currency } : null;
 }
 
-// Every rate the given products have on an active purchase price list, by
-// product. Items with no rate (on a volume-priced list) can't price a plan.
-export async function loadSupplierPrices(productIds: string[]): Promise<Map<string, SupplierPriceRow[]>> {
+// Every rate the given products have on the supplier's active price lists,
+// by product. Only lists linked to the supplier count: an unlinked list could
+// be anyone's prices, and another supplier's are not what this one charges.
+// Items with no rate (on a volume-priced list) can't price a plan.
+export async function loadSupplierPrices(supplierId: string, productIds: string[]): Promise<Map<string, SupplierPriceRow[]>> {
     const byProduct = new Map<string, SupplierPriceRow[]>();
     if (productIds.length === 0) return byProduct;
     const rows = await useDatabase()
         .selectFrom('supplier_price_list_item as i')
         .innerJoin('supplier_price_list as l', 'l.id', 'i.priceListId')
         .select(['i.productId', 'i.rate', 'l.currencyCode', 'l.name', 'l.zohoModifiedAt'])
+        .where('l.supplierId', '=', supplierId)
         .where('i.productId', 'in', productIds)
         .where('i.rate', 'is not', null)
         .where('l.isActive', '=', true)
