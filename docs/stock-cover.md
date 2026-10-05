@@ -20,6 +20,9 @@ matters, not just how close it is to running out.
 - **Per brand or supplier** — open a brand or a supplier and click **View stock
   & cover** to open that same grid filtered to it.
 - **Per product** — the **Stock & cover** section on any product page.
+- **Stock on the way** — Inventory → Stock on the way lists the purchase order
+  lines behind every product's *Stock on way*; see
+  [purchase-orders.md](purchase-orders.md).
 
 ## The figures
 
@@ -27,8 +30,8 @@ matters, not just how close it is to running out.
 | --- | --- |
 | **ABC class** | Revenue-importance grade from the trailing revenue run-rate — see [ABC class](#abc-class). |
 | **Total sales** | Lifetime units sold, from synced invoices. |
-| **Stock available** | On-hand units — Zoho's `stock_on_hand`, refreshed daily. Can be negative when sales are billed ahead of stock. |
-| **Stock on way** | Units on future-dated supplier bills. _Phase 2 — currently always 0, so Total cover equals Current cover._ |
+| **Stock available** | Units on the shelf: Zoho's physical stock (`actual_available_stock`), refreshed daily. It goes up when stock is received, not when it's billed. Can be negative when sales are invoiced ahead of stock. |
+| **Stock on way** | Units on placed purchase orders that haven't been received yet, billed or not. See [purchase-orders.md](purchase-orders.md). |
 | **Est. monthly sales** | Units sold in the last 12 months ÷ the number of months the product has been selling (capped at 12), rounded to a whole number. |
 | **Current cover** | Stock available ÷ est. monthly sales, in months (1 dp). Blank when there is no sales estimate. |
 | **Total cover** | (Stock available + stock on way) ÷ est. monthly sales. |
@@ -131,21 +134,17 @@ order lands with the same months of cover. See
 
 ## Refresh
 
-The `ScheduledSyncStock` flow runs **daily at ~02:00**: it pulls `stock_on_hand`
-from Zoho and recomputes the monthly estimate, cover, and ABC class. Stored
-values only change when it runs, so after a deploy — or any time you want
-figures to reflect a change immediately — trigger `ScheduledSyncStock` once from
-the Console.
+The `ScheduledSyncStock` flow runs **daily at ~02:00**. It mirrors the purchase
+orders from Zoho, pulls physical stock, and recomputes the monthly estimate,
+cover, and ABC class. Stored values only change when it runs, so after a
+deploy — or any time you want figures to reflect a change immediately — run
+**Inventory → Refresh stock & purchase orders**.
 
 ## Where it lives in the code
 
 | Concern | Files |
 | --- | --- |
 | Schema | `backend/schemas/products.keel` — `Product` stock/cover fields, `stockCoverStatus`, `abcClass`, the `listStockAndCover` action; `backend/schemas/suppliers.keel` — `Supplier.leadTimeInDays` |
-| Daily sync | `backend/flows/scheduledSyncStock.ts`, `backend/lib/stockCoverHelpers.ts`, `backend/lib/zohoStockHelpers.ts` |
+| Daily sync | `backend/flows/scheduledSyncStock.ts`, `backend/lib/stockCoverHelpers.ts`, `backend/lib/zohoStockHelpers.ts`, `backend/lib/zohoPurchaseOrderHelpers.ts` |
 | Console | `backend/tools/list-stock-and-cover.json` (the Inventory space's grid, in `_spaces.json`), `get-brand.json`, `get-supplier.json`, `get-product.json`, `_fields.json` |
 | Dashboard | `backend/tools/_dashboards.json` ("Stock cover") and `_charts.json`, over the `stockCover` / `stockValue` measures in `products.keel` |
-
-> **Roadmap — Stock on way (Phase 2):** populate `stockOnWay` from future-dated
-> supplier bills (those dated after today), so Total cover reflects incoming
-> stock. See `scheduledSyncStock.ts` for where this slots in.

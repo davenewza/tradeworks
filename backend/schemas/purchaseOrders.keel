@@ -1,0 +1,119 @@
+// Purchase orders raised to our suppliers in Zoho, and their lines. They are
+// where "stock on the way" comes from: the units ordered on a purchase order
+// that haven't been received yet. ScheduledSyncStock mirrors them from Zoho
+// Inventory just before it reads stock on hand, so the two figures are taken
+// together and a receive moves units from one to the other, never into both.
+//
+// Like the supplier bills, both models are a copy of Zoho with no local edits:
+// a sync is free to rewrite them, and they can be dropped and re-imported at
+// any time. See docs/purchase-orders.md.
+
+// A purchase order, as Zoho Inventory holds it.
+model PurchaseOrder {
+    fields {
+        // Zoho's purchaseorder_id.
+        zohoPurchaseOrderId Text @unique
+        // The vendor in Zoho, and the supplier it is imported as here. A
+        // vendor not imported yet leaves the supplier unset; importing it
+        // links its orders on the next sync.
+        zohoVendorId Text?
+        supplier Supplier?
+        vendorName Text?
+        purchaseOrderNumber Text
+        referenceNumber Text?
+        date Date?
+        expectedDeliveryDate Date?
+        // Zoho's statuses, as it reports them. status is the order's place in
+        // its workflow (draft, issued, cancelled…); receivedStatus how much
+        // has arrived (to_be_received, partially_received, received);
+        // billedStatus how much has been billed.
+        status Text?
+        receivedStatus Text?
+        billedStatus Text?
+        currencyCode Text?
+        // Incl VAT, in the order's currency.
+        total Decimal?
+        // Whether the order has gone to the supplier: not a draft, awaiting
+        // approval or cancelled, and not a drop shipment straight to a
+        // customer. Only a placed order's units count as on the way.
+        isPlaced Boolean @default(false)
+        lines PurchaseOrderLine[]
+        unitsOrdered Number? @computed(SUM(purchaseOrder.lines.quantityOrdered))
+        unitsOnWay Number? @computed(SUM(purchaseOrder.lines.quantityOnWay))
+        // Zoho's last_modified_time and quantity_yet_to_receive, as its
+        // order list gave them at the last read. A sync reads the order again
+        // when either has moved; the second catches a receive even if it
+        // didn't touch the order's modified time.
+        zohoModifiedAt Timestamp
+        zohoQuantityToReceive Number?
+        synchronisedAt Timestamp?
+    }
+
+    actions {
+        get getPurchaseOrder(id)
+        list listPurchaseOrders(supplier.id?, purchaseOrderNumber?, isPlaced?) {
+            @orderBy(date: desc)
+        }
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}
+
+// One line of a purchase order. quantityOnWay is what the line adds to its
+// product's stock on the way.
+model PurchaseOrderLine {
+    fields {
+        purchaseOrder PurchaseOrder
+        // The stock item on the line, matched by SKU. Unset on lines that
+        // aren't stock, and on SKUs with no product here yet; a sync links
+        // those once Sync Products brings the product in.
+        product Product?
+        sku Text?
+        name Text?
+        quantityOrdered Number
+        // Received into stock: Zoho's purchase receives saved as received.
+        // A receive saved as in transit hasn't reached the shelf, so it
+        // isn't counted here.
+        quantityReceived Number @default(0)
+        quantityCancelled Number @default(0)
+        quantityBilled Number @default(0)
+        // Units still to arrive: ordered, less received and cancelled. 0 on
+        // an order that isn't placed, one Zoho has marked as received, and a
+        // line that isn't stock. Written by the sync, which is where these
+        // rules are tested.
+        quantityOnWay Number @default(0)
+        // Display copies of the order, so the lines are legible on their own.
+        purchaseOrderNumber Text? @computed(purchaseOrderLine.purchaseOrder.purchaseOrderNumber)
+        orderDate Date? @computed(purchaseOrderLine.purchaseOrder.date)
+        expectedDeliveryDate Date? @computed(purchaseOrderLine.purchaseOrder.expectedDeliveryDate)
+        vendorName Text? @computed(purchaseOrderLine.purchaseOrder.vendorName)
+        productName Text? @computed(purchaseOrderLine.product.name)
+        // Zoho's line_item_id. Not relied on as a key: a changed order's lines
+        // are replaced outright, as a bill's are.
+        zohoLineItemId Text
+        // The line's position on the order, from 1.
+        position Number
+    }
+
+    actions {
+        get getPurchaseOrderLine(id)
+        list listPurchaseOrderLines(purchaseOrder.id?, product.id?) {
+            @orderBy(orderDate: desc, position: asc)
+        }
+        // Inventory → Stock on the way: every line with units still to
+        // arrive. Named to sort after listPurchaseOrderLines, so the Console's
+        // relation links keep picking the unfiltered list.
+        list listStockOnWay(product.id?, purchaseOrder.supplier.id?, sku?) {
+            @where(purchaseOrderLine.quantityOnWay > 0)
+            @orderBy(orderDate: asc, position: asc)
+        }
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list]
+    )
+}

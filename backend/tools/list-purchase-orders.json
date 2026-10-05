@@ -1,0 +1,50 @@
+{
+  "id": "list-purchase-orders",
+  "action_name": "listPurchaseOrders",
+  "name": "Purchase orders",
+  "title": "Purchase orders",
+  "icon": "emoji:📝",
+  "help_text": "Every purchase order in Zoho, mirrored nightly by the stock sync. A placed order's units count as stock on the way until they are received, whether or not the order has been billed. Drafts and cancelled orders count for nothing. See docs/purchase-orders.md.",
+  "inputs": {
+    "$.where.purchaseOrderNumber": { "display_name": "PO number" },
+    "$.where.isPlaced": { "display_name": "Placed" }
+  },
+  "response": {
+    "$.results[*].date": { "display_order": 0 },
+    "$.results[*].purchaseOrderNumber": { "display_name": "PO number", "display_order": 1 },
+    "$.results[*].vendorName": { "display_name": "Vendor", "display_order": 2 },
+    "$.results[*].status": { "display_order": 3 },
+    "$.results[*].receivedStatus": { "display_name": "Received", "display_order": 4 },
+    "$.results[*].billedStatus": { "display_name": "Billed", "display_order": 5 },
+    "$.results[*].unitsOrdered": { "display_name": "Units ordered", "display_order": 6 },
+    "$.results[*].unitsOnWay": { "display_name": "Units on way", "display_order": 7 },
+    "$.results[*].expectedDeliveryDate": { "display_name": "Expected", "display_order": 8 },
+    "$.results[*].currencyCode": { "display_name": "Currency", "display_order": 9 },
+    "$.results[*].total": { "display_name": "Total incl VAT", "display_order": 10 },
+    "$.results[*].isPlaced": { "display_name": "Placed", "display_order": 11 },
+    "$.results[*].supplierId": { "display_name": "Supplier", "visible": false },
+    "$.results[*].referenceNumber": { "display_name": "Reference", "visible": false },
+    "$.results[*].zohoPurchaseOrderId": { "display_name": "Zoho purchase order ID", "visible": false },
+    "$.results[*].zohoVendorId": { "display_name": "Zoho vendor ID", "visible": false },
+    "$.results[*].zohoModifiedAt": { "display_name": "Modified in Zoho", "visible": false },
+    "$.results[*].zohoQuantityToReceive": { "visible": false },
+    "$.results[*].synchronisedAt": { "display_name": "Synced", "visible": false },
+    "$.results[*].createdAt": { "visible": false },
+    "$.results[*].updatedAt": { "visible": false },
+    "$.results[*].id": {
+      "display_order": 20,
+      "link": {
+        "tool_id": "get-purchase-order",
+        "display_order": 0,
+        "data_mapping": [{ "key": "$.id", "path": { "path": "$.results[*].id" } }]
+      }
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "get-purchase-order",
+      "title": "View purchase order",
+      "display_order": 0
+    }
+  ]
+}

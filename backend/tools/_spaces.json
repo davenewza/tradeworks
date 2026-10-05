@@ -199,12 +199,32 @@
         "hidden": false
       },
       {
+        "id": "action-list-stock-on-way",
+        "link": {
+          "tool_id": "list-stock-on-way",
+          "title": "Stock on the way",
+          "description": "Units on purchase orders still to arrive, order by order",
+          "display_order": 1
+        },
+        "hidden": false
+      },
+      {
         "id": "action-plan-purchase",
         "link": {
           "tool_id": "plan-purchase",
           "title": "Plan a purchase",
           "description": "Pick a supplier, set the purchase date and lead time, review the suggested quantities",
-          "display_order": 1
+          "display_order": 2
+        },
+        "hidden": false
+      },
+      {
+        "id": "action-scheduled-sync-stock",
+        "link": {
+          "tool_id": "scheduled-sync-stock",
+          "title": "Refresh stock & purchase orders",
+          "description": "Pull stock on hand and purchase orders from Zoho now — it also runs nightly",
+          "display_order": 3
         },
         "hidden": false
       }
@@ -263,6 +283,16 @@
               "title": "Products without a supplier",
               "description": "Ungraded and left out of purchase planning until assigned",
               "display_order": 2
+            },
+            "hidden": false
+          },
+          {
+            "id": "action-list-purchase-orders",
+            "link": {
+              "tool_id": "list-purchase-orders",
+              "title": "Purchase orders",
+              "description": "Every purchase order in Zoho, with what each still has to arrive",
+              "display_order": 5
             },
             "hidden": false
           }

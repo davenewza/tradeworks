@@ -1,18 +1,23 @@
 import { ProgressReporter } from './progress';
-import { ZohoProductCtx } from './zohoProductHelpers';
-import { isZohoDailyRateLimit } from './zohoSalesHelpers';
+import { ZohoApiError, ZohoGet } from './zohoInventoryApi';
 
 // ─── Zoho types ─────────────────────────────────────────────────────────────
 
-// The item shape we read from GET /items. stock_on_hand and the composite flag
-// are optional: they're absent on non-inventory/service items, and Zoho returns
-// numeric fields as strings. We deliberately read stock straight off the list
-// response (no per-item detail call) to stay cheap on the shared daily quota.
+// The item shape we read from GET /items. The stock figure and the composite
+// flag are optional: they're absent on non-inventory/service items, and Zoho
+// can return numeric fields as strings. We deliberately read stock straight off
+// the list response (no per-item detail call) to stay cheap on the shared daily
+// quota.
+//
+// actual_available_stock is physical stock: it moves when a purchase order is
+// received, where stock_on_hand moves when it is billed. The two agree on every
+// item except one on an order billed ahead of its delivery — see
+// zohoPurchaseOrderHelpers, which counts those units as on the way instead.
 export interface ZohoStockItem {
     item_id: string;
     sku?: string;
     status?: string;
-    stock_on_hand?: string | number | null;
+    actual_available_stock?: string | number | null;
     // Composite/bundle markers — Zoho exposes these inconsistently across orgs,
     // so we check all of them.
     is_combo_product?: boolean;
@@ -54,8 +59,8 @@ export function isCompositeItem(item: ZohoStockItem): boolean {
 
 // Reduce a page of raw Zoho items to the (sku, stockAvailable) pairs we persist.
 // Drops items without a SKU, inactive items, composites, and anything without a
-// numeric stock_on_hand (service items etc. — nothing to give cover on). Pure,
-// so the sheet-matching rules are exercised directly in tests.
+// numeric physical stock figure (service items etc. — nothing to give cover
+// on). Pure, so the sheet-matching rules are exercised directly in tests.
 export function parseStockItems(items: ZohoStockItem[]): ProductStock[] {
     const out: ProductStock[] = [];
     for (const item of items) {
@@ -64,7 +69,7 @@ export function parseStockItems(items: ZohoStockItem[]): ProductStock[] {
         if ((item.status ?? '').toLowerCase() === 'inactive') continue;
         if (isCompositeItem(item)) continue;
 
-        const raw = item.stock_on_hand;
+        const raw = item.actual_available_stock;
         if (raw === null || raw === undefined || raw === '') continue;
         const stock = typeof raw === 'number' ? raw : Number(raw);
         if (!Number.isFinite(stock)) continue;
@@ -76,46 +81,24 @@ export function parseStockItems(items: ZohoStockItem[]): ProductStock[] {
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
-// Page every active item from Zoho Books (200/page) and read stock_on_hand off
-// the list response. A daily rate-limit stops the sweep and returns what we have
-// with rateLimited=true (STOP, don't retry — the quota won't recover today); any
-// other non-OK response throws.
-export async function fetchProductStock(
-    ctx: ZohoProductCtx,
-    accessToken: string,
-    progress?: ProgressReporter,
-): Promise<FetchStockResult> {
+// Page every active item from Zoho Inventory (200/page) and read physical stock
+// off the list response. A daily rate-limit stops the sweep and returns what we
+// have with rateLimited=true (STOP, don't retry — the quota won't recover
+// today); any other failure throws.
+export async function fetchProductStock(get: ZohoGet, progress?: ProgressReporter): Promise<FetchStockResult> {
     const stock: ProductStock[] = [];
-    let page = 1;
-    let hasMorePages = true;
 
     progress?.set({ message: 'Fetching stock levels from Zoho…' });
-    while (hasMorePages) {
-        const url = `${ctx.env.ZOHO_BOOKS_BASE_URL}/items?organization_id=${ctx.env.ZOHO_BOOKS_ORG_ID}&filter_by=Status.Active&page=${page}&per_page=200`;
-
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Zoho-oauthtoken ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            if (isZohoDailyRateLimit(response.status, errorText)) {
-                return { stock, rateLimited: true };
-            }
-            throw new Error(`Failed to fetch items from Zoho: ${response.status} - ${errorText}`);
+    for (let page = 1; ; page++) {
+        let data: ZohoItemsResponse;
+        try {
+            data = await get('/items', { filter_by: 'Status.Active', page: String(page), per_page: '200' });
+        } catch (error) {
+            if (error instanceof ZohoApiError && error.isDailyRateLimit) return { stock, rateLimited: true };
+            throw error;
         }
-
-        const data: ZohoItemsResponse = await response.json();
         stock.push(...parseStockItems(data.items ?? []));
-
-        hasMorePages = data.page_context?.has_more_page ?? false;
         progress?.set({ message: `Fetched stock for ${stock.length} item${stock.length === 1 ? '' : 's'}…` });
-        page++;
+        if (!data.page_context?.has_more_page) return { stock, rateLimited: false };
     }
-
-    return { stock, rateLimited: false };
 }
