@@ -90,7 +90,12 @@ export async function listZohoBills(get: ZohoGet, vendorId: string): Promise<Zoh
             );
         }
         const data = await get('/bills', { vendor_id: vendorId, per_page: '200', page: String(page) });
-        bills.push(...(data.bills ?? []));
+        // A bill missing from the listing is deleted here, so a response
+        // without the list must fail the sync, not read as "no bills".
+        if (!Array.isArray(data?.bills)) {
+            throw new Error(`Zoho's bill listing for vendor ${vendorId} came back without a list of bills: ${JSON.stringify(data).slice(0, 300)}`);
+        }
+        bills.push(...data.bills);
         if (!data.page_context?.has_more_page) return bills;
     }
 }
