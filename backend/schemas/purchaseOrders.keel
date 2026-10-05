@@ -11,6 +11,9 @@
 // A purchase order, as Zoho Inventory holds it.
 model PurchaseOrder {
     fields {
+        // First, because the Console labels an order with the model's first
+        // field.
+        purchaseOrderNumber Text
         // Zoho's purchaseorder_id.
         zohoPurchaseOrderId Text @unique
         // The vendor in Zoho, and the supplier it is imported as here. A
@@ -19,7 +22,6 @@ model PurchaseOrder {
         zohoVendorId Text?
         supplier Supplier?
         vendorName Text?
-        purchaseOrderNumber Text
         referenceNumber Text?
         date Date?
         expectedDeliveryDate Date?
