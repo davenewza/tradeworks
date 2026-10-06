@@ -472,5 +472,38 @@
     "metrics": null,
     "topics": null,
     "charts": null
+  },
+  {
+    "id": "space-tasks",
+    "name": "Tasks",
+    "icon": "clipboard-list",
+    "display_order": 3,
+    "hidden": false,
+    "actions": [
+      {
+        "id": "action-list-team-tasks",
+        "link": {
+          "tool_id": "team-tasks-hub",
+          "title": "Tasks",
+          "description": "The team's tasks, with a tab for each status",
+          "display_order": 0
+        },
+        "hidden": false
+      },
+      {
+        "id": "action-create-team-task",
+        "link": {
+          "tool_id": "create-team-task",
+          "title": "New task",
+          "display_order": 1
+        },
+        "hidden": false
+      }
+    ],
+    "groups": null,
+    "links": null,
+    "metrics": null,
+    "topics": null,
+    "charts": null
   }
 ]

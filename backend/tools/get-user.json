@@ -1,0 +1,5 @@
+{
+  "id": "get-user",
+  "action_name": "getUser",
+  "title": "{{$.givenName}}"
+}

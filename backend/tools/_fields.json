@@ -256,5 +256,66 @@
   {
     "id": "SupplierBillLine.extendedUnitCost",
     "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+  },
+  {
+    "id": "TeamTask.status",
+    "format": {
+      "enum_config": {
+        "values": [
+          {
+            "value": "Backlog",
+            "colour": "pale"
+          },
+          {
+            "value": "InProgress",
+            "colour": "sunshine",
+            "display_order": 2
+          },
+          {
+            "value": "Blocked",
+            "colour": "red",
+            "display_order": 3
+          },
+          {
+            "value": "Done",
+            "colour": "green",
+            "display_order": 4
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "TeamTaskStatus",
+    "format": {
+      "enum_config": {
+        "values": [
+          {
+            "value": "Backlog",
+            "display_value": "Backlog",
+            "colour": "grey",
+            "display_order": 1
+          },
+          {
+            "value": "InProgress",
+            "display_value": "In progress",
+            "colour": "sunshine",
+            "display_order": 3
+          },
+          {
+            "value": "Blocked",
+            "display_value": "Blocked",
+            "colour": "red",
+            "display_order": 4
+          },
+          {
+            "value": "Done",
+            "display_value": "Done",
+            "colour": "green",
+            "display_order": 5
+          }
+        ]
+      }
+    }
   }
 ]

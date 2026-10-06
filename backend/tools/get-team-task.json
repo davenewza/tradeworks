@@ -1,0 +1,57 @@
+{
+  "id": "get-team-task",
+  "action_name": "getTeamTask",
+  "response": {
+    "$.createdAt": {
+      "display_order": 5
+    },
+    "$.description": {
+      "display_order": 2
+    },
+    "$.id": {
+      "display_order": 4
+    },
+    "$.status": {
+      "display_order": 1,
+      "format": {
+        "enum_config": {
+          "values": [
+            {
+              "value": "Backlog",
+              "display_value": "Backlog",
+              "colour": "grey",
+              "display_order": 1
+            },
+            {
+              "value": "InProgress",
+              "display_value": "In progress",
+              "colour": "sunshine",
+              "display_order": 3
+            },
+            {
+              "value": "Blocked",
+              "display_value": "Blocked",
+              "colour": "red",
+              "display_order": 4
+            },
+            {
+              "value": "Done",
+              "display_value": "Done",
+              "colour": "green",
+              "display_order": 5
+            }
+          ]
+        }
+      }
+    },
+    "$.updatedAt": {
+      "display_order": 6
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "edit-team-task-inline",
+      "deleted": true
+    }
+  ]
+}

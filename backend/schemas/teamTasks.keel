@@ -1,0 +1,60 @@
+// A lightweight task list for the team. Deliberately not Keel's `task`
+// construct: that is a queue of system-raised work with a fixed lifecycle
+// (New, Assigned, Started, Completed, ...), whereas this is work people write
+// down and move between statuses by hand.
+enum TeamTaskStatus {
+    Backlog
+    InProgress
+    Blocked
+    Done
+}
+
+model TeamTask {
+    fields {
+        title Text
+        description Markdown?
+        status TeamTaskStatus @default(TeamTaskStatus.Backlog)
+        // Unassigned tasks are normal, most of the backlog will be.
+        assignee User?
+    }
+
+    actions {
+        get getTeamTask(id)
+        list listTeamTasks(status?, assignee.id?) {
+            @orderBy(createdAt: asc)
+            @sortable(status)
+            @searchable(
+                title,
+                description
+            )
+        }
+        create createTeamTask() with (title, description?, status?, assignee.id?)
+        // Only the words on the task. Status moves through moveTeamTask and the
+        // assignee through assignTeamTask, so neither is changed by accident here.
+        update updateTeamTask(id) with (title?, description?)
+        // The Assign task button: sets who the task is for, or clears it by
+        // leaving the assignee empty. It can change nothing else.
+        update assignTeamTask(id) with (assignee.id?)
+        // What the grid edits through. The Console grid ignores configuration and
+        // edits via the model's update action with the most writable inputs, and
+        // only those columns are editable. The narrow actions here each cover one
+        // or two fields, so this wider one exists to make title, status and
+        // assignee editable in place. It has to stay the widest update action,
+        // and the task page and list hide it from their own action lists.
+        update editTeamTaskInline(id) with (
+            title?,
+            description?,
+            status?,
+            assignee.id?,
+        )
+        // The Move button on a task: a one-field form for changing status without
+        // opening the full edit form. It can change nothing but the status.
+        update moveTeamTask(id) with (status)
+        delete deleteTeamTask(id)
+    }
+
+    @permission(
+        roles: [Operator],
+        actions: [get, list, create, update, delete]
+    )
+}

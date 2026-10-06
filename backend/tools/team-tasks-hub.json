@@ -1,0 +1,65 @@
+{
+  "id": "team-tasks-hub",
+  "type": "hub",
+  "model_name": "TeamTask",
+  "title": "Tasks",
+  "tabs": [
+    {
+      "id": "list-team-tasks",
+      "title": "All",
+      "display_order": 0
+    },
+    {
+      "id": "backlog",
+      "title": "Backlog",
+      "tool_id": "list-team-tasks",
+      "display_order": 1,
+      "inputs": {
+        "where": {
+          "status": {
+            "equals": "Backlog"
+          }
+        }
+      }
+    },
+    {
+      "id": "in-progress",
+      "title": "In progress",
+      "tool_id": "list-team-tasks",
+      "display_order": 2,
+      "inputs": {
+        "where": {
+          "status": {
+            "equals": "InProgress"
+          }
+        }
+      }
+    },
+    {
+      "id": "blocked",
+      "title": "Blocked",
+      "tool_id": "list-team-tasks",
+      "display_order": 3,
+      "inputs": {
+        "where": {
+          "status": {
+            "equals": "Blocked"
+          }
+        }
+      }
+    },
+    {
+      "id": "done",
+      "title": "Done",
+      "tool_id": "list-team-tasks",
+      "display_order": 4,
+      "inputs": {
+        "where": {
+          "status": {
+            "equals": "Done"
+          }
+        }
+      }
+    }
+  ]
+}
