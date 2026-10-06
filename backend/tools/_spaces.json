@@ -483,9 +483,9 @@
       {
         "id": "action-list-team-tasks",
         "link": {
-          "tool_id": "list-team-tasks",
+          "tool_id": "team-tasks-hub",
           "title": "Tasks",
-          "description": "The team's tasks. Filter or sort by status and assignee",
+          "description": "The team's tasks, with a tab for each status",
           "display_order": 0
         },
         "hidden": false
