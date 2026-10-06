@@ -21,6 +21,17 @@ async function person(opts: { operator: boolean }) {
     return { user, identity };
 }
 
+// A Date column holds a calendar day, and the two ways in treat a JS Date
+// differently: an action's JSON input takes its UTC date, while a write through
+// models takes local midnight. So actions get UTC midnight, models get local
+// midnight, and reads go by local parts. These tests then hold in any timezone.
+const apiDay = (iso: string) => new Date(iso);
+const dbDay = (iso: string) => new Date(`${iso}T00:00:00`);
+const dayOf = (d: Date | null) =>
+    d === null
+        ? null
+        : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 describe('team tasks', () => {
     beforeEach(resetDatabase);
 
@@ -77,18 +88,42 @@ describe('team tasks', () => {
             expect(task.assigneeId).toBeNull();
         });
 
-        test('can be created straight into another status with someone assigned', async () => {
+        test('lands in the backlog whoever it is for and whenever it is due', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             const { user: sam } = await person({ operator: true });
 
             const task = await authed.createTeamTask({
                 title: 'Book the courier',
-                status: TeamTaskStatus.InProgress,
+                targetDate: apiDay('2026-10-31'),
                 assignee: { id: sam.id },
             });
 
-            expect(task.status).toBe(TeamTaskStatus.InProgress);
+            expect(task.status).toBe(TeamTaskStatus.Backlog);
             expect(task.assigneeId).toBe(sam.id);
+            expect(dayOf((await models.teamTask.findOne({ id: task.id }))!.targetDate)).toBe('2026-10-31');
+        });
+
+        test('has no target date unless one is given', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+
+            const task = await authed.createTeamTask({ title: 'Whenever' });
+
+            expect(task.targetDate).toBeNull();
+        });
+
+        test('cannot be created in any other status', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+
+            // The create action does not take a status, so asking for one is not
+            // honoured: whatever the API does with the extra field, the task starts
+            // in the backlog.
+            const created = await authed
+                .createTeamTask({ title: 'Sneak straight to done', status: TeamTaskStatus.Done } as never)
+                .catch(() => null);
+
+            const stored = await models.teamTask.findMany({ where: { title: { equals: 'Sneak straight to done' } } });
+            for (const task of stored) expect(task.status).toBe(TeamTaskStatus.Backlog);
+            if (created) expect(created.status).toBe(TeamTaskStatus.Backlog);
         });
     });
 
@@ -132,11 +167,12 @@ describe('team tasks', () => {
         test('changes the title and description and nothing else', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             const { user: sam } = await person({ operator: true });
-            const task = await authed.createTeamTask({
+            const task = await models.teamTask.create({
                 title: 'Chase the courier',
                 description: 'Ask for a delivery slot',
                 status: TeamTaskStatus.Blocked,
-                assignee: { id: sam.id },
+                assigneeId: sam.id,
+                targetDate: dbDay('2026-10-31'),
             });
 
             await authed.updateTeamTask({
@@ -149,6 +185,7 @@ describe('team tasks', () => {
             expect(stored!.description).toBe('Ask for a Friday slot');
             expect(stored!.status).toBe(TeamTaskStatus.Blocked);
             expect(stored!.assigneeId).toBe(sam.id);
+            expect(dayOf(stored!.targetDate)).toBe('2026-10-31');
         });
     });
 
@@ -159,11 +196,11 @@ describe('team tasks', () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             const { user: sam } = await person({ operator: true });
             const { user: alex } = await person({ operator: true });
-            const task = await authed.createTeamTask({
+            const task = await models.teamTask.create({
                 title: 'Book the courier',
                 description: 'Friday slot',
                 status: TeamTaskStatus.InProgress,
-                assignee: { id: sam.id },
+                assigneeId: sam.id,
             });
 
             await authed.editTeamTaskInline({ where: { id: task.id }, values: { status: TeamTaskStatus.Blocked } });
@@ -192,6 +229,33 @@ describe('team tasks', () => {
             ]);
         });
 
+        // The Console's grid sends a date cell as a plain YYYY-MM-DD string, so the
+        // test sends the same.
+        test('sets, changes and clears the target date without touching the rest', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const { user: sam } = await person({ operator: true });
+            const task = await models.teamTask.create({
+                title: 'Book the courier',
+                status: TeamTaskStatus.Blocked,
+                assigneeId: sam.id,
+            });
+            const rest = async () => {
+                const t = await models.teamTask.findOne({ id: task.id });
+                return [t!.title, t!.status, t!.assigneeId];
+            };
+
+            await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: '2026-11-15' as never } });
+            expect(dayOf((await models.teamTask.findOne({ id: task.id }))!.targetDate)).toBe('2026-11-15');
+            expect(await rest()).toEqual(['Book the courier', TeamTaskStatus.Blocked, sam.id]);
+
+            await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: '2026-12-01' as never } });
+            expect(dayOf((await models.teamTask.findOne({ id: task.id }))!.targetDate)).toBe('2026-12-01');
+
+            await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: null } });
+            expect((await models.teamTask.findOne({ id: task.id }))!.targetDate).toBeNull();
+            expect(await rest()).toEqual(['Book the courier', TeamTaskStatus.Blocked, sam.id]);
+        });
+
         test('can clear the assignee', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             const { user: sam } = await person({ operator: true });
@@ -207,7 +271,7 @@ describe('team tasks', () => {
         test('assigning changes the assignee and nothing else', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             const { user: sam } = await person({ operator: true });
-            const task = await authed.createTeamTask({
+            const task = await models.teamTask.create({
                 title: 'Chase the courier',
                 description: 'Ask for a delivery slot',
                 status: TeamTaskStatus.InProgress,
@@ -295,6 +359,88 @@ describe('team tasks', () => {
                 TeamTaskStatus.InProgress,
             ]);
             expect(desc.results.map((t) => t.status)).toEqual(asc.results.map((t) => t.status).reverse());
+        });
+
+        test('can be sorted by target date, in either direction', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            // Created out of date order, with one that has no date at all.
+            await models.teamTask.create({ title: 'December', targetDate: dbDay('2026-12-01') });
+            await models.teamTask.create({ title: 'Unscheduled' });
+            await models.teamTask.create({ title: 'October', targetDate: dbDay('2026-10-31') });
+            await models.teamTask.create({ title: 'November', targetDate: dbDay('2026-11-15') });
+
+            const asc = await authed.listTeamTasks({ orderBy: [{ targetDate: 'asc' }] });
+            const desc = await authed.listTeamTasks({ orderBy: [{ targetDate: 'desc' }] });
+
+            const dated = (r: typeof asc) => r.results.filter((t) => t.targetDate !== null).map((t) => t.title);
+            expect(dated(asc)).toEqual(['October', 'November', 'December']);
+            expect(dated(desc)).toEqual(['December', 'November', 'October']);
+
+            // The task with no date sits at one end, not in the middle of the dated ones.
+            for (const result of [asc, desc]) {
+                const titles = result.results.map((t) => t.title);
+                expect([0, titles.length - 1]).toContain(titles.indexOf('Unscheduled'));
+            }
+        });
+    });
+
+    // What the Console's user pickers for a task browse and search.
+    describe('the people a task can be given to', () => {
+        test('are the warehouse team and nobody else', async () => {
+            const caller = await person({ operator: true });
+            const sam = await models.user.create({ email: 'sam@tradeworks.test', name: 'Sam Smith', teams: [Team.Warehouse] });
+            const alex = await models.user.create({ email: 'alex@tradeworks.test', name: 'Alex Adams', teams: [Team.Warehouse] });
+            // Not in the warehouse: a SuperAdmin on its own, and a customer with no team at all.
+            await models.user.create({ email: 'boss@tradeworks.test', name: 'Bo Boss', teams: [Team.SuperAdmin] });
+            await models.user.create({ email: 'customer@example.test', name: 'Cass Customer' });
+
+            const listed = await actions.withIdentity(caller.identity).listWarehouseUsers({});
+
+            expect(listed.results.map((u) => u.email).sort()).toEqual(
+                [caller.user.email, sam.email, alex.email].sort()
+            );
+        });
+
+        test('someone in several teams is included once they are in the warehouse', async () => {
+            const caller = await person({ operator: true });
+            const both = await models.user.create({
+                email: 'both@tradeworks.test',
+                name: 'Bo Both',
+                teams: [Team.SuperAdmin, Team.Warehouse],
+            });
+
+            const listed = await actions.withIdentity(caller.identity).listWarehouseUsers({});
+
+            expect(listed.results.map((u) => u.id)).toContain(both.id);
+        });
+
+        test('come back alphabetically by name', async () => {
+            const caller = await person({ operator: true });
+            await models.user.create({ email: 'z@tradeworks.test', name: 'Zed Zane', teams: [Team.Warehouse] });
+            await models.user.create({ email: 'a@tradeworks.test', name: 'Alex Adams', teams: [Team.Warehouse] });
+            await models.user.create({ email: 'b@tradeworks.test', name: 'Bea Brown', teams: [Team.Warehouse] });
+
+            const listed = await actions.withIdentity(caller.identity).listWarehouseUsers({});
+
+            expect(listed.results.map((u) => u.name).filter((n) => n !== null)).toEqual([
+                'Alex Adams',
+                'Bea Brown',
+                'Zed Zane',
+            ]);
+        });
+
+        test('can be searched by name, and only finds warehouse people', async () => {
+            const caller = await person({ operator: true });
+            await models.user.create({ email: 'bea@tradeworks.test', name: 'Bea Brown', teams: [Team.Warehouse] });
+            await models.user.create({ email: 'bea.outsider@example.test', name: 'Bea Outsider' });
+
+            const found = await actions.withIdentity(caller.identity).listWarehouseUsers({ search: 'Bea' });
+
+            expect(found.results.map((u) => u.name)).toEqual(['Bea Brown']);
+        });
+
+        test('are only listed to someone who is signed in', async () => {
+            await expect(actions.listWarehouseUsers({})).toHaveAuthorizationError();
         });
     });
 });

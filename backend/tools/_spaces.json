@@ -489,15 +489,6 @@
           "display_order": 0
         },
         "hidden": false
-      },
-      {
-        "id": "action-create-team-task",
-        "link": {
-          "tool_id": "create-team-task",
-          "title": "New task",
-          "display_order": 1
-        },
-        "hidden": false
       }
     ],
     "groups": null,

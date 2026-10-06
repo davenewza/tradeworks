@@ -1,0 +1,12 @@
+{
+  "id": "create-team-task",
+  "action_name": "createTeamTask",
+  "inputs": {
+    "$.assignee.id": {
+      "lookup_action": {
+        "tool_id": "list-warehouse-users",
+        "as_dialog": true
+      }
+    }
+  }
+}
