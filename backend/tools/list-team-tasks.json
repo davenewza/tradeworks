@@ -1,0 +1,105 @@
+{
+  "id": "list-team-tasks",
+  "action_name": "listTeamTasks",
+  "name": "Tasks",
+  "icon": "emoji:📋",
+  "response": {
+    "$.pageInfo": {
+      "visible": true
+    },
+    "$.pageInfo.count": {
+      "visible": true
+    },
+    "$.pageInfo.endCursor": {
+      "visible": true
+    },
+    "$.pageInfo.hasNextPage": {
+      "visible": true
+    },
+    "$.pageInfo.pageNumber": {
+      "visible": true
+    },
+    "$.pageInfo.startCursor": {
+      "visible": true
+    },
+    "$.pageInfo.totalCount": {
+      "visible": true
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].description": {
+      "visible": false
+    },
+    "$.results[*].id": {
+      "link": {
+        "tool_id": "get-team-task",
+        "display_order": 0,
+        "data_mapping": [
+          {
+            "key": "$.id",
+            "path": {
+              "path": "$.results[*].id"
+            }
+          }
+        ]
+      }
+    },
+    "$.results[*].status": {
+      "format": {
+        "enum_config": {
+          "values": [
+            {
+              "value": "Backlog",
+              "display_value": "Backlog",
+              "colour": "grey",
+              "display_order": 1
+            },
+            {
+              "value": "InProgress",
+              "display_value": "In progress",
+              "colour": "sunshine",
+              "display_order": 3
+            },
+            {
+              "value": "Blocked",
+              "display_value": "Blocked",
+              "colour": "red",
+              "display_order": 4
+            },
+            {
+              "value": "Done",
+              "display_value": "Done",
+              "colour": "green",
+              "display_order": 5
+            }
+          ]
+        }
+      }
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    }
+  },
+  "pagination": {
+    "page_size": {
+      "default_value": 200
+    }
+  },
+  "display_layout": {
+    "config": {
+      "board_config": {
+        "group_by_field": {
+          "path": "$.results[*].status"
+        }
+      },
+      "type": 3
+    }
+  },
+  "entry_activity_actions": [
+    {
+      "tool_id": "edit-team-task-inline",
+      "deleted": true
+    }
+  ]
+}
