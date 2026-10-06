@@ -1,8 +1,6 @@
 {
-  "id": "assign-team-task",
-  "action_name": "assignTeamTask",
-  "name": "Assign task",
-  "title": "Assign task",
+  "id": "edit-team-task-inline",
+  "action_name": "editTeamTaskInline",
   "inputs": {
     "$.values.assignee.id": {
       "lookup_action": {

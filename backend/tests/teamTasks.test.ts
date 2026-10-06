@@ -383,4 +383,64 @@ describe('team tasks', () => {
             }
         });
     });
+
+    // What the Console's user pickers for a task browse and search.
+    describe('the people a task can be given to', () => {
+        test('are the warehouse team and nobody else', async () => {
+            const caller = await person({ operator: true });
+            const sam = await models.user.create({ email: 'sam@tradeworks.test', name: 'Sam Smith', teams: [Team.Warehouse] });
+            const alex = await models.user.create({ email: 'alex@tradeworks.test', name: 'Alex Adams', teams: [Team.Warehouse] });
+            // Not in the warehouse: a SuperAdmin on its own, and a customer with no team at all.
+            await models.user.create({ email: 'boss@tradeworks.test', name: 'Bo Boss', teams: [Team.SuperAdmin] });
+            await models.user.create({ email: 'customer@example.test', name: 'Cass Customer' });
+
+            const listed = await actions.withIdentity(caller.identity).listWarehouseUsers({});
+
+            expect(listed.results.map((u) => u.email).sort()).toEqual(
+                [caller.user.email, sam.email, alex.email].sort()
+            );
+        });
+
+        test('someone in several teams is included once they are in the warehouse', async () => {
+            const caller = await person({ operator: true });
+            const both = await models.user.create({
+                email: 'both@tradeworks.test',
+                name: 'Bo Both',
+                teams: [Team.SuperAdmin, Team.Warehouse],
+            });
+
+            const listed = await actions.withIdentity(caller.identity).listWarehouseUsers({});
+
+            expect(listed.results.map((u) => u.id)).toContain(both.id);
+        });
+
+        test('come back alphabetically by name', async () => {
+            const caller = await person({ operator: true });
+            await models.user.create({ email: 'z@tradeworks.test', name: 'Zed Zane', teams: [Team.Warehouse] });
+            await models.user.create({ email: 'a@tradeworks.test', name: 'Alex Adams', teams: [Team.Warehouse] });
+            await models.user.create({ email: 'b@tradeworks.test', name: 'Bea Brown', teams: [Team.Warehouse] });
+
+            const listed = await actions.withIdentity(caller.identity).listWarehouseUsers({});
+
+            expect(listed.results.map((u) => u.name).filter((n) => n !== null)).toEqual([
+                'Alex Adams',
+                'Bea Brown',
+                'Zed Zane',
+            ]);
+        });
+
+        test('can be searched by name, and only finds warehouse people', async () => {
+            const caller = await person({ operator: true });
+            await models.user.create({ email: 'bea@tradeworks.test', name: 'Bea Brown', teams: [Team.Warehouse] });
+            await models.user.create({ email: 'bea.outsider@example.test', name: 'Bea Outsider' });
+
+            const found = await actions.withIdentity(caller.identity).listWarehouseUsers({ search: 'Bea' });
+
+            expect(found.results.map((u) => u.name)).toEqual(['Bea Brown']);
+        });
+
+        test('are only listed to someone who is signed in', async () => {
+            await expect(actions.listWarehouseUsers({})).toHaveAuthorizationError();
+        });
+    });
 });

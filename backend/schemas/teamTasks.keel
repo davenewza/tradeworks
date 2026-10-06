@@ -67,3 +67,20 @@ model TeamTask {
         actions: [get, list, create, update, delete]
     )
 }
+
+// The people a task can be given to: the Warehouse team. The Console's user
+// pickers for a task (the Assign form, the grid's Assignee cell and the assignee
+// filter) browse this list instead of every user, customers included. It only
+// narrows what the pickers offer; the actions still accept any user id.
+extend model User {
+    actions {
+        list listWarehouseUsers() {
+            @where(Team.Warehouse in user.teams)
+            @orderBy(name: asc)
+            @searchable(
+                name,
+                email
+            )
+        }
+    }
+}
