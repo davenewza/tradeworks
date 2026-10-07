@@ -140,14 +140,6 @@ model TeamTask {
     )
 }
 
-// One-off: the Blocked status was renamed Waiting. Keel stores an enum as plain
-// text and a rename migrates nothing, so tasks that were Blocked when the rename
-// deployed still say Blocked until this has been run once. Running it again
-// finds nothing to do.
-flow MoveBlockedTasksToWaiting {
-    @permission(roles: [Operator])
-}
-
 // The people a task can be given to: the Warehouse team. The Console's user
 // pickers for a task (the Assign form, the grid's Assignee cell and the assignee
 // filter) browse this list instead of every user, customers included. It only

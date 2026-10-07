@@ -489,16 +489,6 @@
           "display_order": 0
         },
         "hidden": false
-      },
-      {
-        "id": "action-move-blocked-tasks-to-waiting",
-        "link": {
-          "tool_id": "move-blocked-tasks-to-waiting",
-          "title": "Move Blocked tasks to Waiting",
-          "description": "One-off after the rename: tasks still stored as Blocked become Waiting",
-          "display_order": 1
-        },
-        "hidden": false
       }
     ],
     "groups": null,
