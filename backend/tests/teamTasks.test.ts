@@ -1,7 +1,7 @@
 // The team task list: who may touch it, where a new task lands, what moving a
 // task between statuses can and cannot change, and how the list filters and sorts.
 
-import { actions, flows, models, resetDatabase } from '@teamkeel/testing';
+import { actions, models, resetDatabase } from '@teamkeel/testing';
 import { Team, TeamTaskStatus } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
 
@@ -20,8 +20,6 @@ async function person(opts: { operator: boolean }) {
     const identity = await models.identity.create({ email, userId: user.id });
     return { user, identity };
 }
-
-const FLOW_TIMEOUT = 30_000;
 
 // Timestamps set by the runtime are compared loosely against the test's clock.
 const within = (a: Date | null, ms: number, of: number = Date.now()) =>
@@ -555,48 +553,6 @@ describe('team tasks', () => {
             await expect(actions.listWarehouseUsers({})).toHaveAuthorizationError();
         });
     });
-
-    // The one-off that finishes renaming Blocked to Waiting for the tasks that
-    // were written before it: the enum changed, the rows did not.
-    describe('moving stored Blocked tasks to Waiting', () => {
-        const completion = (run: { steps: Array<{ type: string; ui?: unknown }> }) =>
-            (run.steps.find((s) => s.type === 'COMPLETE')?.ui as { title?: string } | undefined)?.title;
-
-        test('renames the tasks still stored as Blocked and leaves every other task alone', async () => {
-            const operator = await person({ operator: true });
-            // The old name has left the enum, so it goes in past the types, just as
-            // it sits in the table.
-            const stale = await models.teamTask.create({ title: 'Old blocked', status: 'Blocked' as TeamTaskStatus });
-            const waiting = await models.teamTask.create({ title: 'Already waiting', status: TeamTaskStatus.Waiting });
-            const doing = await models.teamTask.create({ title: 'In flight', status: TeamTaskStatus.InProgress });
-            const authed = flows.moveBlockedTasksToWaiting.withIdentity(operator.identity);
-
-            const run = await authed.untilFinished((await authed.start({})).id, FLOW_TIMEOUT);
-
-            expect(run.status).toBe('COMPLETED');
-            expect(completion(run)).toBe('1 task(s) moved to Waiting');
-            expect((await models.teamTask.findOne({ id: stale.id }))!.status).toBe(TeamTaskStatus.Waiting);
-            expect((await models.teamTask.findOne({ id: waiting.id }))!.status).toBe(TeamTaskStatus.Waiting);
-            expect((await models.teamTask.findOne({ id: doing.id }))!.status).toBe(TeamTaskStatus.InProgress);
-        });
-
-        test('finds nothing to do when there are none', async () => {
-            const operator = await person({ operator: true });
-            await models.teamTask.create({ title: 'Already waiting', status: TeamTaskStatus.Waiting });
-            const authed = flows.moveBlockedTasksToWaiting.withIdentity(operator.identity);
-
-            const run = await authed.untilFinished((await authed.start({})).id, FLOW_TIMEOUT);
-
-            expect(run.status).toBe('COMPLETED');
-            expect(completion(run)).toBe('No tasks were still Blocked');
-        });
-
-        test('is for operators only', async () => {
-            const outsider = await person({ operator: false });
-
-            await expect(flows.moveBlockedTasksToWaiting.withIdentity(outsider.identity).start({})).rejects.toThrow();
-        });
-    });
 });
 
 // The hub's metric tiles read this aggregate: one number per call, counting
@@ -759,9 +715,34 @@ describe('archiveTeamTask', () => {
         expect(archivedOpen.status).toBe(TeamTaskStatus.Archived);
         expect(archivedOpen.completedAt).toBeNull();
 
-        // Out of the Done column, but still on the books.
-        expect((await authed.listTeamTasks({ where: { status: { equals: TeamTaskStatus.Done } } })).results).toEqual([]);
-        expect((await authed.listTeamTasks({})).results).toHaveLength(2);
+        // Gone from every list, but still on the books behind its own page.
+        expect((await authed.listTeamTasks({})).results).toEqual([]);
+        expect((await authed.getTeamTask({ id: done.id }))!.status).toBe(TeamTaskStatus.Archived);
+    });
+
+    test('no task list shows an archived task, even asked for by status', async () => {
+        const me = await person({ operator: true });
+        const archived = { status: TeamTaskStatus.Archived, assigneeId: me.user.id, targetDate: localDay(-3) };
+        await models.teamTask.create({ title: 'Mine, archived', ...archived });
+        await models.teamTask.create({ title: 'Mine, archived too', ...archived });
+        await models.teamTask.create({ title: 'Mine, done', status: TeamTaskStatus.Done, assigneeId: me.user.id });
+        await models.teamTask.create({ title: 'Mine, late', assigneeId: me.user.id, targetDate: localDay(-3) });
+        const mine = actions.withIdentity(me.identity);
+        const titles = (res: { results: { title: string }[] }) => res.results.map((t) => t.title);
+        const onlyArchived = { where: { status: { equals: TeamTaskStatus.Archived } } };
+
+        expect(titles(await mine.listTeamTasks({}))).toEqual(['Mine, done', 'Mine, late']);
+        expect(titles(await mine.listTeamTasks(onlyArchived))).toEqual([]);
+        expect(titles(await mine.listTeamTasks({ where: { assignee: { id: { equals: me.user.id } } } }))).toEqual([
+            'Mine, done',
+            'Mine, late',
+        ]);
+        expect(titles(await mine.listTeamTasks({ search: 'archived' }))).toEqual([]);
+
+        expect(titles(await mine.listTeamTasksMine({}))).toEqual(['Mine, done', 'Mine, late']);
+        expect(titles(await mine.listTeamTasksMine(onlyArchived))).toEqual([]);
+
+        expect(titles(await mine.listTeamTasksOverdue({}))).toEqual(['Mine, late']);
     });
 
     test('a finished task brought back out of the archive to Done keeps its time', async () => {

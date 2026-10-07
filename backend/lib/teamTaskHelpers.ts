@@ -1,5 +1,4 @@
-import { TeamTaskStatus, useDatabase } from '@teamkeel/sdk';
-import { sql } from 'kysely';
+import { TeamTaskStatus } from '@teamkeel/sdk';
 
 // What a task's completedAt should be after an action has set its status. It is
 // the moment the task went into Done, whichever action moved it: set on the way
@@ -22,16 +21,4 @@ export function completedAtAfterMove(args: {
     // from the archive having been finished before) keeps it; otherwise the
     // task is finished now.
     return completedAt ?? now;
-}
-
-// For the MoveBlockedTasksToWaiting one-off: rewrites the stored status of every
-// task still carrying a name that has left the enum. Keel keeps an enum as plain
-// text, so the rows survive the rename untouched, and because the old name is
-// no longer a TeamTaskStatus neither the model API nor its types will say it;
-// hence a plain statement. Returns how many tasks it changed.
-export async function renameStoredTaskStatus(from: string, to: TeamTaskStatus): Promise<number> {
-    const result = await sql`update team_task set status = ${to}, updated_at = now() where status = ${from}`.execute(
-        useDatabase(),
-    );
-    return Number(result.numAffectedRows ?? 0);
 }
