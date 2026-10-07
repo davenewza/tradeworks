@@ -36,14 +36,14 @@
       }
     },
     {
-      "id": "blocked",
-      "title": "Blocked",
+      "id": "waiting",
+      "title": "Waiting",
       "tool_id": "list-team-tasks",
       "display_order": 3,
       "inputs": {
         "where": {
           "status": {
-            "equals": "Blocked"
+            "equals": "Waiting"
           }
         }
       }

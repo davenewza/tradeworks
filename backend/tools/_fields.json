@@ -272,7 +272,7 @@
             "display_order": 2
           },
           {
-            "value": "Blocked",
+            "value": "Waiting",
             "colour": "red",
             "display_order": 3
           },
@@ -303,8 +303,8 @@
             "display_order": 3
           },
           {
-            "value": "Blocked",
-            "display_value": "Blocked",
+            "value": "Waiting",
+            "display_value": "Waiting",
             "colour": "red",
             "display_order": 4
           },
