@@ -1,0 +1,60 @@
+{
+  "id": "list-warehouse-users",
+  "action_name": "listWarehouseUsers",
+  "response": {
+    "$.results[*].name": {
+      "display_order": 0
+    },
+    "$.results[*].email": {
+      "display_order": 1
+    },
+    "$.results[*].givenName": {
+      "visible": false
+    },
+    "$.results[*].familyName": {
+      "visible": false
+    },
+    "$.results[*].middleName": {
+      "visible": false
+    },
+    "$.results[*].nickName": {
+      "visible": false
+    },
+    "$.results[*].profile": {
+      "visible": false
+    },
+    "$.results[*].picture": {
+      "visible": false
+    },
+    "$.results[*].website": {
+      "visible": false
+    },
+    "$.results[*].gender": {
+      "visible": false
+    },
+    "$.results[*].zoneInfo": {
+      "visible": false
+    },
+    "$.results[*].locale": {
+      "visible": false
+    },
+    "$.results[*].teams": {
+      "visible": false
+    },
+    "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].updatedAt": {
+      "visible": false
+    },
+    "$.results[*].firstName": {
+      "visible": false
+    },
+    "$.results[*].lastName": {
+      "visible": false
+    },
+    "$.results[*].customerId": {
+      "visible": false
+    }
+  }
+}

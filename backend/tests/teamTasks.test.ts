@@ -1,7 +1,7 @@
 // The team task list: who may touch it, where a new task lands, what moving a
 // task between statuses can and cannot change, and how the list filters and sorts.
 
-import { actions, models, resetDatabase } from '@teamkeel/testing';
+import { actions, flows, models, resetDatabase } from '@teamkeel/testing';
 import { Team, TeamTaskStatus } from '@teamkeel/sdk';
 import { beforeEach, describe, expect, test } from 'vitest';
 
@@ -20,6 +20,12 @@ async function person(opts: { operator: boolean }) {
     const identity = await models.identity.create({ email, userId: user.id });
     return { user, identity };
 }
+
+const FLOW_TIMEOUT = 30_000;
+
+// Timestamps set by the runtime are compared loosely against the test's clock.
+const within = (a: Date | null, ms: number, of: number = Date.now()) =>
+    a !== null && Math.abs(a.getTime() - of) < ms;
 
 // A Date column holds a calendar day, and the two ways in treat a JS Date
 // differently: an action's JSON input takes its UTC date, while a write through
@@ -111,6 +117,24 @@ describe('team tasks', () => {
             expect(task.targetDate).toBeNull();
         });
 
+        test('records who wrote it down', async () => {
+            const author = await person({ operator: true });
+            const authed = actions.withIdentity(author.identity);
+
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+
+            expect(task.createdById).toBe(author.user.id);
+            expect((await models.teamTask.findOne({ id: task.id }))!.createdById).toBe(author.user.id);
+        });
+
+        test('is not complete', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+
+            const task = await authed.createTeamTask({ title: 'Not yet' });
+
+            expect(task.completedAt).toBeNull();
+        });
+
         test('cannot be created in any other status', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
 
@@ -128,13 +152,13 @@ describe('team tasks', () => {
     });
 
     describe('moving a task', () => {
-        test('can put a task into every status, including blocked and done', async () => {
+        test('can put a task into every status, including waiting and done', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             const task = await authed.createTeamTask({ title: 'Walk through every status' });
 
             for (const status of [
                 TeamTaskStatus.InProgress,
-                TeamTaskStatus.Blocked,
+                TeamTaskStatus.Waiting,
                 TeamTaskStatus.InProgress,
                 TeamTaskStatus.Done,
                 TeamTaskStatus.Backlog,
@@ -153,13 +177,86 @@ describe('team tasks', () => {
                 assignee: { id: sam.id },
             });
 
-            await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Blocked } });
+            await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Waiting } });
 
             const stored = await models.teamTask.findOne({ id: task.id });
-            expect(stored!.status).toBe(TeamTaskStatus.Blocked);
+            expect(stored!.status).toBe(TeamTaskStatus.Waiting);
             expect(stored!.title).toBe('Unpack the Takealot delivery');
             expect(stored!.description).toBe('Check against the packing list');
             expect(stored!.assigneeId).toBe(sam.id);
+        });
+    });
+
+    // completedAt is the moment a task went into Done, whichever action moved it
+    // there, and it goes again when the task comes back out.
+    describe('completing a task', () => {
+        test('moving a task to Done records when', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+
+            const moved = await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+
+            expect(within(moved.completedAt, 5_000)).toBe(true);
+            const stored = await models.teamTask.findOne({ id: task.id });
+            expect(stored!.status).toBe(TeamTaskStatus.Done);
+            expect(stored!.completedAt?.getTime()).toBe(moved.completedAt!.getTime());
+        });
+
+        test('the grid can complete a task too', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+
+            const edited = await authed.editTeamTaskInline({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+
+            expect(within(edited.completedAt, 5_000)).toBe(true);
+        });
+
+        test('moving a done task back out of Done clears the time', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+            await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+
+            const reopened = await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.InProgress } });
+
+            expect(reopened.completedAt).toBeNull();
+            expect((await models.teamTask.findOne({ id: task.id }))!.completedAt).toBeNull();
+        });
+
+        test('moving a done task to Done again keeps the time it was first finished', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+            const first = await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+            await new Promise((r) => setTimeout(r, 20));
+
+            const again = await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+
+            expect(again.completedAt!.getTime()).toBe(first.completedAt!.getTime());
+        });
+
+        test('editing a done task without touching its status keeps the time', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const { user: sam } = await person({ operator: true });
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+            const done = await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+            await new Promise((r) => setTimeout(r, 20));
+
+            await authed.updateTeamTask({ where: { id: task.id }, values: { title: 'Count pallets' } });
+            await authed.assignTeamTask({ where: { id: task.id }, values: { assignee: { id: sam.id } } });
+            await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: '2026-11-15' as never } });
+
+            const stored = await models.teamTask.findOne({ id: task.id });
+            expect(stored!.status).toBe(TeamTaskStatus.Done);
+            expect(stored!.completedAt?.getTime()).toBe(done.completedAt!.getTime());
+        });
+
+        test('moving between unfinished statuses leaves a task incomplete', async () => {
+            const authed = actions.withIdentity((await person({ operator: true })).identity);
+            const task = await authed.createTeamTask({ title: 'Count the pallets' });
+
+            await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.InProgress } });
+            await authed.editTeamTaskInline({ where: { id: task.id }, values: { status: TeamTaskStatus.Waiting } });
+
+            expect((await models.teamTask.findOne({ id: task.id }))!.completedAt).toBeNull();
         });
     });
 
@@ -170,7 +267,7 @@ describe('team tasks', () => {
             const task = await models.teamTask.create({
                 title: 'Chase the courier',
                 description: 'Ask for a delivery slot',
-                status: TeamTaskStatus.Blocked,
+                status: TeamTaskStatus.Waiting,
                 assigneeId: sam.id,
                 targetDate: dbDay('2026-10-31'),
             });
@@ -183,9 +280,23 @@ describe('team tasks', () => {
             const stored = await models.teamTask.findOne({ id: task.id });
             expect(stored!.title).toBe('Chase DHL');
             expect(stored!.description).toBe('Ask for a Friday slot');
-            expect(stored!.status).toBe(TeamTaskStatus.Blocked);
+            expect(stored!.status).toBe(TeamTaskStatus.Waiting);
             expect(stored!.assigneeId).toBe(sam.id);
             expect(dayOf(stored!.targetDate)).toBe('2026-10-31');
+        });
+
+        test('whoever edits, moves or reassigns a task, its creator stays the same', async () => {
+            const author = await person({ operator: true });
+            const editor = await person({ operator: true });
+            const task = await actions.withIdentity(author.identity).createTeamTask({ title: 'Chase the courier' });
+            const asEditor = actions.withIdentity(editor.identity);
+
+            await asEditor.updateTeamTask({ where: { id: task.id }, values: { title: 'Chase DHL' } });
+            await asEditor.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.InProgress } });
+            await asEditor.assignTeamTask({ where: { id: task.id }, values: { assignee: { id: editor.user.id } } });
+            await asEditor.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: '2026-11-15' as never } });
+
+            expect((await models.teamTask.findOne({ id: task.id }))!.createdById).toBe(author.user.id);
         });
     });
 
@@ -203,10 +314,10 @@ describe('team tasks', () => {
                 assigneeId: sam.id,
             });
 
-            await authed.editTeamTaskInline({ where: { id: task.id }, values: { status: TeamTaskStatus.Blocked } });
+            await authed.editTeamTaskInline({ where: { id: task.id }, values: { status: TeamTaskStatus.Waiting } });
             let stored = await models.teamTask.findOne({ id: task.id });
             expect([stored!.status, stored!.assigneeId, stored!.title, stored!.description]).toEqual([
-                TeamTaskStatus.Blocked,
+                TeamTaskStatus.Waiting,
                 sam.id,
                 'Book the courier',
                 'Friday slot',
@@ -215,7 +326,7 @@ describe('team tasks', () => {
             await authed.editTeamTaskInline({ where: { id: task.id }, values: { assignee: { id: alex.id } } });
             stored = await models.teamTask.findOne({ id: task.id });
             expect([stored!.status, stored!.assigneeId, stored!.title]).toEqual([
-                TeamTaskStatus.Blocked,
+                TeamTaskStatus.Waiting,
                 alex.id,
                 'Book the courier',
             ]);
@@ -223,7 +334,7 @@ describe('team tasks', () => {
             await authed.editTeamTaskInline({ where: { id: task.id }, values: { title: 'Book DHL' } });
             stored = await models.teamTask.findOne({ id: task.id });
             expect([stored!.status, stored!.assigneeId, stored!.title]).toEqual([
-                TeamTaskStatus.Blocked,
+                TeamTaskStatus.Waiting,
                 alex.id,
                 'Book DHL',
             ]);
@@ -236,7 +347,7 @@ describe('team tasks', () => {
             const { user: sam } = await person({ operator: true });
             const task = await models.teamTask.create({
                 title: 'Book the courier',
-                status: TeamTaskStatus.Blocked,
+                status: TeamTaskStatus.Waiting,
                 assigneeId: sam.id,
             });
             const rest = async () => {
@@ -246,14 +357,14 @@ describe('team tasks', () => {
 
             await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: '2026-11-15' as never } });
             expect(dayOf((await models.teamTask.findOne({ id: task.id }))!.targetDate)).toBe('2026-11-15');
-            expect(await rest()).toEqual(['Book the courier', TeamTaskStatus.Blocked, sam.id]);
+            expect(await rest()).toEqual(['Book the courier', TeamTaskStatus.Waiting, sam.id]);
 
             await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: '2026-12-01' as never } });
             expect(dayOf((await models.teamTask.findOne({ id: task.id }))!.targetDate)).toBe('2026-12-01');
 
             await authed.editTeamTaskInline({ where: { id: task.id }, values: { targetDate: null } });
             expect((await models.teamTask.findOne({ id: task.id }))!.targetDate).toBeNull();
-            expect(await rest()).toEqual(['Book the courier', TeamTaskStatus.Blocked, sam.id]);
+            expect(await rest()).toEqual(['Book the courier', TeamTaskStatus.Waiting, sam.id]);
         });
 
         test('can clear the assignee', async () => {
@@ -317,15 +428,15 @@ describe('team tasks', () => {
     describe('the task list', () => {
         test('a status filter narrows the list to one status, oldest task first', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
-            await models.teamTask.create({ title: 'Blocked one', status: TeamTaskStatus.Blocked });
+            await models.teamTask.create({ title: 'Waiting one', status: TeamTaskStatus.Waiting });
             await models.teamTask.create({ title: 'In flight', status: TeamTaskStatus.InProgress });
-            await models.teamTask.create({ title: 'Blocked two', status: TeamTaskStatus.Blocked });
+            await models.teamTask.create({ title: 'Waiting two', status: TeamTaskStatus.Waiting });
 
-            const blocked = await authed.listTeamTasks({
-                where: { status: { equals: TeamTaskStatus.Blocked } },
+            const waiting = await authed.listTeamTasks({
+                where: { status: { equals: TeamTaskStatus.Waiting } },
             });
 
-            expect(blocked.results.map((t) => t.title)).toEqual(['Blocked one', 'Blocked two']);
+            expect(waiting.results.map((t) => t.title)).toEqual(['Waiting one', 'Waiting two']);
         });
 
         test('can be searched by title', async () => {
@@ -341,7 +452,7 @@ describe('team tasks', () => {
         test('can be sorted by status, in either direction', async () => {
             const authed = actions.withIdentity((await person({ operator: true })).identity);
             // Created out of any order, so the creation-date default can't pass by luck.
-            await models.teamTask.create({ title: 'c', status: TeamTaskStatus.Blocked });
+            await models.teamTask.create({ title: 'c', status: TeamTaskStatus.Waiting });
             await models.teamTask.create({ title: 'a', status: TeamTaskStatus.Done });
             await models.teamTask.create({ title: 'e', status: TeamTaskStatus.Backlog });
             await models.teamTask.create({ title: 'd', status: TeamTaskStatus.InProgress });
@@ -351,12 +462,13 @@ describe('team tasks', () => {
 
             // Enums are stored as text, so this is the status name's order (which
             // groups tasks by status) and not the workflow's: Done comes before
-            // InProgress. A workflow order would need its own numeric column.
+            // InProgress, and Waiting last. A workflow order would need its own
+            // numeric column.
             expect(asc.results.map((t) => t.status)).toEqual([
                 TeamTaskStatus.Backlog,
-                TeamTaskStatus.Blocked,
                 TeamTaskStatus.Done,
                 TeamTaskStatus.InProgress,
+                TeamTaskStatus.Waiting,
             ]);
             expect(desc.results.map((t) => t.status)).toEqual(asc.results.map((t) => t.status).reverse());
         });
@@ -441,6 +553,48 @@ describe('team tasks', () => {
 
         test('are only listed to someone who is signed in', async () => {
             await expect(actions.listWarehouseUsers({})).toHaveAuthorizationError();
+        });
+    });
+
+    // The one-off that finishes renaming Blocked to Waiting for the tasks that
+    // were written before it: the enum changed, the rows did not.
+    describe('moving stored Blocked tasks to Waiting', () => {
+        const completion = (run: { steps: Array<{ type: string; ui?: unknown }> }) =>
+            (run.steps.find((s) => s.type === 'COMPLETE')?.ui as { title?: string } | undefined)?.title;
+
+        test('renames the tasks still stored as Blocked and leaves every other task alone', async () => {
+            const operator = await person({ operator: true });
+            // The old name has left the enum, so it goes in past the types, just as
+            // it sits in the table.
+            const stale = await models.teamTask.create({ title: 'Old blocked', status: 'Blocked' as TeamTaskStatus });
+            const waiting = await models.teamTask.create({ title: 'Already waiting', status: TeamTaskStatus.Waiting });
+            const doing = await models.teamTask.create({ title: 'In flight', status: TeamTaskStatus.InProgress });
+            const authed = flows.moveBlockedTasksToWaiting.withIdentity(operator.identity);
+
+            const run = await authed.untilFinished((await authed.start({})).id, FLOW_TIMEOUT);
+
+            expect(run.status).toBe('COMPLETED');
+            expect(completion(run)).toBe('1 task(s) moved to Waiting');
+            expect((await models.teamTask.findOne({ id: stale.id }))!.status).toBe(TeamTaskStatus.Waiting);
+            expect((await models.teamTask.findOne({ id: waiting.id }))!.status).toBe(TeamTaskStatus.Waiting);
+            expect((await models.teamTask.findOne({ id: doing.id }))!.status).toBe(TeamTaskStatus.InProgress);
+        });
+
+        test('finds nothing to do when there are none', async () => {
+            const operator = await person({ operator: true });
+            await models.teamTask.create({ title: 'Already waiting', status: TeamTaskStatus.Waiting });
+            const authed = flows.moveBlockedTasksToWaiting.withIdentity(operator.identity);
+
+            const run = await authed.untilFinished((await authed.start({})).id, FLOW_TIMEOUT);
+
+            expect(run.status).toBe('COMPLETED');
+            expect(completion(run)).toBe('No tasks were still Blocked');
+        });
+
+        test('is for operators only', async () => {
+            const outsider = await person({ operator: false });
+
+            await expect(flows.moveBlockedTasksToWaiting.withIdentity(outsider.identity).start({})).rejects.toThrow();
         });
     });
 });

@@ -25,7 +25,13 @@
     "$.pageInfo.totalCount": {
       "visible": true
     },
+    "$.results[*].completedAt": {
+      "visible": false
+    },
     "$.results[*].createdAt": {
+      "visible": false
+    },
+    "$.results[*].createdById": {
       "visible": false
     },
     "$.results[*].description": {
@@ -62,8 +68,8 @@
               "display_order": 3
             },
             {
-              "value": "Blocked",
-              "display_value": "Blocked",
+              "value": "Waiting",
+              "display_value": "Waiting",
               "colour": "red",
               "display_order": 4
             },

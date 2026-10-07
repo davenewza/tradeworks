@@ -5,7 +5,7 @@
 enum TeamTaskStatus {
     Backlog
     InProgress
-    Blocked
+    Waiting
     Done
 }
 
@@ -18,6 +18,14 @@ model TeamTask {
         assignee User?
         // When the task should be done by. Optional: most tasks won't have one.
         targetDate Date?
+        // Who wrote the task down: the signed-in user when the task is created,
+        // set by the create action and taken as input by nothing. Optional only
+        // because tasks from before this was recorded have nobody on them.
+        createdBy User?
+        // When the task was last moved into Done, kept by the two actions that
+        // can change a status (see lib/teamTaskHelpers.ts), and cleared again if
+        // the task is moved back out of Done.
+        completedAt Timestamp?
     }
 
     actions {
@@ -35,7 +43,9 @@ model TeamTask {
         }
         // Status is not asked for: every task starts in Backlog and is moved on from
         // there.
-        create createTeamTask() with (title, description?, targetDate?, assignee.id?)
+        create createTeamTask() with (title, description?, targetDate?, assignee.id?) {
+            @set(teamTask.createdBy = ctx.identity.user)
+        }
         // Only the words on the task. Status moves through moveTeamTask and the
         // assignee through assignTeamTask, so neither is changed by accident here.
         update updateTeamTask(id) with (title?, description?)
@@ -47,18 +57,19 @@ model TeamTask {
         // only those columns are editable. The narrow actions here each cover one
         // or two fields, so this wider one exists to make title, status, assignee
         // and target date editable in place. It has to stay the widest update
-        // action,
-        // and the task page and list hide it from their own action lists.
+        // action, and the task page and list hide it from their own action lists.
+        // A function because it can change the status, and so keeps completedAt.
         update editTeamTaskInline(id) with (
             title?,
             description?,
             status?,
             assignee.id?,
             targetDate?,
-        )
+        ) @function
         // The Move button on a task: a one-field form for changing status without
-        // opening the full edit form. It can change nothing but the status.
-        update moveTeamTask(id) with (status)
+        // opening the full edit form. It can change nothing but the status, and
+        // keeps completedAt in step with it.
+        update moveTeamTask(id) with (status) @function
         delete deleteTeamTask(id)
     }
 
@@ -66,6 +77,14 @@ model TeamTask {
         roles: [Operator],
         actions: [get, list, create, update, delete]
     )
+}
+
+// One-off: the Blocked status was renamed Waiting. Keel stores an enum as plain
+// text and a rename migrates nothing, so tasks that were Blocked when the rename
+// deployed still say Blocked until this has been run once. Running it again
+// finds nothing to do.
+flow MoveBlockedTasksToWaiting {
+    @permission(roles: [Operator])
 }
 
 // The people a task can be given to: the Warehouse team. The Console's user
