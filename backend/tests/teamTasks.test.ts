@@ -759,9 +759,34 @@ describe('archiveTeamTask', () => {
         expect(archivedOpen.status).toBe(TeamTaskStatus.Archived);
         expect(archivedOpen.completedAt).toBeNull();
 
-        // Out of the Done column, but still on the books.
-        expect((await authed.listTeamTasks({ where: { status: { equals: TeamTaskStatus.Done } } })).results).toEqual([]);
-        expect((await authed.listTeamTasks({})).results).toHaveLength(2);
+        // Gone from every list, but still on the books behind its own page.
+        expect((await authed.listTeamTasks({})).results).toEqual([]);
+        expect((await authed.getTeamTask({ id: done.id }))!.status).toBe(TeamTaskStatus.Archived);
+    });
+
+    test('no task list shows an archived task, even asked for by status', async () => {
+        const me = await person({ operator: true });
+        const archived = { status: TeamTaskStatus.Archived, assigneeId: me.user.id, targetDate: localDay(-3) };
+        await models.teamTask.create({ title: 'Mine, archived', ...archived });
+        await models.teamTask.create({ title: 'Mine, archived too', ...archived });
+        await models.teamTask.create({ title: 'Mine, done', status: TeamTaskStatus.Done, assigneeId: me.user.id });
+        await models.teamTask.create({ title: 'Mine, late', assigneeId: me.user.id, targetDate: localDay(-3) });
+        const mine = actions.withIdentity(me.identity);
+        const titles = (res: { results: { title: string }[] }) => res.results.map((t) => t.title);
+        const onlyArchived = { where: { status: { equals: TeamTaskStatus.Archived } } };
+
+        expect(titles(await mine.listTeamTasks({}))).toEqual(['Mine, done', 'Mine, late']);
+        expect(titles(await mine.listTeamTasks(onlyArchived))).toEqual([]);
+        expect(titles(await mine.listTeamTasks({ where: { assignee: { id: { equals: me.user.id } } } }))).toEqual([
+            'Mine, done',
+            'Mine, late',
+        ]);
+        expect(titles(await mine.listTeamTasks({ search: 'archived' }))).toEqual([]);
+
+        expect(titles(await mine.listTeamTasksMine({}))).toEqual(['Mine, done', 'Mine, late']);
+        expect(titles(await mine.listTeamTasksMine(onlyArchived))).toEqual([]);
+
+        expect(titles(await mine.listTeamTasksOverdue({}))).toEqual(['Mine, late']);
     });
 
     test('a finished task brought back out of the archive to Done keeps its time', async () => {
