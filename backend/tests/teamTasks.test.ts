@@ -598,3 +598,186 @@ describe('team tasks', () => {
         });
     });
 });
+
+// The hub's metric tiles read this aggregate: one number per call, counting
+// the signed-in person's own tasks, narrowed to a status by the tile's inputs.
+describe('countMyTeamTasks', () => {
+    beforeEach(resetDatabase);
+
+    test("counts the signed-in person's tasks, and only theirs, by status", async () => {
+        const me = await person({ operator: true });
+        const them = await person({ operator: true });
+        const task = (title: string, status: TeamTaskStatus, assigneeId: string | null) =>
+            models.teamTask.create({ title, status, assigneeId });
+        await task('Mine, backlog', TeamTaskStatus.Backlog, me.user.id);
+        await task('Mine, backlog too', TeamTaskStatus.Backlog, me.user.id);
+        await task('Mine, in progress', TeamTaskStatus.InProgress, me.user.id);
+        await task('Mine, done', TeamTaskStatus.Done, me.user.id);
+        await task('Theirs, backlog', TeamTaskStatus.Backlog, them.user.id);
+        await task('Theirs, waiting', TeamTaskStatus.Waiting, them.user.id);
+        await task("Nobody's, backlog", TeamTaskStatus.Backlog, null);
+
+        const mine = actions.withIdentity(me.identity);
+        const count = async (status?: TeamTaskStatus) => {
+            const res = await mine.countMyTeamTasks({ where: status ? { status: { equals: status } } : {} });
+            // No grouping: the whole answer is the total, with no group rows.
+            expect(res.results).toEqual([]);
+            return Number(res.totals!.tasks);
+        };
+
+        expect(await count()).toBe(4);
+        expect(await count(TeamTaskStatus.Backlog)).toBe(2);
+        expect(await count(TeamTaskStatus.InProgress)).toBe(1);
+        expect(await count(TeamTaskStatus.Waiting)).toBe(0);
+        expect(await count(TeamTaskStatus.Done)).toBe(1);
+    });
+
+    test('is zero, not an error, for someone with nothing assigned', async () => {
+        await models.teamTask.create({ title: 'Reorder tape' });
+        const mine = actions.withIdentity((await person({ operator: true })).identity);
+
+        const res = await mine.countMyTeamTasks({ where: {} });
+        expect(Number(res.totals!.tasks)).toBe(0);
+    });
+
+    test('is for operators only', async () => {
+        await models.teamTask.create({ title: 'Reorder tape' });
+        const outsider = actions.withIdentity((await person({ operator: false })).identity);
+
+        await expect(outsider.countMyTeamTasks({ where: {} })).toHaveAuthorizationError();
+        await expect(actions.countMyTeamTasks({ where: {} })).toHaveAuthorizationError();
+    });
+});
+
+// Calendar days relative to today, as local midnight: what a write through
+// models stores in a Date column (see dbDay above).
+const localDay = (offset: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offset);
+    return d;
+};
+
+describe('listTeamTasksMine', () => {
+    beforeEach(resetDatabase);
+
+    test("lists the signed-in person's tasks and nobody else's, narrowed by status", async () => {
+        const me = await person({ operator: true });
+        const them = await person({ operator: true });
+        await models.teamTask.create({ title: 'Mine, backlog', assigneeId: me.user.id });
+        await models.teamTask.create({ title: 'Mine, done', status: TeamTaskStatus.Done, assigneeId: me.user.id });
+        await models.teamTask.create({ title: 'Theirs', assigneeId: them.user.id });
+        await models.teamTask.create({ title: "Nobody's" });
+
+        const mine = actions.withIdentity(me.identity);
+        expect((await mine.listTeamTasksMine({})).results.map((t) => t.title).sort()).toEqual(['Mine, backlog', 'Mine, done']);
+        expect(
+            (await mine.listTeamTasksMine({ where: { status: { equals: TeamTaskStatus.Done } } })).results.map((t) => t.title)
+        ).toEqual(['Mine, done']);
+    });
+
+    test('is for operators only', async () => {
+        const outsider = actions.withIdentity((await person({ operator: false })).identity);
+        await expect(outsider.listTeamTasksMine({})).toHaveAuthorizationError();
+        await expect(actions.listTeamTasksMine({})).toHaveAuthorizationError();
+    });
+});
+
+describe('overdue tasks', () => {
+    beforeEach(resetDatabase);
+
+    // Everyone's open tasks: one due the day before yesterday, one yesterday
+    // (both overdue), one today, one tomorrow, one with no date, and two past
+    // their day but finished or archived.
+    async function seed() {
+        const me = await person({ operator: true });
+        const them = await person({ operator: true });
+        const task = (title: string, targetDate: Date | null, extra: { status?: TeamTaskStatus; assigneeId?: string } = {}) =>
+            models.teamTask.create({ title, targetDate, ...extra });
+        await task('Mine, two days late', localDay(-2), { assigneeId: me.user.id });
+        await task('Theirs, a day late', localDay(-1), { assigneeId: them.user.id });
+        await task('Mine, due today', localDay(0), { assigneeId: me.user.id });
+        await task('Mine, due tomorrow', localDay(1), { assigneeId: me.user.id });
+        await task('Mine, no date', null, { assigneeId: me.user.id });
+        await task('Mine, late but done', localDay(-3), { assigneeId: me.user.id, status: TeamTaskStatus.Done });
+        await task('Mine, late but archived', localDay(-3), { assigneeId: me.user.id, status: TeamTaskStatus.Archived });
+        await task("Nobody's, a day late", localDay(-1), { status: TeamTaskStatus.Waiting });
+        return { me, them };
+    }
+
+    test('the Overdue list has every open task past its day, soonest due first', async () => {
+        const { me } = await seed();
+        const res = await actions.withIdentity(me.identity).listTeamTasksOverdue({});
+        expect(res.results.map((t) => t.title)).toEqual(['Mine, two days late', 'Theirs, a day late', "Nobody's, a day late"]);
+    });
+
+    test('the Overdue list narrows to one person', async () => {
+        const { me, them } = await seed();
+        const res = await actions
+            .withIdentity(me.identity)
+            .listTeamTasksOverdue({ where: { assignee: { id: { equals: them.user.id } } } });
+        expect(res.results.map((t) => t.title)).toEqual(['Theirs, a day late']);
+    });
+
+    test("the Mine overdue tile counts only the signed-in person's open tasks past their day", async () => {
+        const { me, them } = await seed();
+        const mine = await actions.withIdentity(me.identity).countMyOverdueTeamTasks({});
+        expect(mine.results).toEqual([]);
+        expect(Number(mine.totals!.tasks)).toBe(1);
+
+        const theirs = await actions.withIdentity(them.identity).countMyOverdueTeamTasks({});
+        expect(Number(theirs.totals!.tasks)).toBe(1);
+
+        const nobody = await actions.withIdentity((await person({ operator: true })).identity).countMyOverdueTeamTasks({});
+        expect(Number(nobody.totals!.tasks)).toBe(0);
+    });
+
+    test('both are for operators only', async () => {
+        await seed();
+        const outsider = actions.withIdentity((await person({ operator: false })).identity);
+        await expect(outsider.listTeamTasksOverdue({})).toHaveAuthorizationError();
+        await expect(outsider.countMyOverdueTeamTasks({})).toHaveAuthorizationError();
+        await expect(actions.listTeamTasksOverdue({})).toHaveAuthorizationError();
+        await expect(actions.countMyOverdueTeamTasks({})).toHaveAuthorizationError();
+    });
+});
+
+describe('archiveTeamTask', () => {
+    beforeEach(resetDatabase);
+
+    test('archives a task in one click and keeps when it was finished', async () => {
+        const authed = actions.withIdentity((await person({ operator: true })).identity);
+        const finishedAt = new Date('2026-10-01T09:00:00Z');
+        const done = await models.teamTask.create({ title: 'Count the pallets', status: TeamTaskStatus.Done, completedAt: finishedAt });
+        const open = await models.teamTask.create({ title: 'Never happening' });
+
+        const archivedDone = await authed.archiveTeamTask({ where: { id: done.id } });
+        expect(archivedDone.status).toBe(TeamTaskStatus.Archived);
+        expect(archivedDone.completedAt).toEqual(finishedAt);
+
+        const archivedOpen = await authed.archiveTeamTask({ where: { id: open.id } });
+        expect(archivedOpen.status).toBe(TeamTaskStatus.Archived);
+        expect(archivedOpen.completedAt).toBeNull();
+
+        // Out of the Done column, but still on the books.
+        expect((await authed.listTeamTasks({ where: { status: { equals: TeamTaskStatus.Done } } })).results).toEqual([]);
+        expect((await authed.listTeamTasks({})).results).toHaveLength(2);
+    });
+
+    test('a finished task brought back out of the archive to Done keeps its time', async () => {
+        const authed = actions.withIdentity((await person({ operator: true })).identity);
+        const finishedAt = new Date('2026-10-01T09:00:00Z');
+        const task = await models.teamTask.create({ title: 'Count the pallets', status: TeamTaskStatus.Done, completedAt: finishedAt });
+
+        await authed.archiveTeamTask({ where: { id: task.id } });
+        const back = await authed.moveTeamTask({ where: { id: task.id }, values: { status: TeamTaskStatus.Done } });
+        expect(back.completedAt).toEqual(finishedAt);
+    });
+
+    test('is for operators only', async () => {
+        const task = await models.teamTask.create({ title: 'Reorder tape' });
+        const outsider = actions.withIdentity((await person({ operator: false })).identity);
+        await expect(outsider.archiveTeamTask({ where: { id: task.id } })).toHaveAuthorizationError();
+        await expect(actions.archiveTeamTask({ where: { id: task.id } })).toHaveAuthorizationError();
+    });
+});

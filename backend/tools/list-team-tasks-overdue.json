@@ -1,7 +1,7 @@
 {
-  "id": "list-team-tasks",
-  "action_name": "listTeamTasks",
-  "name": "Tasks",
+  "id": "list-team-tasks-overdue",
+  "action_name": "listTeamTasksOverdue",
+  "name": "Overdue tasks",
   "icon": "emoji:\ud83d\udccb",
   "response": {
     "$.pageInfo": {
