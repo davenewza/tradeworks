@@ -39,6 +39,12 @@
               "display_value": "Done",
               "colour": "green",
               "display_order": 5
+            },
+            {
+              "value": "Archived",
+              "display_value": "Archived",
+              "colour": "pale",
+              "display_order": 6
             }
           ]
         }
@@ -52,6 +58,26 @@
     {
       "tool_id": "edit-team-task-inline",
       "deleted": true
+    },
+    {
+      "tool_id": "move-team-task",
+      "display_order": 1
+    },
+    {
+      "tool_id": "assign-team-task",
+      "display_order": 2
+    },
+    {
+      "tool_id": "update-team-task",
+      "display_order": 3
+    },
+    {
+      "tool_id": "archive-team-task",
+      "display_order": 4
+    },
+    {
+      "tool_id": "delete-team-task",
+      "display_order": 5
     }
   ]
 }

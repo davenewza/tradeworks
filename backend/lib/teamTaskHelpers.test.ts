@@ -28,6 +28,24 @@ describe('completedAtAfterMove', () => {
         expect(completedAtAfterMove({ from: TeamTaskStatus.Backlog, to: TeamTaskStatus.Waiting, completedAt: null, now })).toBeNull();
     });
 
+    test('archiving leaves the time as it was, finished or not', () => {
+        expect(completedAtAfterMove({ from: TeamTaskStatus.Done, to: TeamTaskStatus.Archived, completedAt: earlier, now })).toBe(
+            earlier,
+        );
+        expect(completedAtAfterMove({ from: TeamTaskStatus.Backlog, to: TeamTaskStatus.Archived, completedAt: null, now })).toBeNull();
+    });
+
+    test('a finished task brought back from the archive to Done keeps its time; an unfinished one is finished now', () => {
+        expect(completedAtAfterMove({ from: TeamTaskStatus.Archived, to: TeamTaskStatus.Done, completedAt: earlier, now })).toBe(
+            earlier,
+        );
+        expect(completedAtAfterMove({ from: TeamTaskStatus.Archived, to: TeamTaskStatus.Done, completedAt: null, now })).toBe(now);
+    });
+
+    test('a task brought back from the archive into open work is not complete', () => {
+        expect(completedAtAfterMove({ from: TeamTaskStatus.Archived, to: TeamTaskStatus.Backlog, completedAt: earlier, now })).toBeNull();
+    });
+
     test('a write that does not touch the status leaves the time as it was', () => {
         expect(completedAtAfterMove({ from: TeamTaskStatus.Done, to: undefined, completedAt: earlier, now })).toBe(earlier);
         expect(completedAtAfterMove({ from: TeamTaskStatus.Backlog, to: undefined, completedAt: null, now })).toBeNull();

@@ -7,6 +7,10 @@ enum TeamTaskStatus {
     InProgress
     Waiting
     Done
+    // Out of the way for good: finished work, or work that will never be done,
+    // that no longer needs to sit in the Done column. It has no tab of its own;
+    // the All tab's status filter finds it.
+    Archived
 }
 
 model TeamTask {
@@ -28,6 +32,11 @@ model TeamTask {
         completedAt Timestamp?
     }
 
+    // How many tasks: the measure behind the hub's metric tiles.
+    measures {
+        tasks @computed(COUNT())
+    }
+
     actions {
         get getTeamTask(id)
         list listTeamTasks(status?, assignee.id?) {
@@ -40,6 +49,48 @@ model TeamTask {
                 title,
                 description
             )
+        }
+        // The hub's Mine tab: the signed-in person's tasks, otherwise as
+        // listTeamTasks. Named to sort after listTeamTasks: the Console wires a
+        // model's relation pickers to its alphabetically first list tool.
+        list listTeamTasksMine(status?) {
+            @where(teamTask.assignee == ctx.identity.user)
+            @orderBy(createdAt: asc)
+            @sortable(
+                status,
+                targetDate
+            )
+            @searchable(
+                title,
+                description
+            )
+        }
+        // The hub's Overdue tab: open tasks whose target day has gone by. Due
+        // today is not overdue yet, so days are compared rather than instants.
+        list listTeamTasksOverdue(assignee.id?) {
+            @where(BUCKET(teamTask.targetDate, day) < BUCKET(ctx.now, day) && teamTask.status != TeamTaskStatus.Done && teamTask.status != TeamTaskStatus.Archived)
+            @orderBy(targetDate: asc)
+            @sortable(
+                status,
+                targetDate
+            )
+            @searchable(
+                title,
+                description
+            )
+        }
+        // The hub's metric tiles: how many of the signed-in person's tasks are
+        // in each status. No grouping, so each call answers one number, and the
+        // tile narrows it to a status through the action's own where input.
+        aggregate countMyTeamTasks(status?) {
+            @measures(tasks)
+            @where(teamTask.assignee == ctx.identity.user)
+        }
+        // The "Mine overdue" tile: the signed-in person's share of the Overdue
+        // tab, under the same rule as listTeamTasksOverdue.
+        aggregate countMyOverdueTeamTasks() {
+            @measures(tasks)
+            @where(teamTask.assignee == ctx.identity.user && BUCKET(teamTask.targetDate, day) < BUCKET(ctx.now, day) && teamTask.status != TeamTaskStatus.Done && teamTask.status != TeamTaskStatus.Archived)
         }
         // Status is not asked for: every task starts in Backlog and is moved on from
         // there.
@@ -70,12 +121,19 @@ model TeamTask {
         // opening the full edit form. It can change nothing but the status, and
         // keeps completedAt in step with it.
         update moveTeamTask(id) with (status) @function
+        // The Archive task button: puts a task out of the way for good. One
+        // click, nothing to fill in. completedAt is left as it was, so a
+        // finished task keeps the time it was finished (see
+        // lib/teamTaskHelpers.ts for the rule the status-changing actions share).
+        update archiveTeamTask(id) {
+            @set(teamTask.status = TeamTaskStatus.Archived)
+        }
         delete deleteTeamTask(id)
     }
 
     @permission(
         roles: [Operator],
-        actions: [get, list, create, update, delete]
+        actions: [get, list, aggregate, create, update, delete]
     )
 }
 

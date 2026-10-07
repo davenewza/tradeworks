@@ -1,7 +1,7 @@
 {
-  "id": "list-team-tasks",
-  "action_name": "listTeamTasks",
-  "name": "Tasks",
+  "id": "list-team-tasks-mine",
+  "action_name": "listTeamTasksMine",
+  "name": "My tasks",
   "icon": "emoji:\ud83d\udccb",
   "response": {
     "$.pageInfo": {
@@ -91,6 +91,9 @@
     },
     "$.results[*].updatedAt": {
       "visible": false
+    },
+    "$.results[*].assigneeId": {
+      "visible": false
     }
   },
   "pagination": {
@@ -133,25 +136,5 @@
       "tool_id": "delete-team-task",
       "display_order": 5
     }
-  ],
-  "inputs": {
-    "$.where.assignee.id.equals": {
-      "lookup_action": {
-        "tool_id": "list-warehouse-users",
-        "as_dialog": true
-      }
-    },
-    "$.where.assignee.id.oneOf": {
-      "lookup_action": {
-        "tool_id": "list-warehouse-users",
-        "as_dialog": true
-      }
-    },
-    "$.where.assignee.id.notEquals": {
-      "lookup_action": {
-        "tool_id": "list-warehouse-users",
-        "as_dialog": true
-      }
-    }
-  }
+  ]
 }

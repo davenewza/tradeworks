@@ -6,117 +6,280 @@
   },
   {
     "id": "Product.weightedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.weightedFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.weightedLandedCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.averageSalePrice",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.totalSalesValue",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Sale.netAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Sale.taxAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Sale.discountAmount",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.priceInclVat",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.price",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.unitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.unitFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.landedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.channelFees",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.adSpend",
     "display_name": "Ad spend",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.totalCosts",
     "display_name": "Total costs",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.grossProfit",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB", "colourise": "NORMAL" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB",
+        "colourise": "NORMAL"
+      }
+    }
   },
   {
     "id": "ProductPrice.grossProfitMargin",
-    "format": { "number_config": { "mode": "PERCENTAGE", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "PERCENTAGE",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "PriceList.targetAdvertisingRoi",
     "display_name": "Target ad ROI",
-    "format": { "number_config": { "mode": "DECIMAL", "suffix": ":1", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "suffix": ":1",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ProductPrice.targetAdvertisingRoi",
     "display_name": "Target ad ROI",
-    "format": { "number_config": { "mode": "DECIMAL", "suffix": ":1", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "suffix": ":1",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.estimatedMonthlySale",
     "display_name": "Est. monthly sales",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.currentStockCover",
     "display_name": "Current cover",
-    "format": { "number_config": { "mode": "DECIMAL", "suffix": " months", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "suffix": " months",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Product.totalStockCover",
     "display_name": "Total cover",
-    "format": { "number_config": { "mode": "DECIMAL", "suffix": " months", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "suffix": " months",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "Supplier.leadTimeInDays",
     "display_name": "Lead time",
-    "format": { "number_config": { "mode": "DECIMAL", "suffix": " days", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "suffix": " days",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "StockCoverStatus",
     "format": {
       "enum_config": {
         "values": [
-          { "value": "GoodSupply", "display_value": "Good supply", "colour": "green", "display_order": 1 },
-          { "value": "LowSupply", "display_value": "Low supply", "colour": "sunshine", "display_order": 2 },
-          { "value": "InsufficientSupply", "display_value": "Shortfall", "colour": "red", "display_order": 3 },
-          { "value": "Oversupply", "display_value": "Oversupply", "colour": "purple", "display_order": 4 }
+          {
+            "value": "GoodSupply",
+            "display_value": "Good supply",
+            "colour": "green",
+            "display_order": 1
+          },
+          {
+            "value": "LowSupply",
+            "display_value": "Low supply",
+            "colour": "sunshine",
+            "display_order": 2
+          },
+          {
+            "value": "InsufficientSupply",
+            "display_value": "Shortfall",
+            "colour": "red",
+            "display_order": 3
+          },
+          {
+            "value": "Oversupply",
+            "display_value": "Oversupply",
+            "colour": "purple",
+            "display_order": 4
+          }
         ]
       }
     }
@@ -126,9 +289,24 @@
     "format": {
       "enum_config": {
         "values": [
-          { "value": "A", "display_value": "A", "colour": "green", "display_order": 1 },
-          { "value": "B", "display_value": "B", "colour": "blue", "display_order": 2 },
-          { "value": "C", "display_value": "C", "colour": "grey", "display_order": 3 }
+          {
+            "value": "A",
+            "display_value": "A",
+            "colour": "green",
+            "display_order": 1
+          },
+          {
+            "value": "B",
+            "display_value": "B",
+            "colour": "blue",
+            "display_order": 2
+          },
+          {
+            "value": "C",
+            "display_value": "C",
+            "colour": "grey",
+            "display_order": 3
+          }
         ]
       }
     }
@@ -136,33 +314,100 @@
   {
     "id": "CumulativeSales.dailySales",
     "display_name": "Sales on day",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "CumulativeSales.cumulativeSales",
     "display_name": "Cumulative sales",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "CumulativeSales.dayOfMonth",
     "display_name": "Day of month",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "DeliveryStatus",
     "format": {
       "enum_config": {
         "values": [
-          { "value": "Pending", "display_value": "Pending", "colour": "grey", "display_order": 1 },
-          { "value": "InfoReceived", "display_value": "Info received", "colour": "blue", "display_order": 2 },
-          { "value": "InTransit", "display_value": "In transit", "colour": "blue", "display_order": 3 },
-          { "value": "OutForDelivery", "display_value": "Out for delivery", "colour": "sunshine", "display_order": 4 },
-          { "value": "Arrived", "display_value": "Arrived at port", "colour": "sunshine", "display_order": 5 },
-          { "value": "Delivered", "display_value": "Delivered", "colour": "green", "display_order": 6 },
-          { "value": "Exception", "display_value": "Exception", "colour": "red", "display_order": 7 },
-          { "value": "Cancelled", "display_value": "Cancelled", "colour": "grey", "display_order": 8 },
-          { "value": "NotFound", "display_value": "Not found yet", "colour": "purple", "display_order": 9 },
-          { "value": "Unknown", "display_value": "Unknown", "colour": "grey", "display_order": 10 }
+          {
+            "value": "Pending",
+            "display_value": "Pending",
+            "colour": "grey",
+            "display_order": 1
+          },
+          {
+            "value": "InfoReceived",
+            "display_value": "Info received",
+            "colour": "blue",
+            "display_order": 2
+          },
+          {
+            "value": "InTransit",
+            "display_value": "In transit",
+            "colour": "blue",
+            "display_order": 3
+          },
+          {
+            "value": "OutForDelivery",
+            "display_value": "Out for delivery",
+            "colour": "sunshine",
+            "display_order": 4
+          },
+          {
+            "value": "Arrived",
+            "display_value": "Arrived at port",
+            "colour": "sunshine",
+            "display_order": 5
+          },
+          {
+            "value": "Delivered",
+            "display_value": "Delivered",
+            "colour": "green",
+            "display_order": 6
+          },
+          {
+            "value": "Exception",
+            "display_value": "Exception",
+            "colour": "red",
+            "display_order": 7
+          },
+          {
+            "value": "Cancelled",
+            "display_value": "Cancelled",
+            "colour": "grey",
+            "display_order": 8
+          },
+          {
+            "value": "NotFound",
+            "display_value": "Not found yet",
+            "colour": "purple",
+            "display_order": 9
+          },
+          {
+            "value": "Unknown",
+            "display_value": "Unknown",
+            "colour": "grey",
+            "display_order": 10
+          }
         ]
       }
     }
@@ -172,8 +417,18 @@
     "format": {
       "enum_config": {
         "values": [
-          { "value": "AirCourier", "display_value": "Air courier", "colour": "blue", "display_order": 1 },
-          { "value": "SeaFreight", "display_value": "Sea freight", "colour": "purple", "display_order": 2 }
+          {
+            "value": "AirCourier",
+            "display_value": "Air courier",
+            "colour": "blue",
+            "display_order": 1
+          },
+          {
+            "value": "SeaFreight",
+            "display_value": "Sea freight",
+            "colour": "purple",
+            "display_order": 2
+          }
         ]
       }
     }
@@ -183,9 +438,21 @@
     "format": {
       "enum_config": {
         "values": [
-          { "value": "Fedex", "display_value": "FedEx", "display_order": 1 },
-          { "value": "Dhl", "display_value": "DHL", "display_order": 2 },
-          { "value": "Ups", "display_value": "UPS", "display_order": 3 }
+          {
+            "value": "Fedex",
+            "display_value": "FedEx",
+            "display_order": 1
+          },
+          {
+            "value": "Dhl",
+            "display_value": "DHL",
+            "display_order": 2
+          },
+          {
+            "value": "Ups",
+            "display_value": "UPS",
+            "display_order": 3
+          }
         ]
       }
     }
@@ -193,17 +460,42 @@
   {
     "id": "SupplierDelivery.totalEvents",
     "display_name": "Tracking events",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ChannelShipmentStatus",
     "format": {
       "enum_config": {
         "values": [
-          { "value": "Open", "display_value": "Open", "colour": "blue", "display_order": 1 },
-          { "value": "Shipped", "display_value": "Shipped", "colour": "sunshine", "display_order": 2 },
-          { "value": "Received", "display_value": "Received", "colour": "green", "display_order": 3 },
-          { "value": "Cancelled", "display_value": "Cancelled", "colour": "grey", "display_order": 4 }
+          {
+            "value": "Open",
+            "display_value": "Open",
+            "colour": "blue",
+            "display_order": 1
+          },
+          {
+            "value": "Shipped",
+            "display_value": "Shipped",
+            "colour": "sunshine",
+            "display_order": 2
+          },
+          {
+            "value": "Received",
+            "display_value": "Received",
+            "colour": "green",
+            "display_order": 3
+          },
+          {
+            "value": "Cancelled",
+            "display_value": "Cancelled",
+            "colour": "grey",
+            "display_order": 4
+          }
         ]
       }
     }
@@ -211,51 +503,116 @@
   {
     "id": "ChannelShipment.totalLines",
     "display_name": "Lines",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ChannelShipment.matchedLines",
     "display_name": "Matched",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "ChannelShipment.totalUnits",
     "display_name": "Units",
-    "format": { "number_config": { "mode": "DECIMAL", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "DECIMAL",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "LabelStockSize",
     "format": {
       "enum_config": {
         "values": [
-          { "value": "Size40x25", "display_value": "40 × 25 mm", "display_order": 1 },
-          { "value": "Size50x25", "display_value": "50 × 25 mm", "display_order": 2 },
-          { "value": "Size50x30", "display_value": "50 × 30 mm", "display_order": 3 },
-          { "value": "Size67x25", "display_value": "66.7 × 25.4 mm", "display_order": 4 },
-          { "value": "Size100x50", "display_value": "100 × 50 mm", "display_order": 5 }
+          {
+            "value": "Size40x25",
+            "display_value": "40 \u00d7 25 mm",
+            "display_order": 1
+          },
+          {
+            "value": "Size50x25",
+            "display_value": "50 \u00d7 25 mm",
+            "display_order": 2
+          },
+          {
+            "value": "Size50x30",
+            "display_value": "50 \u00d7 30 mm",
+            "display_order": 3
+          },
+          {
+            "value": "Size67x25",
+            "display_value": "66.7 \u00d7 25.4 mm",
+            "display_order": 4
+          },
+          {
+            "value": "Size100x50",
+            "display_value": "100 \u00d7 50 mm",
+            "display_order": 5
+          }
         ]
       }
     }
   },
   {
     "id": "SupplierBillLine.unitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "SupplierBillLine.unitFreightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "SupplierBillLine.landedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "SupplierBillLine.freightIn",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "SupplierBillLine.extendedUnitCost",
-    "format": { "number_config": { "mode": "CURRENCY", "currency_code": "ZAR", "locale": "en-GB" } }
+    "format": {
+      "number_config": {
+        "mode": "CURRENCY",
+        "currency_code": "ZAR",
+        "locale": "en-GB"
+      }
+    }
   },
   {
     "id": "TeamTask.status",
@@ -280,6 +637,11 @@
             "value": "Done",
             "colour": "green",
             "display_order": 4
+          },
+          {
+            "value": "Archived",
+            "colour": "pale",
+            "display_order": 5
           }
         ]
       }
@@ -313,6 +675,12 @@
             "display_value": "Done",
             "colour": "green",
             "display_order": 5
+          },
+          {
+            "value": "Archived",
+            "display_value": "Archived",
+            "colour": "pale",
+            "display_order": 6
           }
         ]
       }

@@ -3,6 +3,73 @@
   "type": "hub",
   "model_name": "TeamTask",
   "title": "Tasks",
+  "metrics": [
+    {
+      "id": "my-backlog",
+      "label": "Mine in backlog",
+      "display_order": 0,
+      "aggregate": {
+        "action_name": "countMyTeamTasks",
+        "measure": "tasks",
+        "inputs": {
+          "where": {
+            "status": {
+              "equals": "Backlog"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "my-in-progress",
+      "label": "Mine in progress",
+      "display_order": 1,
+      "aggregate": {
+        "action_name": "countMyTeamTasks",
+        "measure": "tasks",
+        "inputs": {
+          "where": {
+            "status": {
+              "equals": "InProgress"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "my-waiting",
+      "label": "Mine waiting",
+      "display_order": 2,
+      "aggregate": {
+        "action_name": "countMyTeamTasks",
+        "measure": "tasks",
+        "inputs": {
+          "where": {
+            "status": {
+              "equals": "Waiting"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "my-overdue",
+      "label": "Mine overdue",
+      "display_order": 3,
+      "aggregate": {
+        "action_name": "countMyOverdueTeamTasks",
+        "measure": "tasks"
+      }
+    },
+    {
+      "id": "count-my-team-tasks.tasks",
+      "deleted": true
+    },
+    {
+      "id": "count-my-overdue-team-tasks.tasks",
+      "deleted": true
+    }
+  ],
   "tabs": [
     {
       "id": "list-team-tasks",
@@ -10,10 +77,20 @@
       "display_order": 0
     },
     {
+      "id": "list-team-tasks-mine",
+      "title": "Mine",
+      "display_order": 1
+    },
+    {
+      "id": "list-team-tasks-overdue",
+      "title": "Overdue",
+      "display_order": 2
+    },
+    {
       "id": "backlog",
       "title": "Backlog",
       "tool_id": "list-team-tasks",
-      "display_order": 1,
+      "display_order": 3,
       "inputs": {
         "where": {
           "status": {
@@ -26,7 +103,7 @@
       "id": "in-progress",
       "title": "In progress",
       "tool_id": "list-team-tasks",
-      "display_order": 2,
+      "display_order": 4,
       "inputs": {
         "where": {
           "status": {
@@ -39,7 +116,7 @@
       "id": "waiting",
       "title": "Waiting",
       "tool_id": "list-team-tasks",
-      "display_order": 3,
+      "display_order": 5,
       "inputs": {
         "where": {
           "status": {
@@ -52,7 +129,7 @@
       "id": "done",
       "title": "Done",
       "tool_id": "list-team-tasks",
-      "display_order": 4,
+      "display_order": 6,
       "inputs": {
         "where": {
           "status": {
