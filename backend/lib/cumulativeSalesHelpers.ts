@@ -10,6 +10,9 @@ const INSERT_CHUNK = 500;
 // the runtime's ICU data.
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// The app's Kysely instance, or a transaction opened on it.
+type Database = ReturnType<typeof useDatabase>;
+
 // One day's realized sales for a channel/brand pair, straight off the Sale table.
 export interface DailySalesAggregate {
     channelId: string;
@@ -164,9 +167,13 @@ export function buildCumulativeSeries(
 // Kysely per the project's DB-query convention. The date is read back as text
 // and parsed as UTC: node-postgres turns a `date` column into a Date at *local*
 // midnight, which would shift every point by a day on a non-UTC host.
-export async function loadDailySalesAggregates(from: Date, toExclusive: Date): Promise<DailySalesAggregate[]> {
-    const db = useDatabase();
-
+//
+// Takes the executor so rebuildMonth can read inside its locked transaction.
+export async function loadDailySalesAggregates(
+    from: Date,
+    toExclusive: Date,
+    db: Database = useDatabase(),
+): Promise<DailySalesAggregate[]> {
     // Query the DB's snake_case columns but read camelCase result keys: Keel's
     // Kysely instance runs the CamelCasePlugin, which rewrites result columns
     // (channel_id → channelId) even for raw SQL.
@@ -202,13 +209,30 @@ export async function loadDailySalesAggregates(from: Date, toExclusive: Date): P
 // or been removed, and the transaction keeps the month from being briefly empty
 // while a chart is reading it. A month with no sales legitimately ends up with
 // zero rows.
+//
+// Always the whole month, never just the pairs a sale touched: the month in
+// progress runs every pair up to today, so rebuilding one pair alone would leave
+// the others stopping a day short and break the density the chart sums on.
+//
+// Rebuilds of the same month are serialised on an advisory lock. They overlap
+// routinely — every webhook delivery triggers one, and Zoho often sends the same
+// invoice twice within ~100ms — and unserialised, each transaction's DELETE
+// misses the rows the other has just inserted, so the second INSERT dies on the
+// unique key. The sales are read AFTER the lock is taken, so a rebuild that
+// queued behind another still sees every sale committed before it ran, and the
+// last rebuild to finish always reflects the latest data.
 export async function rebuildMonth(monthStart: Date, today: Date, now: Date): Promise<number> {
     const nextMonth = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
-    const aggregates = await loadDailySalesAggregates(monthStart, nextMonth);
-    const points = buildCumulativeSeries(aggregates, today);
+    const monthLockKey = monthStart.getUTCFullYear() * 100 + monthStart.getUTCMonth() + 1;
 
     const db = useDatabase();
-    await db.transaction().execute(async (trx) => {
+    return await db.transaction().execute(async (trx) => {
+        // Released automatically at commit or rollback.
+        await sql`select pg_advisory_xact_lock(hashtext('cumulative_sales'), ${monthLockKey}::int)`.execute(trx);
+
+        const aggregates = await loadDailySalesAggregates(monthStart, nextMonth, trx);
+        const points = buildCumulativeSeries(aggregates, today);
+
         // Table names are snake_case in Kysely's schema but column names stay
         // camelCase — the CamelCasePlugin converts only the columns.
         //
@@ -232,7 +256,30 @@ export async function rebuildMonth(monthStart: Date, today: Date, now: Date): Pr
             }));
             await trx.insertInto('cumulative_sales').values(chunk).execute();
         }
-    });
 
-    return points.length;
+        return points.length;
+    });
+}
+
+// The months (UTC month starts) a set of calendar days ('YYYY-MM-DD') fall in,
+// each once, oldest first.
+export function monthStartsOfDays(days: Iterable<string>): Date[] {
+    const months = [...new Set([...days].map((day) => day.slice(0, 7)))].sort();
+    return months.map((month) => new Date(`${month}-01T00:00:00.000Z`));
+}
+
+// Rebuild every month the given calendar days fall in. This is how sale writers
+// keep the worm current: they report the days their writes landed on (and moved
+// off), and those months are rebuilt straight away rather than waiting for the
+// scheduled refresh.
+export async function rebuildMonthsForDays(
+    days: Iterable<string>,
+    now: Date,
+): Promise<{ month: string; rows: number }[]> {
+    const rebuilt: { month: string; rows: number }[] = [];
+    for (const monthStart of monthStartsOfDays(days)) {
+        const rows = await rebuildMonth(monthStart, now, now);
+        rebuilt.push({ month: formatDay(monthStart).slice(0, 7), rows });
+    }
+    return rebuilt;
 }

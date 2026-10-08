@@ -2,14 +2,17 @@ import { ScheduledRebuildCumulativeSales } from '@teamkeel/sdk';
 import { formatDay, monthStartOf, rebuildMonth } from '../lib/cumulativeSalesHelpers';
 
 // Months rebuilt on every run: the one in progress, plus the one before it.
-// The previous month stays in scope because invoices keep being edited in Zoho
-// for a while after month end, and each SyncSales run can revise sales already
-// dated to it. Anything older needs the manual RebuildCumulativeSales flow.
+// The previous month stays in scope so it is closed out to its last day once
+// the month turns, and because invoices keep being edited in Zoho for a while
+// after month end. Anything older needs the manual RebuildCumulativeSales flow.
 const MONTHS_REBUILT = 2;
 
-// Keeps the sales worm current. Runs 30 minutes past every 6th hour, just behind
-// ScheduledSyncSales, so it derives from sales that run has already written.
-// Pure local SQL — no Zoho calls, so it never eats into the shared daily quota.
+// Safety net for the sales worm. The invoice webhook and the sales syncs
+// rebuild the months they write into as they go, so this isn't what keeps the
+// worm current. It rolls the month in progress forward to today even when
+// nothing has sold (and closes last month out on the 1st), and repairs any
+// rebuild that failed in the webhook. Pure local SQL — no Zoho calls, so it
+// never eats into the shared daily quota.
 export default ScheduledRebuildCumulativeSales({}, async (ctx) => {
     const now = new Date();
     const thisMonth = monthStartOf(now);

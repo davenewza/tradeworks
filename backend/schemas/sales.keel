@@ -101,8 +101,11 @@ flow ScheduledSyncSales {
 // past month leaves the daily chart empty. Its title says which month it shows,
 // and the worm is what the Month filter is really there for.
 //
-// Rebuilt wholesale per month by RebuildCumulativeSales — never incrementally
-// updated, so a re-run always converges on the current Sale data.
+// Always rebuilt a whole month at a time, never incrementally updated, so a
+// re-run always converges on the current Sale data. Rebuilds happen as sales
+// land: the invoice webhook and both sales syncs rebuild every month they wrote
+// into, so the worm trails Zoho by seconds rather than hours.
+// ScheduledRebuildCumulativeSales and RebuildCumulativeSales cover the rest.
 model CumulativeSales {
     fields {
         channel Channel
@@ -151,8 +154,9 @@ model CumulativeSales {
     )
 }
 
-// Manual rebuild over an arbitrary range — for backfilling history, or after a
-// correction in Zoho lands outside the window the scheduled job covers.
+// Manual rebuild over an arbitrary range — for backfilling history, or to repair
+// a month older than the scheduled job covers whose rebuild failed when its
+// sales landed.
 // Cheap: pure local SQL over the Sale table, no Zoho API calls, so it doesn't
 // touch the shared daily quota.
 flow RebuildCumulativeSales {
@@ -163,8 +167,10 @@ flow RebuildCumulativeSales {
     @permission(roles: [Operator])
 }
 
-// Runs 30 minutes past every 6th hour, so it lands after ScheduledSyncSales
-// (every 6 hours) has had time to write the sales it derives from.
+// Safety net behind the rebuilds the webhook and syncs trigger. It rolls the
+// month in progress forward to today even when nothing has sold (and closes
+// last month out on the 1st), and repairs any rebuild that failed in the
+// webhook.
 flow ScheduledRebuildCumulativeSales {
     @schedule("30 */6 * * *")
     @permission(roles: [Operator])

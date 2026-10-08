@@ -2,9 +2,9 @@ import { RebuildCumulativeSales } from '@teamkeel/sdk';
 import { formatDay, monthsInRange, rebuildMonth } from '../lib/cumulativeSalesHelpers';
 
 // Manual rebuild of the sales worm over a date range — used to backfill history,
-// or to pick up a Zoho correction that landed outside the window the scheduled
-// job covers. Reads only local Sale rows, so it costs nothing against the shared
-// Zoho API quota and is safe to re-run.
+// or to repair a month older than the scheduled job covers whose rebuild failed
+// when its sales landed. Reads only local Sale rows, so it costs nothing against
+// the shared Zoho API quota and is safe to re-run.
 export default RebuildCumulativeSales({}, async (ctx, inputs) => {
     const now = new Date();
     const months = monthsInRange(inputs.start, inputs.end);
