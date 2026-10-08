@@ -10,6 +10,7 @@ import {
     monthStartOf,
     monthsInRange,
     rebuildMonth,
+    rebuildMonthsForDays,
     round2,
     type DailySalesAggregate,
 } from './cumulativeSalesHelpers';
@@ -439,5 +440,56 @@ describe('rebuildMonth', () => {
 
         const written = await rebuildMonth(utc('2026-08-01'), TODAY, TODAY);
         expect(written).toBe(TODAY.getUTCDate());
+    });
+
+    // Rebuilds are triggered by each webhook delivery, and Zoho routinely sends
+    // the same invoice twice within ~100ms — so two rebuilds of one month
+    // overlapping is the normal case, not an edge case. Unserialised, each
+    // transaction's DELETE misses the rows the other has just inserted, and the
+    // second INSERT dies on the unique key.
+    test('concurrent rebuilds of the same month serialise rather than colliding', async () => {
+        const { channel, product } = await seed();
+        await sale(channel.id, product.id, utc('2026-07-05'), 100, 'a');
+
+        await Promise.all(Array.from({ length: 5 }, () => rebuildMonth(utc('2026-07-01'), TODAY, TODAY)));
+
+        const rows = await models.cumulativeSales.findMany({});
+        expect(rows).toHaveLength(31);
+        expect(Number(rows.find((r) => r.dayOfMonth === 31)!.cumulativeSales)).toBe(100);
+    });
+});
+
+describe('rebuildMonthsForDays', () => {
+    beforeEach(resetDatabase);
+
+    test('rebuilds each month the days fall in, once, in order', async () => {
+        const brand = await models.brand.create({ name: 'Brand A' });
+        const channel = await models.channel.create({ name: 'Channel 1' });
+        const product = await models.product.create({ name: 'PA', sku: 'CUM-A', brandId: brand.id });
+        for (const [ref, day] of [['a', '2026-06-10'], ['b', '2026-07-05']]) {
+            await models.sale.create({
+                invoiceNumber: `INV-${ref}`,
+                lineItemId: ref,
+                lineKey: ref,
+                channelId: channel.id,
+                productId: product.id,
+                date: utc(day),
+                quantity: 1,
+                price: 0,
+                netAmount: 10,
+            });
+        }
+
+        const rebuilt = await rebuildMonthsForDays(['2026-07-31', '2026-06-10', '2026-07-05'], TODAY);
+
+        expect(rebuilt).toEqual([
+            { month: '2026-06', rows: 30 },
+            { month: '2026-07', rows: 31 },
+        ]);
+        expect(await models.cumulativeSales.findMany({})).toHaveLength(61);
+    });
+
+    test('does nothing for no days', async () => {
+        expect(await rebuildMonthsForDays([], TODAY)).toEqual([]);
     });
 });

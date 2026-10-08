@@ -7,6 +7,8 @@ import {
     isZohoDailyRateLimit,
     partitionInvoicesByChange,
     isUniqueViolation,
+    isSameModifiedTime,
+    normalizeWebhookInvoice,
 } from './zohoSalesHelpers';
 
 beforeEach(resetDatabase);
@@ -24,20 +26,20 @@ async function seedProduct(sku = 'RL-NA396') {
 
 // Build a one-line invoice; `lineItemId` is the (volatile) Zoho id, `orderItemId`
 // the stable source id carried in the line description.
-function invoice(lineItemId: string, opts: { managed?: boolean; orderItemId?: string; qty?: number; modified?: string } = {}): ZohoInvoice {
+function invoice(lineItemId: string, opts: { managed?: boolean; orderItemId?: string; qty?: number; modified?: string; date?: string; sku?: string } = {}): ZohoInvoice {
     const custom_fields: any[] = [];
     if (opts.managed) custom_fields.push({ customfield_id: '1', label: 'ManagedByWebhook', value: 'true' });
     return {
         invoice_id: 'inv1',
         invoice_number: 'IT100',
-        date: '2026-01-15',
+        date: opts.date ?? '2026-01-15',
         status: 'paid',
         last_modified_time: opts.modified,
         custom_fields,
         line_items: [
             {
                 line_item_id: lineItemId,
-                sku: 'RL-NA396',
+                sku: opts.sku ?? 'RL-NA396',
                 name: 'Kit',
                 quantity: opts.qty ?? 1,
                 rate: 299,
@@ -141,6 +143,56 @@ describe('processInvoiceLineItems dedup', () => {
     });
 });
 
+// The days a write touched decide which cumulative sales months get rebuilt, so
+// a sale that moves to another month must report the day it left as well —
+// otherwise its old month keeps showing revenue that is no longer there.
+describe('processInvoiceLineItems touched days', () => {
+    test('reports the invoice date for a newly created sale', async () => {
+        await seedProduct();
+        const r = await processInvoiceLineItems(invoice('LINE-A'), new Map());
+
+        expect(r.touchedDays).toEqual(['2026-01-15']);
+    });
+
+    test('reports both the old and the new day when an invoice date moves', async () => {
+        await seedProduct();
+        await processInvoiceLineItems(invoice('LINE-A', { date: '2026-01-31' }), new Map());
+
+        const r = await processInvoiceLineItems(invoice('LINE-A', { date: '2026-02-01' }), new Map());
+
+        expect(r.updated).toBe(1);
+        expect([...r.touchedDays].sort()).toEqual(['2026-01-31', '2026-02-01']);
+    });
+
+    // The batch syncs hand in existing sales pre-fetched through the models API,
+    // whose Date fields come back at local midnight — the old day must still be
+    // read as the stored calendar day, not shifted by the host's UTC offset.
+    test('reads the old day correctly from a pre-fetched existing sale', async () => {
+        const product = await seedProduct();
+        await processInvoiceLineItems(invoice('LINE-A', { date: '2026-03-01' }), new Map());
+
+        const [stored] = await models.sale.findMany({ where: {} });
+        const existingSalesMap = new Map([
+            [`IT100-${stored.lineKey}`, { id: stored.id, quantity: stored.quantity, price: stored.price, productId: stored.productId, date: stored.date }],
+        ]);
+
+        const r = await processInvoiceLineItems(invoice('LINE-A', { date: '2026-04-10' }), new Map(), {
+            productMap: new Map([['RL-NA396', { id: product.id }]]),
+            existingSalesMap,
+        });
+
+        expect([...r.touchedDays].sort()).toEqual(['2026-03-01', '2026-04-10']);
+    });
+
+    test('reports nothing for a line that was not persisted', async () => {
+        await seedProduct();
+        const r = await processInvoiceLineItems(invoice('LINE-A', { sku: 'NO-SUCH-SKU' }), new Map());
+
+        expect(r.skipped).toBe(1);
+        expect(r.touchedDays).toEqual([]);
+    });
+});
+
 describe('isUniqueViolation', () => {
     test('true for a Postgres duplicate-key error', () => {
         expect(
@@ -193,5 +245,57 @@ describe('partitionInvoicesByChange', () => {
         );
         expect(skipped).toBe(0);
         expect(toFetch).toHaveLength(2);
+    });
+
+    // A webhook delivery stores the modified time in ISO form; the list API
+    // spells the same instant Zoho's way. Comparing strings made every invoice
+    // the webhook had written look changed, so the scheduled sync re-fetched
+    // its detail and spent shared Zoho quota on data it already held.
+    test('skips an invoice whose stored time is the same instant spelled differently', () => {
+        const stored = new Map<string, string | null>([['A', '2026-01-01T02:00:00.000Z']]);
+        const { toFetch, skipped } = partitionInvoicesByChange(
+            [{ invoice_number: 'A', last_modified_time: '2026-01-01T04:00:00+0200' }],
+            stored
+        );
+        expect(skipped).toBe(1);
+        expect(toFetch).toHaveLength(0);
+    });
+});
+
+describe('isSameModifiedTime', () => {
+    test('matches identical strings, and the same instant in different spellings', () => {
+        expect(isSameModifiedTime('2026-10-07T06:20:37+0200', '2026-10-07T06:20:37+0200')).toBe(true);
+        expect(isSameModifiedTime('2026-10-07T04:20:37.000Z', '2026-10-07T06:20:37+0200')).toBe(true);
+        expect(isSameModifiedTime('2026-10-07T06:20:37.000+02:00', '2026-10-07T06:20:37+0200')).toBe(true);
+    });
+
+    test('does not match a different instant, or an unparseable stored value', () => {
+        expect(isSameModifiedTime('2026-10-07T04:20:38.000Z', '2026-10-07T06:20:37+0200')).toBe(false);
+        expect(isSameModifiedTime('not a time', '2026-10-07T06:20:37+0200')).toBe(false);
+    });
+});
+
+describe('normalizeWebhookInvoice', () => {
+    test('turns the Dates Keel parsed out of the payload back into strings', () => {
+        // What Keel's input parser makes of "2026-01-15" and "2026-01-15T11:00:00+0200".
+        const parsed = {
+            ...invoice('LINE-A'),
+            date: new Date('2026-01-15'),
+            last_modified_time: new Date('2026-01-15T11:00:00+0200'),
+        } as unknown as ZohoInvoice;
+
+        const normalized = normalizeWebhookInvoice(parsed);
+
+        expect(normalized.date).toBe('2026-01-15');
+        expect(normalized.last_modified_time).toBe('2026-01-15T09:00:00.000Z');
+        expect(normalized.line_items).toBe(parsed.line_items);
+    });
+
+    test('leaves string values as they are', () => {
+        const raw = invoice('LINE-A', { modified: '2026-01-15T11:00:00+0200' });
+        const normalized = normalizeWebhookInvoice(raw);
+
+        expect(normalized.date).toBe('2026-01-15');
+        expect(normalized.last_modified_time).toBe('2026-01-15T11:00:00+0200');
     });
 });
