@@ -101,9 +101,7 @@ model ProductPrice {
     }
 
     actions {
-        get getProductPrice(id) {
-            @embed(product)
-        }
+        get getProductPrice(id)
         create createProductPrice() with (product.id, priceList.id, priceInclVat)
         list listProductPrices(
             priceList.id,
