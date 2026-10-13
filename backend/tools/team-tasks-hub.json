@@ -60,14 +60,6 @@
         "action_name": "countMyOverdueTeamTasks",
         "measure": "tasks"
       }
-    },
-    {
-      "id": "count-my-team-tasks.tasks",
-      "deleted": true
-    },
-    {
-      "id": "count-my-overdue-team-tasks.tasks",
-      "deleted": true
     }
   ],
   "tabs": [
