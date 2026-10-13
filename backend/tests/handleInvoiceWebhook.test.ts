@@ -14,8 +14,21 @@
 import { actions, models, resetDatabase } from '@teamkeel/testing';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { partitionInvoicesByChange } from '../lib/zohoSalesHelpers';
+import { daysInMonth, formatDay, monthLabelOf, monthStartOf } from '../lib/cumulativeSalesHelpers';
 
 beforeEach(resetDatabase);
+
+// The worm only holds the month in progress and the two before it, so its
+// tests date invoices against the real clock — the action runs in the
+// functions runtime, out of reach of fake timers.
+const THIS_MONTH = monthStartOf(new Date());
+const monthsAgo = (n: number) => new Date(Date.UTC(THIS_MONTH.getUTCFullYear(), THIS_MONTH.getUTCMonth() - n, 1));
+// Closed months, so their series run to the last day.
+const LAST_MONTH = monthsAgo(1);
+const TWO_MONTHS_AGO = monthsAgo(2);
+const monthKey = (month: Date) => formatDay(month).slice(0, 7);
+const dayIn = (month: Date, day: number) =>
+    formatDay(new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), day)));
 
 async function seedProduct(sku = 'RL-NA396') {
     const brand = await models.brand.create({ name: 'B' });
@@ -109,19 +122,41 @@ describe('handleInvoiceWebhook', () => {
             invoice: {
                 invoice_id: 'zoho-3',
                 invoice_number: 'INV-300',
-                date: '2026-01-15',
+                date: dayIn(LAST_MONTH, 15),
                 status: 'paid',
                 line_items: [lineItem('LINE-A')],
             },
         });
-        expect(result.cumulativeMonthsRebuilt).toEqual(['2026-01']);
+        expect(result.cumulativeMonthsRebuilt).toEqual([monthKey(LAST_MONTH)]);
 
         const rows = await models.cumulativeSales.findMany({});
-        // A closed month, so the series runs to the 31st.
-        expect(rows).toHaveLength(31);
+        const lastDay = daysInMonth(LAST_MONTH);
+        // A closed month, so the series runs to its last day.
+        expect(rows).toHaveLength(lastDay);
         expect(Number(rows.find((r) => r.dayOfMonth === 14)!.cumulativeSales)).toBe(0);
         expect(Number(rows.find((r) => r.dayOfMonth === 15)!.cumulativeSales)).toBe(260);
-        expect(Number(rows.find((r) => r.dayOfMonth === 31)!.cumulativeSales)).toBe(260);
+        expect(Number(rows.find((r) => r.dayOfMonth === lastDay)!.cumulativeSales)).toBe(260);
+    });
+
+    // Invoices from long ago still get edited in Zoho. Rebuilding their month
+    // would put it back on the worm beside the current three.
+    test('an invoice dated before the worm window leaves the worm alone', async () => {
+        await seedProduct();
+
+        const result = await actions.handleInvoiceWebhook({
+            invoice: {
+                invoice_id: 'zoho-7',
+                invoice_number: 'INV-700',
+                date: dayIn(monthsAgo(3), 15),
+                status: 'paid',
+                line_items: [lineItem('LINE-A')],
+            },
+        });
+
+        // The sale itself is still recorded.
+        expect(result.created).toBe(1);
+        expect(result.cumulativeMonthsRebuilt).toEqual([]);
+        expect(await models.cumulativeSales.findMany({})).toHaveLength(0);
     });
 
     test('an invoice re-dated into another month moves its revenue across', async () => {
@@ -138,16 +173,17 @@ describe('handleInvoiceWebhook', () => {
                 },
             });
 
-        await deliver('2026-01-31');
-        const moved = await deliver('2026-02-01');
-        expect(moved.cumulativeMonthsRebuilt).toEqual(['2026-01', '2026-02']);
+        await deliver(dayIn(TWO_MONTHS_AGO, daysInMonth(TWO_MONTHS_AGO)));
+        const moved = await deliver(dayIn(LAST_MONTH, 1));
+        expect(moved.cumulativeMonthsRebuilt).toEqual([monthKey(TWO_MONTHS_AGO), monthKey(LAST_MONTH)]);
 
         const rows = await models.cumulativeSales.findMany({});
-        // January is emptied out entirely, not left holding stale revenue.
-        expect(rows.filter((r) => r.monthLabel === 'Jan 2026')).toHaveLength(0);
-        const february = rows.filter((r) => r.monthLabel === 'Feb 2026');
-        expect(february).toHaveLength(28);
-        expect(Number(february.find((r) => r.dayOfMonth === 28)!.cumulativeSales)).toBe(260);
+        // The month it left is emptied out entirely, not left holding stale revenue.
+        expect(rows.filter((r) => r.monthLabel === monthLabelOf(TWO_MONTHS_AGO))).toHaveLength(0);
+        const lastDay = daysInMonth(LAST_MONTH);
+        const landedIn = rows.filter((r) => r.monthLabel === monthLabelOf(LAST_MONTH));
+        expect(landedIn).toHaveLength(lastDay);
+        expect(Number(landedIn.find((r) => r.dayOfMonth === lastDay)!.cumulativeSales)).toBe(260);
     });
 
     // Zoho often sends the same invoice twice within ~100ms; both deliveries
@@ -160,7 +196,7 @@ describe('handleInvoiceWebhook', () => {
                 invoice: {
                     invoice_id: 'zoho-5',
                     invoice_number: 'INV-500',
-                    date: '2026-01-15',
+                    date: dayIn(LAST_MONTH, 15),
                     status: 'paid',
                     line_items: [lineItem('LINE-A')],
                 },
@@ -168,12 +204,13 @@ describe('handleInvoiceWebhook', () => {
 
         const results = await Promise.all([delivery(), delivery(), delivery()]);
         for (const result of results) {
-            expect(result.cumulativeMonthsRebuilt).toEqual(['2026-01']);
+            expect(result.cumulativeMonthsRebuilt).toEqual([monthKey(LAST_MONTH)]);
         }
 
         const rows = await models.cumulativeSales.findMany({});
-        expect(rows).toHaveLength(31);
-        expect(Number(rows.find((r) => r.dayOfMonth === 31)!.cumulativeSales)).toBe(260);
+        const lastDay = daysInMonth(LAST_MONTH);
+        expect(rows).toHaveLength(lastDay);
+        expect(Number(rows.find((r) => r.dayOfMonth === lastDay)!.cumulativeSales)).toBe(260);
     });
 
     // Keel parses the payload's last_modified_time into a Date before the

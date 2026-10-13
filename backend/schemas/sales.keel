@@ -101,6 +101,14 @@ flow ScheduledSyncSales {
 // past month leaves the daily chart empty. Its title says which month it shows,
 // and the worm is what the Month filter is really there for.
 //
+// Holds only the worm's window: the month in progress and the two before it
+// (WORM_MONTHS in lib/cumulativeSalesHelpers). The worm plots every month in
+// the table, so the table is what limits it to three. The window can't sit on
+// the chart: Cube's relative ranges have no "this month and the two before",
+// and a dashboard filter's default can only be fixed dates. Rebuilds never
+// write a month outside the window, and the scheduled refresh deletes the
+// oldest month once it ages out.
+//
 // Always rebuilt a whole month at a time, never incrementally updated, so a
 // re-run always converges on the current Sale data. Rebuilds happen as sales
 // land: the invoice webhook and both sales syncs rebuild every month they wrote
@@ -154,24 +162,22 @@ model CumulativeSales {
     )
 }
 
-// Manual rebuild over an arbitrary range — for backfilling history, or to repair
-// a month older than the scheduled job covers whose rebuild failed when its
-// sales landed.
+// Manual run of the scheduled refresh below, for when it can't wait for the
+// next run — e.g. to repair a month whose rebuild failed when its sales landed.
+// Takes no range: the table only ever holds the worm's window.
 // Cheap: pure local SQL over the Sale table, no Zoho API calls, so it doesn't
 // touch the shared daily quota.
 flow RebuildCumulativeSales {
-    inputs {
-        start Date
-        end Date
-    }
     @permission(roles: [Operator])
 }
 
-// Safety net behind the rebuilds the webhook and syncs trigger. It rolls the
-// month in progress forward to today even when nothing has sold (and closes
-// last month out on the 1st), and repairs any rebuild that failed in the
-// webhook.
+// Safety net behind the rebuilds the webhook and syncs trigger. Rebuilds every
+// month in the worm's window, rolling the month in progress forward to today
+// even when nothing has sold and repairing any rebuild that failed in the
+// webhook, then deletes rows from any month outside it. On the hour, so the
+// run at midnight UTC turns the month over: last month closes out and the
+// oldest month leaves the chart.
 flow ScheduledRebuildCumulativeSales {
-    @schedule("30 */6 * * *")
+    @schedule("0 */6 * * *")
     @permission(roles: [Operator])
 }

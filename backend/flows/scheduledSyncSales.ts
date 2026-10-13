@@ -10,7 +10,7 @@ import {
     isZohoDailyRateLimit,
     partitionInvoicesByChange,
 } from '../lib/zohoSalesHelpers';
-import { formatDay, monthStartsOfDays, rebuildMonth } from '../lib/cumulativeSalesHelpers';
+import { formatDay, rebuildMonth, wormMonthsOfDays } from '../lib/cumulativeSalesHelpers';
 
 const LOOKBACK_HOURS = 48;
 
@@ -200,10 +200,10 @@ export default ScheduledSyncSales({}, async (ctx) => {
     // Bring the sales worm up to date with whatever this run wrote, instead of
     // leaving it for the scheduled refresh. Before the failure check below, so
     // the sales that did land show even if the run then fails; and after a
-    // rate-limit pause too, for the same reason. A step per month keeps a long
-    // backfill resumable. Pure local SQL — no Zoho calls.
+    // rate-limit pause too, for the same reason. Only months on the worm are
+    // rebuilt, a step each. Pure local SQL — no Zoho calls.
     const rebuiltMonths: string[] = [];
-    for (const monthStart of monthStartsOfDays(touchedDays)) {
+    for (const monthStart of wormMonthsOfDays(touchedDays, now)) {
         const monthKey = formatDay(monthStart).slice(0, 7);
         await ctx.step(`rebuild-cumulative-${monthKey}`, async () => {
             return await rebuildMonth(monthStart, now, now);
