@@ -6,12 +6,14 @@ import {
     buildCumulativeSeries,
     daysInMonth,
     loadDailySalesAggregates,
+    isWormMonth,
     monthLabelOf,
     monthStartOf,
-    monthsInRange,
+    pruneCumulativeSales,
     rebuildMonth,
     rebuildMonthsForDays,
     round2,
+    wormMonths,
     type DailySalesAggregate,
 } from './cumulativeSalesHelpers';
 
@@ -58,25 +60,32 @@ describe('calendar helpers', () => {
         expect(daysInMonth(utc('2028-02-01'))).toBe(29); // leap year
     });
 
-    test('monthsInRange spans year boundaries inclusively', () => {
-        expect(monthsInRange(utc('2025-11-15'), utc('2026-02-03')).map((d) => d.toISOString().slice(0, 7))).toEqual([
-            '2025-11',
-            '2025-12',
-            '2026-01',
-            '2026-02',
-        ]);
+});
+
+describe('the worm window', () => {
+    const months = (today: Date) => wormMonths(today).map((d) => d.toISOString().slice(0, 7));
+
+    test('is the month in progress and the two before it, oldest first', () => {
+        expect(months(TODAY)).toEqual(['2026-06', '2026-07', '2026-08']);
     });
 
-    test('monthsInRange copes with the range given backwards', () => {
-        expect(monthsInRange(utc('2026-03-01'), utc('2026-01-01')).map((d) => d.toISOString().slice(0, 7))).toEqual([
-            '2026-01',
-            '2026-02',
-            '2026-03',
-        ]);
+    test('spans a year boundary', () => {
+        expect(months(utc('2027-01-01'))).toEqual(['2026-11', '2026-12', '2027-01']);
+        expect(months(utc('2027-02-28'))).toEqual(['2026-12', '2027-01', '2027-02']);
     });
 
-    test('monthsInRange returns the single month when both ends share it', () => {
-        expect(monthsInRange(utc('2026-08-03'), utc('2026-08-29'))).toHaveLength(1);
+    test('turns over on the 1st, not before', () => {
+        expect(months(new Date('2026-08-31T23:59:59.999Z'))).toEqual(['2026-06', '2026-07', '2026-08']);
+        expect(months(utc('2026-09-01'))).toEqual(['2026-07', '2026-08', '2026-09']);
+    });
+
+    test('isWormMonth excludes the month before the window and any month ahead of today', () => {
+        expect(isWormMonth(utc('2026-05-01'), TODAY)).toBe(false);
+        expect(isWormMonth(utc('2026-06-01'), TODAY)).toBe(true);
+        expect(isWormMonth(utc('2026-08-01'), TODAY)).toBe(true);
+        expect(isWormMonth(utc('2026-09-01'), TODAY)).toBe(false);
+        // The month of last year that shares its name with this one.
+        expect(isWormMonth(utc('2025-08-01'), TODAY)).toBe(false);
     });
 });
 
@@ -434,6 +443,24 @@ describe('rebuildMonth', () => {
         expect(rows.filter((r) => r.monthLabel === 'Jul 2026')).toHaveLength(31);
     });
 
+    // Sale writers rebuild whatever month a write lands in, and invoices from
+    // long ago still get edited in Zoho. Writing those months put them on the
+    // worm beside the current three.
+    test('writes nothing for a month outside the worm window', async () => {
+        const { channel, product } = await seed();
+        await sale(channel.id, product.id, utc('2026-05-10'), 100, 'a');
+        await sale(channel.id, product.id, utc('2025-08-10'), 100, 'b');
+        await sale(channel.id, product.id, utc('2026-09-10'), 100, 'c');
+
+        // The month before the window, the same month a year earlier, and a
+        // month that hasn't started yet.
+        expect(await rebuildMonth(utc('2026-05-01'), TODAY, TODAY)).toBe(0);
+        expect(await rebuildMonth(utc('2025-08-01'), TODAY, TODAY)).toBe(0);
+        expect(await rebuildMonth(utc('2026-09-01'), TODAY, TODAY)).toBe(0);
+
+        expect(await models.cumulativeSales.findMany({})).toHaveLength(0);
+    });
+
     test('the month in progress stops at today', async () => {
         const { channel, product } = await seed();
         await sale(channel.id, product.id, utc('2026-08-03'), 100, 'a');
@@ -491,5 +518,69 @@ describe('rebuildMonthsForDays', () => {
 
     test('does nothing for no days', async () => {
         expect(await rebuildMonthsForDays([], TODAY)).toEqual([]);
+    });
+
+    test('skips days outside the worm window', async () => {
+        expect(await rebuildMonthsForDays(['2025-10-15', '2026-05-31', '2026-09-01'], TODAY)).toEqual([]);
+        expect(await models.cumulativeSales.findMany({})).toHaveLength(0);
+    });
+});
+
+describe('pruneCumulativeSales', () => {
+    beforeEach(resetDatabase);
+
+    // Rows for each month from May to September, built when each was inside the
+    // window, so that pruning as of TODAY (August) has a month either side of
+    // the window to remove.
+    const seedMonths = async () => {
+        const brand = await models.brand.create({ name: 'Brand A' });
+        const channel = await models.channel.create({ name: 'Channel 1' });
+        const product = await models.product.create({ name: 'PA', sku: 'CUM-A', brandId: brand.id });
+
+        for (const month of ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09']) {
+            await models.sale.create({
+                invoiceNumber: `INV-${month}`,
+                lineItemId: month,
+                lineKey: month,
+                channelId: channel.id,
+                productId: product.id,
+                date: utc(`${month}-02`),
+                quantity: 1,
+                price: 0,
+                netAmount: 10,
+            });
+            const builtOn = utc(`${month}-20`);
+            await rebuildMonth(utc(`${month}-01`), builtOn, builtOn);
+        }
+    };
+
+    const storedMonths = async () => [...new Set((await storedDays()).map((r) => r.month.slice(0, 7)))];
+
+    test('removes the months either side of the window and keeps the window', async () => {
+        await seedMonths();
+        expect(await storedMonths()).toEqual(['2026-05', '2026-06', '2026-07', '2026-08', '2026-09']);
+
+        const removed = await pruneCumulativeSales(TODAY);
+
+        // Each month was built on its own 20th, while in progress, so each
+        // holds 20 days: May's and September's go.
+        expect(removed).toBe(20 + 20);
+        expect(await storedMonths()).toEqual(['2026-06', '2026-07', '2026-08']);
+    });
+
+    test('retires the oldest month when the month turns', async () => {
+        await seedMonths();
+        await pruneCumulativeSales(TODAY);
+
+        await pruneCumulativeSales(utc('2026-09-01'));
+
+        expect(await storedMonths()).toEqual(['2026-07', '2026-08']);
+    });
+
+    test('removes nothing when the table holds only the window', async () => {
+        await seedMonths();
+        await pruneCumulativeSales(TODAY);
+
+        expect(await pruneCumulativeSales(TODAY)).toBe(0);
     });
 });

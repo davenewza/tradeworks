@@ -1,23 +1,19 @@
 import { RebuildCumulativeSales } from '@teamkeel/sdk';
-import { formatDay, monthsInRange, rebuildMonth } from '../lib/cumulativeSalesHelpers';
+import { formatDay, pruneCumulativeSales, rebuildMonth, wormMonths } from '../lib/cumulativeSalesHelpers';
 
-// Manual rebuild of the sales worm over a date range — used to backfill history,
-// or to repair a month older than the scheduled job covers whose rebuild failed
-// when its sales landed. Reads only local Sale rows, so it costs nothing against
-// the shared Zoho API quota and is safe to re-run.
-export default RebuildCumulativeSales({}, async (ctx, inputs) => {
+// Manual rebuild of the sales worm: the same work as the scheduled refresh,
+// for when it can't wait for the next run — e.g. to repair a month whose
+// rebuild failed when its sales landed. Reads only local Sale rows, so it costs
+// nothing against the shared Zoho API quota and is safe to re-run.
+export default RebuildCumulativeSales({}, async (ctx) => {
     const now = new Date();
-    const months = monthsInRange(inputs.start, inputs.end);
 
     const rebuilt: { key: string; value: number }[] = [];
     let totalRows = 0;
 
-    for (const monthStart of months) {
+    for (const monthStart of wormMonths(now)) {
         const monthKey = formatDay(monthStart).slice(0, 7);
 
-        // A step per month keeps each unit of work small and the whole backfill
-        // resumable — a long range that trips a timeout resumes at the month it
-        // failed on rather than starting over. Step names are stable across runs.
         const rows = await ctx.step(`rebuild-${monthKey}`, async () => {
             return await rebuildMonth(monthStart, now, now);
         });
@@ -26,13 +22,17 @@ export default RebuildCumulativeSales({}, async (ctx, inputs) => {
         totalRows += rows;
     }
 
+    const pruned = await ctx.step('prune', async () => {
+        return await pruneCumulativeSales(now);
+    });
+
     return ctx.complete({
         title: 'Cumulative sales rebuilt',
         content: [
             ctx.ui.display.keyValue({
                 data: [
-                    { key: 'Months rebuilt', value: months.length },
                     { key: 'Rows written', value: totalRows },
+                    { key: 'Rows outside the window removed', value: pruned },
                     ...rebuilt,
                 ],
             }),

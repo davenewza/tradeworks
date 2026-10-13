@@ -52,21 +52,6 @@ export function daysInMonth(date: Date): number {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
 }
 
-// Every month start touched by the range, inclusive of both ends. Order is
-// chronological regardless of which way round the inputs come.
-export function monthsInRange(start: Date, end: Date): Date[] {
-    const [from, to] = start.getTime() <= end.getTime() ? [start, end] : [end, start];
-    const last = monthStartOf(to).getTime();
-
-    const months: Date[] = [];
-    let cursor = monthStartOf(from);
-    while (cursor.getTime() <= last) {
-        months.push(cursor);
-        cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
-    }
-    return months;
-}
-
 // Money to cents. Daily figures are rounded before they're accumulated, so the
 // stored running total is exactly the sum of the daily values shown beside it.
 export function round2(value: number): number {
@@ -76,6 +61,31 @@ export function round2(value: number): number {
 // 'YYYY-MM-DD' in UTC, for binding against a Postgres `date` column.
 export function formatDay(date: Date): string {
     return date.toISOString().slice(0, 10);
+}
+
+// ─── The worm's window ──────────────────────────────────────────────────────
+
+// Calendar months the worm shows: the month in progress and the two before it.
+//
+// CumulativeSales holds exactly these months and nothing else, which is what
+// keeps the chart to them: it plots every month the table holds. The window
+// can't live on the chart instead. Cube's relative ranges have no "this month
+// and the two before" (`last 3 months` leaves out the month in progress), and
+// a dashboard filter's default can only be a fixed pair of dates, which would
+// go stale at the next month end.
+export const WORM_MONTHS = 3;
+
+// The month starts in the worm's window as of `today`, oldest first.
+export function wormMonths(today: Date): Date[] {
+    const current = monthStartOf(today);
+    return Array.from({ length: WORM_MONTHS }, (_, i) => {
+        return new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - (WORM_MONTHS - 1 - i), 1));
+    });
+}
+
+export function isWormMonth(monthStart: Date, today: Date): boolean {
+    const month = monthStartOf(monthStart).getTime();
+    return wormMonths(today).some((m) => m.getTime() === month);
 }
 
 // ─── Building the series ────────────────────────────────────────────────────
@@ -221,7 +231,17 @@ export async function loadDailySalesAggregates(
 // unique key. The sales are read AFTER the lock is taken, so a rebuild that
 // queued behind another still sees every sale committed before it ran, and the
 // last rebuild to finish always reflects the latest data.
+//
+// A month outside the worm's window is never written, and comes back as 0.
+// Sale writers rebuild whatever month a write lands in, and invoices from long
+// ago still get edited in Zoho, so without this one edit would put its month
+// back on the chart. A month that ages out of the window is cleared by
+// pruneCumulativeSales, not here.
 export async function rebuildMonth(monthStart: Date, today: Date, now: Date): Promise<number> {
+    if (!isWormMonth(monthStart, today)) {
+        return 0;
+    }
+
     const nextMonth = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
     const monthLockKey = monthStart.getUTCFullYear() * 100 + monthStart.getUTCMonth() + 1;
 
@@ -261,23 +281,46 @@ export async function rebuildMonth(monthStart: Date, today: Date, now: Date): Pr
     });
 }
 
-// The months (UTC month starts) a set of calendar days ('YYYY-MM-DD') fall in,
-// each once, oldest first.
-export function monthStartsOfDays(days: Iterable<string>): Date[] {
-    const months = [...new Set([...days].map((day) => day.slice(0, 7)))].sort();
-    return months.map((month) => new Date(`${month}-01T00:00:00.000Z`));
+// Delete every row from a month outside the worm's window, and return how many
+// went. This is what retires the oldest month at each month turn: no sale write
+// touches it again, so nothing else would. Never contends with rebuildMonth,
+// which only ever writes months inside the window.
+export async function pruneCumulativeSales(today: Date): Promise<number> {
+    const months = wormMonths(today);
+    // Bound as 'YYYY-MM-DD' text for the same reason rebuildMonth binds its
+    // dates that way.
+    const first = formatDay(months[0]) as unknown as Date;
+    const last = formatDay(months[months.length - 1]) as unknown as Date;
+
+    const result = await useDatabase()
+        .deleteFrom('cumulative_sales')
+        .where((eb) => eb.or([eb('monthStart', '<', first), eb('monthStart', '>', last)]))
+        .executeTakeFirst();
+
+    return Number(result.numDeletedRows);
 }
 
-// Rebuild every month the given calendar days fall in. This is how sale writers
-// keep the worm current: they report the days their writes landed on (and moved
-// off), and those months are rebuilt straight away rather than waiting for the
-// scheduled refresh.
+// The months (UTC month starts) a set of calendar days ('YYYY-MM-DD') fall in,
+// each once, oldest first — only those in the worm's window as of `today`,
+// since rebuilding any other month writes nothing. Leaving them out keeps a
+// sale writer from reporting a month rebuilt when it wasn't.
+export function wormMonthsOfDays(days: Iterable<string>, today: Date): Date[] {
+    const months = [...new Set([...days].map((day) => day.slice(0, 7)))].sort();
+    return months
+        .map((month) => new Date(`${month}-01T00:00:00.000Z`))
+        .filter((monthStart) => isWormMonth(monthStart, today));
+}
+
+// Rebuild every worm month the given calendar days fall in. This is how sale
+// writers keep the worm current: they report the days their writes landed on
+// (and moved off), and those months are rebuilt straight away rather than
+// waiting for the scheduled refresh.
 export async function rebuildMonthsForDays(
     days: Iterable<string>,
     now: Date,
 ): Promise<{ month: string; rows: number }[]> {
     const rebuilt: { month: string; rows: number }[] = [];
-    for (const monthStart of monthStartsOfDays(days)) {
+    for (const monthStart of wormMonthsOfDays(days, now)) {
         const rows = await rebuildMonth(monthStart, now, now);
         rebuilt.push({ month: formatDay(monthStart).slice(0, 7), rows });
     }
