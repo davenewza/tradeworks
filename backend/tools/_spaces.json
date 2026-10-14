@@ -435,6 +435,16 @@
           "display_order": 1
         },
         "hidden": false
+      },
+      {
+        "id": "action-calculate-shipping",
+        "link": {
+          "tool_id": "calculate-shipping",
+          "title": "Shipping calculator",
+          "description": "Price delivery of products to an address — the same boxes and courier rates as a customer quote",
+          "display_order": 2
+        },
+        "hidden": false
       }
     ],
     "groups": [

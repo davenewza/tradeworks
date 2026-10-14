@@ -170,11 +170,11 @@ export interface MappedRate {
     serviceLevel: {
         code: string;
         name: string;
-        description: string | undefined;
-        deliveryDateFrom: string | undefined;
-        deliveryDateTo: string | undefined;
-        collectionDate: string | undefined;
-        collectionCutOffTime: string | undefined;
+        description?: string;
+        deliveryDateFrom?: string;
+        deliveryDateTo?: string;
+        collectionDate?: string;
+        collectionCutOffTime?: string;
     };
     pricing: {
         rate: number;
@@ -183,9 +183,9 @@ export interface MappedRate {
         vatPercentage: number;
     };
     weights: {
-        chargedWeight: number | undefined;
-        actualWeight: number | undefined;
-        volumetricWeight: number | undefined;
+        chargedWeight?: number;
+        actualWeight?: number;
+        volumetricWeight?: number;
     };
 }
 
