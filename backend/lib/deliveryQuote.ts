@@ -22,7 +22,8 @@ import {
 // customer portal's quotes use (calculateEquipmentBoxes, calculateDelivery).
 
 export interface DeliveryQuoteAddress {
-    addressLine1: string;
+    // Required by getDeliveryRates; optional in the Console's calculator
+    addressLine1?: string | null;
     addressLine2?: string | null;
     suburb: string;
     city: string;
@@ -82,9 +83,7 @@ export function toShipLogicAddress(address: DeliveryQuoteAddress): ShipLogicAddr
     return {
         type: 'business',
         company: address.organisation ?? '',
-        street_address: address.addressLine2
-            ? `${address.addressLine1}, ${address.addressLine2}`
-            : address.addressLine1,
+        street_address: [address.addressLine1, address.addressLine2].filter((line) => !!line).join(', '),
         local_area: address.suburb,
         city: address.city,
         zone: address.province,

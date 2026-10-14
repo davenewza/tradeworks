@@ -272,4 +272,14 @@ describe('toShipLogicAddress', () => {
             code: '7708'
         });
     });
+
+    test('sends whichever street lines are filled in, or none', () => {
+        const base = { suburb: 'Claremont', city: 'Cape Town', province: 'Western Cape', postalCode: '7708' };
+
+        expect(toShipLogicAddress({ ...base, addressLine1: '1 Main Rd', addressLine2: 'Unit 4' }).street_address).toBe(
+            '1 Main Rd, Unit 4'
+        );
+        expect(toShipLogicAddress({ ...base, addressLine1: null, addressLine2: 'Unit 4' }).street_address).toBe('Unit 4');
+        expect(toShipLogicAddress({ ...base, addressLine1: '', addressLine2: null }).street_address).toBe('');
+    });
 });

@@ -96,7 +96,8 @@ export default CalculateShipping(config, async (ctx) => {
                 }),
                 ctx.ui.inputs.text('addressLine1', {
                     label: 'Street address',
-                    defaultValue: shipment?.address.addressLine1,
+                    optional: true,
+                    defaultValue: shipment?.address.addressLine1 ?? undefined,
                 }),
                 ctx.ui.inputs.text('addressLine2', {
                     label: 'Unit, floor or building',

@@ -40,8 +40,9 @@ parcels and rates. The portal's actions run the same steps through the same
    volume, or warns that its dimensions or weight are missing.
 2. Choose cardboard boxes or plastic equipment boxes. Plastic boxes are
    charged per box on top of the delivery fee, as on a customer quote.
-3. Enter the delivery address. Pick the province from the list so the courier
-   gets its exact name.
+3. Enter the delivery address. The street address is optional: the suburb,
+   city, province and postal code are required. Pick the province from the list
+   so the courier gets its exact name.
 4. **Calculate.** The results page shows:
    - the shipping total: the cheapest delivery fee, plus any box charge, plus VAT;
    - the parcels, actual weight and the courier's charged weight;
