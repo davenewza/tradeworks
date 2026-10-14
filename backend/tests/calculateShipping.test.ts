@@ -59,6 +59,7 @@ describe('CalculateShipping', () => {
         expect(page.step.name).toBe('shipment-0');
         expect(element(page.ui, 'ui.input.dataGrid', 'lines').data).toEqual([{ sku: null, quantity: 1 }]);
         expect(element(page.ui, 'ui.select.one', 'boxType').defaultValue).toBe(BoxType.Cardboard);
+        expect(element(page.ui, 'ui.input.text', 'addressLine1').optional).toBe(true);
 
         run = await authed.putStepValues(
             run.id,
@@ -108,7 +109,7 @@ describe('CalculateShipping', () => {
         expect(result.options).toEqual([{ value: 'W-1', label: 'W-1 · Widget', description: '0.5 kg · 2 L' }]);
     });
 
-    test('no packaging for the chosen box type is reported as such', async () => {
+    test('no packaging for the chosen box type is reported as such, with no street address given', async () => {
         const brand = await models.brand.create({ name: 'Acme' });
         await models.product.create({
             name: 'Widget', sku: 'W-1', brandId: brand.id,
@@ -121,10 +122,11 @@ describe('CalculateShipping', () => {
         run = await authed.putStepValues(
             run.id,
             page.step.id,
-            { lines: [{ sku: 'W-1', quantity: 1 }], boxType: BoxType.Cardboard, ...ADDRESS },
+            { lines: [{ sku: 'W-1', quantity: 1 }], boxType: BoxType.Cardboard, ...ADDRESS, addressLine1: '' },
             'calculate',
         );
 
+        // Past the shipment page: a street address is not required to quote.
         page = await pendingPage(authed, run.id);
         expect(page.step.name).toBe('rates-0');
         expect(element(page.ui, 'ui.display.markdown').content).toBe('- No Cardboard equipment boxes are configured');

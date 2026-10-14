@@ -52,7 +52,6 @@ export interface ShipmentPageData {
 }
 
 const REQUIRED_ADDRESS_FIELDS: Array<[keyof ShipmentPageData, string]> = [
-    ['addressLine1', 'street address'],
     ['suburb', 'suburb'],
     ['city', 'city'],
     ['province', 'province'],
@@ -92,7 +91,7 @@ export function readShipmentPage(data: ShipmentPageData): Shipment {
         boxType: data.boxType === BoxType.PlasticEquipment ? BoxType.PlasticEquipment : BoxType.Cardboard,
         address: {
             organisation: optional(data.organisation),
-            addressLine1: (data.addressLine1 ?? '').trim(),
+            addressLine1: optional(data.addressLine1),
             addressLine2: optional(data.addressLine2),
             suburb: (data.suburb ?? '').trim(),
             city: (data.city ?? '').trim(),

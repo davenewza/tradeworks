@@ -97,11 +97,15 @@ describe('validateShipmentPage', () => {
     test('names every blank required address field', () => {
         expect(
             validateShipmentPage({ lines: [{ sku: 'W-1', quantity: 1 }], addressLine1: ' ', suburb: 'Claremont', city: 'Cape Town' })
-        ).toBe('Enter the street address, province, postal code.');
+        ).toBe('Enter the province, postal code.');
     });
 
     test('accepts a complete shipment', () => {
         expect(validateShipmentPage({ ...ADDRESS_FIELDS, lines: [{ sku: 'W-1', quantity: '2' }] })).toBe(true);
+    });
+
+    test('accepts a shipment without a street address', () => {
+        expect(validateShipmentPage({ ...ADDRESS_FIELDS, addressLine1: '', lines: [{ sku: 'W-1', quantity: 1 }] })).toBe(true);
     });
 });
 
@@ -133,6 +137,10 @@ describe('readShipmentPage', () => {
                 country: 'ZA'
             }
         });
+    });
+
+    test('leaves a blank street address out', () => {
+        expect(readShipmentPage({ ...ADDRESS_FIELDS, addressLine1: '  ', lines: [] }).address.addressLine1).toBeNull();
     });
 
     test('packs in cardboard unless plastic was chosen', () => {
