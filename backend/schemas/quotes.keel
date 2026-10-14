@@ -161,6 +161,15 @@ enum QuoteStatus {
     Approved
 }
 
+// The Console's shipping calculator: products, a box type and an address in,
+// the boxes, parcels and every courier rate out. Quotes through the same
+// lib/deliveryQuote as getDeliveryRates below, so the Console, the external
+// API and a customer quote all pack and price a shipment the same way.
+// Nothing is written.
+flow CalculateShipping {
+    @permission(roles: [Operator])
+}
+
 // Messages for the external delivery-rates API (getDeliveryRates), consumed
 // by external services authenticating with the X-API-KEY header.
 
