@@ -1,0 +1,9 @@
+{
+  "id": "create-discount-tier",
+  "action_name": "createDiscountTier",
+  "inputs": {
+    "$.priceList": {
+      "visible": false
+    }
+  }
+}
