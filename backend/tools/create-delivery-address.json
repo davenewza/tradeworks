@@ -1,9 +1,0 @@
-{
-  "id": "create-delivery-address",
-  "action_name": "createDeliveryAddress",
-  "inputs": {
-    "$.customer": {
-      "visible": false
-    }
-  }
-}
