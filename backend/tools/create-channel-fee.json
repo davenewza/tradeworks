@@ -2,6 +2,9 @@
   "id": "create-channel-fee",
   "action_name": "createChannelFee",
   "inputs": {
+    "$.channel": {
+      "visible": false
+    },
     "$.feeType": {
       "display_name": "Description"
     },
