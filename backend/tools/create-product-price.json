@@ -4,9 +4,6 @@
   "inputs": {
     "$.priceInclVat": {
       "display_name": "Price incl VAT"
-    },
-    "$.priceList": {
-      "visible": false
     }
   }
 }
